@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: construction-marketplace-backend
+    env: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # Define your environment variables in the Render dashboard or add them here (avoid committing secrets):
+      # - key: MONGO_URI
+      #   sync: false
+      # - key: CLOUDINARY_URL
+      #   sync: false
