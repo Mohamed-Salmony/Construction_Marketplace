@@ -234,9 +234,9 @@ export default function ProductDetails({
         )
       : 0;
 
-  // Normalize availability in case product from other pages lacks these fields
-  const normalizedInStock = !!product && ((product as any).inStock !== false) && ((((product as any).stockCount ?? (product as any).stock ?? 1) as number) > 0);
-  const normalizedStockCount = (product as any)?.stockCount ?? (product as any)?.stock ?? 99;
+  // Normalize availability strictly based on actual values; avoid any placeholder defaults
+  const normalizedInStock = !!product && ((product as any).inStock !== false) && ((((product as any).stockCount ?? (product as any).stock ?? 0) as number) > 0);
+  const normalizedStockCount = (product as any)?.stockCount ?? (product as any)?.stock ?? 0;
 
   const textName = getText(product?.name || '').toLowerCase();
   const textCat = '';
@@ -697,10 +697,10 @@ export default function ProductDetails({
                 </div>
               )}
 
-              {/* Subtotal reflecting quantity and installation per unit */}
+              {/* Subtotal reflecting quantity and optional installation per unit */}
               <div className="flex items-center justify-between text-sm bg-muted/30 rounded-md px-3 py-2">
                 <span className="text-muted-foreground">
-                  {locale === 'ar' ? 'الإجمالي (يشمل التركيب إن وجد)' : 'Subtotal (incl. installation if selected)'}
+                  {locale === 'ar' ? 'الإجمالي' : 'Subtotal'}
                 </span>
                 <span className="font-semibold text-primary">
                   {subtotal} {currency}
@@ -794,33 +794,7 @@ export default function ProductDetails({
               <CardContent className="p-6">
                 <p className="mb-6">{getText(product.description)}</p>
 
-                <h3 className="font-medium mb-4">{t("features")}</h3>
-                <ul className="space-y-2">
-                  {product.features?.map((feature: string, index: number) => (
-                    <li key={index} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-500" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {product.installationTips && (
-                  <>
-                    <h3 className="font-medium mb-4 mt-6">
-                      {locale === 'en' ? 'Installation Tips' : 'نصائح التركيب'}
-                    </h3>
-                    <ol className="space-y-2">
-                      {product.installationTips.map((tip: string, index: number) => (
-                        <li key={index} className="flex gap-2">
-                          <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground text-sm rounded-full flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </>
-                )}
+                {/* Show only the actual product description as requested; remove generic features and installation tips */}
               </CardContent>
             </Card>
           </TabsContent>

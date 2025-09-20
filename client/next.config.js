@@ -73,6 +73,8 @@ const nextConfig = {
   async rewrites() {
     return [
       { source: '/:locale/icon.svg', destination: '/icon.svg' },
+      // Fix Vercel Insights path when locale prefixes are present (e.g., /ar/_vercel/insights/...)
+      { source: '/:locale/_vercel/insights/:path*', destination: '/_vercel/insights/:path*' },
       // Proxy API calls through the same origin to avoid cross-site CORS/cookie issues in production
       {
         source: '/api/:path*',
