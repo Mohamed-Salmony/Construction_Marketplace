@@ -18,7 +18,12 @@ export default function NotificationsPage(context: Partial<RouteContext>) {
       const r = await listMyNotifications();
       if (r.ok && r.data && (r.data as any).success) {
         const list = ((r.data as any).data || []) as any[];
-        setItems(list);
+        // Exclude any message-related notification types from the list
+        const filtered = list.filter((n:any)=> {
+          const tp = String(n.type || '').toLowerCase();
+          return tp && !tp.includes('message');
+        });
+        setItems(filtered);
       } else {
         setItems([]);
       }

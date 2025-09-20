@@ -84,7 +84,12 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
           const notif = await listMyNotifications({ unread: true });
           if (notif.ok && (notif.data as any)?.success) {
             const arr = (((notif.data as any).data) || []) as any[];
-            setVendorMsgCount(arr.length);
+            // Exclude any message-related notification types from the badge count
+            const filtered = arr.filter((n:any)=> {
+              const tp = String(n.type || '').toLowerCase();
+              return tp && !tp.includes('message');
+            });
+            setVendorMsgCount(filtered.length);
             return;
           }
         } catch { /* fall back below */ }
@@ -159,80 +164,29 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   const [lastChatTs, setLastChatTs] = useState<number>(0);
   const loadNotifications = async () => {
     try {
-      if (role === 'vendor') {
-        const [cntR, recentR, cntP, recentP] = await Promise.all([
-          getVendorMessageCount(),
-          getRecentVendorMessages(),
-          getVendorProjectMessageCount(),
-          getVendorProjectRecentMessages(),
-        ]);
-        const c1 = cntR.ok ? Number((cntR.data as any)?.count || 0) : 0;
-        const c2 = cntP.ok ? Number((cntP.data as any)?.count || 0) : 0;
-        setVendorMsgCount(c1 + c2);
-        const listR = (recentR.ok && Array.isArray(recentR.data)) ? (recentR.data as any[]) : [];
-        const listP = (recentP.ok && Array.isArray(recentP.data)) ? (recentP.data as any[]) : [];
-        const mappedR = listR.map((m:any)=> ({
-          type: 'rental',
-          title: (locale==='ar'? 'رسالة جديدة من عميل' : 'New customer message'),
-          message: m.message,
-          createdAt: m.at,
-          rentalId: m.rentalId,
-        }));
-        const mappedP = listP.map((m:any)=> ({
-          type: 'project',
-          title: (locale==='ar'? 'رسالة جديدة لمشروع' : 'New project message'),
-          message: m.message,
-          createdAt: m.at,
-          projectId: m.projectId,
-          conversationId: m.conversationId,
-        }));
-        // Exclude chat messages here; they will appear in the dedicated chat icon
-        const merged = [...mappedR, ...mappedP].sort((a:any,b:any)=> new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0,10);
-        setNotifications(merged);
-        return;
-      } else if (role === 'worker') {
-        // For technicians, keep notifications popover free of chat; chat will be in chat icon
-        setVendorMsgCount(0);
+      // Use notifications API and exclude any message-related items
+      const resp = await listMyNotifications();
+      if (resp.ok && (resp.data as any)?.success) {
+        const list = (((resp.data as any).data) || []) as any[];
+        const filtered = list
+          .filter((n:any)=> {
+            const tp = String(n.type || '').toLowerCase();
+            return tp && !tp.includes('message');
+          })
+          .map((n:any)=> ({
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            createdAt: n.createdAt,
+            data: n.data,
+            _id: n._id || n.id,
+            read: !!n.read,
+          }))
+          .sort((a:any,b:any)=> new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 10);
+        setNotifications(filtered);
+      } else {
         setNotifications([]);
-        return;
-      } else if (role === 'customer' || isCustomerRole) {
-        const [cntR, recentR, cntP, recentP] = await Promise.all([
-          getCustomerMessageCount(),
-          getCustomerRecentMessages(),
-          getCustomerProjectMessageCount(),
-          getCustomerProjectRecentMessages(),
-        ]);
-        const c1 = cntR.ok ? Number((cntR.data as any)?.count || 0) : 0;
-        const c2 = cntP.ok ? Number((cntP.data as any)?.count || 0) : 0;
-        setVendorMsgCount(c1 + c2);
-        const listR = (recentR.ok && Array.isArray(recentR.data)) ? (recentR.data as any[]) : [];
-        const listP = (recentP.ok && Array.isArray(recentP.data)) ? (recentP.data as any[]) : [];
-        const mappedR = listR.map((m:any)=> ({
-          type: 'rental',
-          title: (locale==='ar'? 'رد جديد من التاجر (تأجير)' : 'New merchant reply (Rental)'),
-          message: m.message,
-          createdAt: m.at,
-          rentalId: m.rentalId,
-        }));
-        const mappedP = listP.map((m:any)=> ({
-          type: 'project',
-          title: (locale==='ar'? 'رد جديد من التاجر (مشروع)' : 'New merchant reply (Project)'),
-          message: m.message,
-          createdAt: m.at,
-          projectId: m.projectId,
-          conversationId: m.conversationId,
-        }));
-        // Exclude chat messages for customers in notifications
-        const merged = [...mappedR, ...mappedP].sort((a:any,b:any)=> new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0,10);
-        setNotifications(merged);
-        return;
-      }
-      // Fallback to localStorage generic notifications
-      if (typeof window !== 'undefined') {
-        const raw = window.localStorage.getItem('notifications');
-        const list = raw ? JSON.parse(raw) : [];
-        const arr = Array.isArray(list) ? list : [];
-        setNotifications(arr.slice(0, 5));
       }
     } catch { setNotifications([]); }
   };
