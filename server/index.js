@@ -33,9 +33,7 @@ import notificationsRoutes from './routes/notifications.routes.js';
 import commissionsRoutes from './routes/commissions.routes.js';
 import techniciansRoutes from './routes/technicians.routes.js';
 import reviewsRoutes from './routes/reviews.routes.js';
-
 import { errorHandler, notFound } from './middlewares/error.js';
-import { seedAdmin, seedCategories } from './utils/seed.js';
 
 dotenv.config();
 configureCloudinary();
@@ -153,18 +151,6 @@ try {
 } catch (e) {
   console.error('[startup] DB connection failed:', e);
   process.exit(1);
-}
-// Dev data seeders (create static Admin if configured)
-try {
-  if (process.env.SEED_ADMIN === 'true' || (process.env.NODE_ENV !== 'production' && process.env.SEED_ADMIN !== 'false')) {
-    try { await seedAdmin(); } catch (e) { console.warn('[seed] admin seeding skipped:', e?.message || e); }
-  }
-  // Optionally seed default Categories for development/testing
-  if (process.env.SEED_CATEGORIES === 'true' || (process.env.NODE_ENV !== 'production' && process.env.SEED_CATEGORIES !== 'false')) {
-    try { await seedCategories(); } catch (e) { console.warn('[seed] categories seeding skipped:', e?.message || e); }
-  }
-} catch (e) {
-  console.warn('[startup] seeders errored:', e?.message || e);
 }
 
 // Health
