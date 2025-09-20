@@ -22,7 +22,7 @@ const nextConfig = {
       // Allow API-served absolute image URLs (production)
       {
         protocol: 'https',
-        hostname: 'construction-market.onrender.com',
+        hostname: 'construction-marketplace.onrender.com',
       },
     ],
   },
@@ -73,6 +73,11 @@ const nextConfig = {
   async rewrites() {
     return [
       { source: '/:locale/icon.svg', destination: '/icon.svg' },
+      // Proxy API calls through the same origin to avoid cross-site CORS/cookie issues in production
+      {
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/:path*`,
+      },
     ];
   },
 }

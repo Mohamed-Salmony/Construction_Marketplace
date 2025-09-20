@@ -86,16 +86,19 @@ export async function apiFetch<T>(path: string, options?: {
   cache?: RequestCache; // e.g., 'no-store' to bypass 304 caches
 }): Promise<{ data: T | null; ok: boolean; status: number; error?: any }> {
 
-  const url = path.startsWith('http')
-    ? path
-    : (() => {
-        const hasApiOnBase = /\/api\/?$/.test(RUNTIME_BASE);
-        const startsWithApi = path.startsWith('/api');
-        const base = hasApiOnBase && startsWithApi
-          ? RUNTIME_BASE.replace(/\/api\/?$/, '')
-          : RUNTIME_BASE;
-        return `${base}${path.startsWith('/') ? path : `/${path}`}`;
-      })();
+  const url = (() => {
+    if (path.startsWith('http')) return path;
+    // If in the browser and calling /api, prefer same-origin so Next rewrites can proxy to backend
+    if (typeof window !== 'undefined' && path.startsWith('/api')) {
+      return path;
+    }
+    const hasApiOnBase = /\/api\/?$/.test(RUNTIME_BASE);
+    const startsWithApi = path.startsWith('/api');
+    const base = hasApiOnBase && startsWithApi
+      ? RUNTIME_BASE.replace(/\/api\/?$/, '')
+      : RUNTIME_BASE;
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  })();
   const isForm = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(isForm ? {} : { 'Content-Type': 'application/json' }),

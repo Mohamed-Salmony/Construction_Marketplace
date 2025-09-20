@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { getToken } from './auth';
 
 export type NotificationDto = {
   id?: string;
@@ -14,6 +15,10 @@ export type NotificationDto = {
 };
 
 export async function listMyNotifications(opts: { unread?: boolean } = {}) {
+  // Short-circuit if not authenticated to avoid spamming 401s on public pages
+  if (!getToken()) {
+    return { ok: true, status: 200, data: { success: true, data: [] } as any };
+  }
   const qs = opts.unread ? '?unread=true' : '';
   return api.get<{ success: boolean; data: NotificationDto[] }>(`/api/Notifications/mine${qs}`, { auth: true });
 }
