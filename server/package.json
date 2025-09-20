@@ -2,8 +2,12 @@
   "name": "construction-marketplace-backend",
   "version": "1.0.0",
   "description": "Backend for Construction Marketplace (Express + MongoDB + JWT + Multer + Cloudinary)",
+  "license": "MIT",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js"
@@ -21,7 +25,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.6.3",
     "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^2.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
