@@ -4,8 +4,8 @@ services:
     env: node
     rootDir: server
     plan: free
-    buildCommand: npm ci --omit=dev
-    startCommand: npm start
+    buildCommand: yarn install --frozen-lockfile || yarn install
+    startCommand: yarn start
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
