@@ -4,7 +4,7 @@ services:
     env: node
     rootDir: server
     plan: free
-    buildCommand: yarn install --frozen-lockfile || yarn install
+    buildCommand: yarn install --frozen-lockfile --no-emoji --no-progress --silent || yarn install --no-emoji --no-progress --silent
     startCommand: yarn start
     autoDeploy: true
     envVars:
