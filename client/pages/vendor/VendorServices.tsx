@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -30,7 +30,7 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
     locale === 'ar' ? 'يرجى الانتظار' : 'Please wait'
   );
 
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     setFetchError(null);
     setLoading(true);
     try {
@@ -49,9 +49,9 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
       setLoading(false);
       if (firstLoadRef.current) { hideFirstOverlay(); firstLoadRef.current = false; }
     }
-  };
+  }, [locale, hideFirstOverlay]);
 
-  useEffect(() => { void loadServices(); }, []);
+  useEffect(() => { void loadServices(); }, [loadServices]);
 
 
   const labelForServiceType = (id: string) => {

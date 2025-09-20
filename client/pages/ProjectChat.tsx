@@ -17,6 +17,9 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     isAr ? 'جاري تحميل المحادثة' : 'Loading chat',
     isAr ? 'يرجى الانتظار' : 'Please wait'
   );
+  // Extract stable user role and id to avoid complex expressions in deps
+  const userRole = String((context as any)?.user?.role || '').toLowerCase();
+  const userId = String((context as any)?.user?.id || '');
 
   const [projectId, setProjectId] = useState<number | null>(null);
   const [merchantId, setMerchantId] = useState<string>('');
@@ -27,8 +30,11 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
   const [messages, setMessages] = useState<Array<{ id: number; from: string; text: string; ts: number }>>([]);
   const [text, setText] = useState<string>('');
   const boxRef = useRef<HTMLDivElement | null>(null);
+  const firstInitRef = useRef(false);
 
   useEffect(() => {
+    if (firstInitRef.current) return;
+    firstInitRef.current = true;
     if (typeof window === 'undefined') return;
     // Read from localStorage
     const pidLs = Number(window.localStorage.getItem('project_chat_project_id') || '') || null;
@@ -53,11 +59,9 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     // Determine merchant id to use now (avoid stale state inside async)
     let midUsed = midLs;
     try {
-      const role = String((context as any)?.user?.role || '').toLowerCase();
-      const myId = String((context as any)?.user?.id || '');
-      if (!midUsed && role === 'vendor' && myId) {
-        midUsed = myId;
-        setMerchantId(myId);
+      if (!midUsed && userRole === 'vendor' && userId) {
+        midUsed = userId;
+        setMerchantId(userId);
       }
     } catch {}
     (async () => {
@@ -109,7 +113,7 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     };
     window.addEventListener('storage', onStorage);
     return () => { window.removeEventListener('storage', onStorage); };
-  }, []);
+  }, [hideFirstOverlay, userRole, userId, context]);
 
   useEffect(() => {
     (async () => {
@@ -117,9 +121,9 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
         if (!conversationId) return;
         const c = await getProjectConversation(conversationId);
         if (c.ok && c.data) {
-          setMerchantId((c.data as any).merchantId || merchantId);
+          setMerchantId((prev) => String((c.data as any).merchantId || '') || prev);
           setMerchantName((c.data as any).merchantName || '');
-          setCustomerId((c.data as any).customerId || customerId);
+          setCustomerId((prev) => String((c.data as any).customerId || '') || prev);
           setCustomerName((c.data as any).customerName || '');
         }
       } catch {}
@@ -182,8 +186,8 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
   };
 
   // Determine current user and role to render labels and bubble alignment correctly
-  const role = String((context as any)?.user?.role || '').toLowerCase();
-  const myId = String((context as any)?.user?.id || '');
+  const role = userRole;
+  const myId = userId;
   const isVendor = role === 'vendor' || role === 'merchant';
 
   return (

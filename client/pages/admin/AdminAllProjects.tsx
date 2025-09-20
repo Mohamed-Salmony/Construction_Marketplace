@@ -80,7 +80,7 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     }
   }, [query, isAr]);
 
-  React.useEffect(() => { (async ()=> { await load(); hideFirstOverlay(); })(); }, [load]);
+  React.useEffect(() => { (async ()=> { await load(); hideFirstOverlay(); })(); }, [load, hideFirstOverlay]);
 
   const filtered = React.useMemo(() => {
     const s = status;

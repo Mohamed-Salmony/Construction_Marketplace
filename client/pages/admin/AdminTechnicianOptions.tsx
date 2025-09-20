@@ -32,7 +32,7 @@ export default function AdminTechnicianOptions(props: Partial<RouteContext>) {
       } finally { if (!cancelled) hideFirstOverlay(); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [hideFirstOverlay]);
 
   const addItem = () => {
     const v = newItem.trim();

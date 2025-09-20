@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { Search, Package, Plus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -100,7 +101,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
       } finally { if (!cancelled) { try { hideFirstOverlay(); } catch {} } }
     })();
     return () => { cancelled = true; };
-  }, [locale]);
+  }, [locale, hideFirstOverlay]);
 
   // Load commission rates for rentals (uses products commission rate)
   useEffect(() => {
@@ -512,8 +513,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                       <div className="mt-2 flex flex-wrap gap-2">
                         {images.map((src, idx)=> (
                           <div key={idx} className="relative w-16 h-16 border rounded overflow-hidden bg-white">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={src} alt={`img-${idx}`} className="w-full h-full object-cover" />
+                            <Image src={src} alt={`img-${idx}`} width={64} height={64} className="w-full h-full object-cover" />
                             <button
                               type="button"
                               className="absolute -top-1 -right-1 bg-white/90 border rounded-full w-5 h-5 text-xs"
@@ -618,11 +618,18 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                   <Card key={rental.id} className="group hover:shadow-lg transition-all duration-300 relative">
                     <CardContent className="p-4">
                       <div className="relative mb-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         {(() => {
                           const fallback = (myProducts || []).find((p:any)=> String(p.id) === String(rental.productId))?.image || '';
                           const src = rental.imageUrl || fallback || '';
-                          return <img src={src} alt={String(rental.productName || '')} className="w-full h-40 object-cover rounded bg-gray-100" />;
+                          return (
+                            <Image
+                              src={src || '/placeholder.png'}
+                              alt={String(rental.productName || '')}
+                              width={800}
+                              height={400}
+                              className="w-full h-40 object-cover rounded bg-gray-100"
+                            />
+                          );
                         })()}
                         <span className="absolute top-2 right-2 text-xs bg-primary text-primary-foreground rounded px-2 py-0.5">{locale==='ar'? 'عقد' : 'Contract'}</span>
                       </div>

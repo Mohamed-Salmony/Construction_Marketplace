@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import Header from '../../components/Header';
 import type { RouteContext } from '../../components/Router';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -95,8 +95,7 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
   const [profileImgError, setProfileImgError] = useState(false);
   const [docImgError, setDocImgError] = useState(false);
 
-  useEffect(() => { (async () => { await Promise.all([loadVendors(), loadPending()]); hideFirstOverlay(); })(); }, []);
-  const loadVendors = async () => {
+  const loadVendors = useCallback(async () => {
     try {
       const res = await adminGetUsers({ role: 'Merchant' });
       if (res.ok && res.data && Array.isArray((res.data as any).items)) {
@@ -110,7 +109,7 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
         setRows(list);
       } else setRows([]);
     } catch { setRows([]); }
-  };
+  }, []);
 
   const openView = async (userId: string) => {
     setViewOpen(true); setViewLoading(true); setViewError(null); setViewUser(null);
@@ -127,13 +126,15 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
     }
     finally { setViewLoading(false); }
   };
-  const loadPending = async () => {
+  const loadPending = useCallback(async () => {
     try {
       const r = await getPendingMerchants();
       if (r.ok && r.data && Array.isArray((r.data as any).items)) setPendingVendors((r.data as any).items);
       else setPendingVendors([]);
     } catch { setPendingVendors([]); }
-  };
+  }, []);
+
+  useEffect(() => { (async () => { await Promise.all([loadVendors(), loadPending()]); hideFirstOverlay(); })(); }, [loadVendors, loadPending, hideFirstOverlay]);
 
   const filtered = rows.filter(r => {
     const s = search.trim().toLowerCase();

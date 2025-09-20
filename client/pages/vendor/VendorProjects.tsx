@@ -97,7 +97,7 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
       } catch { setUserProjects([]); }
       finally { try { hideFirstOverlay(); } catch {} }
     })();
-  }, []);
+  }, [hideFirstOverlay]);
 
   // Load commission rates for projects (merchants)
   useEffect(() => {

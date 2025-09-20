@@ -23,6 +23,10 @@ export default function RootLayout({
   
   return (
     <html suppressHydrationWarning lang={locale} dir={isRTL ? 'rtl' : 'ltr'}>
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/favicon.ico" />
+      </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
         <Toaster position="top-center" richColors />

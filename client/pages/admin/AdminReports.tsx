@@ -108,7 +108,7 @@ export default function AdminReports({ setCurrentPage, ...context }: Partial<Rou
         console.error('Failed to load reports data', e);
       } finally { hideFirstOverlay(); }
     })();
-  }, [locale]);
+  }, [locale, hideFirstOverlay]);
   return (
     <div className="min-h-screen bg-background">
       <Header {...context} />

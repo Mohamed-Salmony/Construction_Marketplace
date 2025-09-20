@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
   Filter,
@@ -183,7 +183,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
     } catch { return null; }
   }
 
-  function hasAnyAuth(): boolean {
+  const hasAnyAuth = useCallback((): boolean => {
     try {
       if (typeof window === 'undefined') return false;
       if (getAuthToken()) return true;
@@ -191,7 +191,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       const authCookieKeys = ['auth_token','token','access_token','jwt','.AspNetCore.Cookies'];
       return authCookieKeys.some(k => cookieStr.includes(`${k}=`));
     } catch { return false; }
-  }
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -218,7 +218,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', onFocus);
     };
-  }, []);
+  }, [hasAnyAuth]);
 
   // Load admin project catalog for resolving accessory names per type
   useEffect(() => {
@@ -279,7 +279,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       finally { if (!cancelled) setLoadedMine(true); }
     })();
     return () => { cancelled = true; };
-  }, [hasToken, isVendor, currentUserId, locale]);
+  }, [hasToken, isVendor, currentUserId, locale, hasAnyAuth]);
 
   // Fetch open projects from backend (read-only showcase)
   useEffect(() => {
@@ -441,11 +441,11 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
   useEffect(() => { setFiltered([] as any); }, [projects, searchTerm, selectedCategory, selectedStacks, budgetRange, sortBy, locale]);
 
   // Fixed price per m² per product type (SAR)
-  const fixedPricePerType: Record<string, number> = {
+  const fixedPricePerType: Record<string, number> = useMemo(() => ({
     door: 500,
     window: 400,
     railing: 380,
-  };
+  }), []);
 
   useEffect(() => {
     if (autoPrice) {
@@ -456,7 +456,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       const calc = fixedPricePerType[ptype] ?? 0;
       setPricePerMeter(calc);
     }
-  }, [autoPrice, ptype]);
+  }, [autoPrice, ptype, fixedPricePerType]);
 
   const isComplete = Boolean(ptype) && Boolean(material) && width > 0 && height > 0 && quantity > 0 && pricePerMeter > 0;
 

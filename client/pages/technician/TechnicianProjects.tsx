@@ -54,7 +54,7 @@ export default function TechnicianProjects({ setCurrentPage, ...context }: Props
     })().finally(() => {
       (context as any)?.hideLoading?.();
     });
-  }, []);
+  }, [context, isAr]);
 
   // Load my offers for submitted set
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function TechnicianProjects({ setCurrentPage, ...context }: Props
     })().finally(() => {
       (context as any)?.hideLoading?.();
     });
-  }, [technicianId]);
+  }, [technicianId, context, isAr]);
 
   const labelForProductType = (id: string) => {
     const map: any = {

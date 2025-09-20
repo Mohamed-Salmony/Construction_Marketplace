@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Header from '../../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -73,7 +74,7 @@ export default function AdminProductOptions(props: Partial<RouteContext>) {
     };
     void load();
     return () => { mounted = false; };
-  }, [locale]);
+  }, [locale, hideFirstOverlay]);
 
   const handlePickNewImage = () => {
     newImageInputRef.current?.click();
@@ -272,7 +273,7 @@ export default function AdminProductOptions(props: Partial<RouteContext>) {
                   {newImageUploading ? (locale==='ar' ? '...جاري الرفع' : 'Uploading...') : (locale==='ar' ? 'اختيار صورة' : 'Choose Image')}
                 </Button>
                 {newImageUrl && (
-                  <img src={newImageUrl} alt="cat" className="h-10 w-10 object-cover rounded" />
+                  <Image src={newImageUrl} alt="cat" width={40} height={40} className="h-10 w-10 object-cover rounded" />
                 )}
                 <input ref={newImageInputRef} type="file" accept="image/*" hidden onChange={handleNewImageSelected} />
               </div>
@@ -311,7 +312,7 @@ export default function AdminProductOptions(props: Partial<RouteContext>) {
                   <div key={c.id} className="flex items-center justify-between p-3 border rounded-md">
                     <div className="flex items-center gap-3">
                       {c.imageUrl && (
-                        <img src={c.imageUrl} alt={c.nameAr || c.nameEn} className="h-10 w-10 object-cover rounded-md border" />
+                        <Image src={c.imageUrl} alt={c.nameAr || c.nameEn} width={40} height={40} className="h-10 w-10 object-cover rounded-md border" />
                       )}
                       <div>
                         <div className="font-medium">{c.nameAr}</div>
@@ -366,7 +367,7 @@ export default function AdminProductOptions(props: Partial<RouteContext>) {
                   <Button type="button" variant="outline" onClick={handlePickEditImage} disabled={editUploading}>
                     {editUploading ? (locale==='ar' ? '...جاري الرفع' : 'Uploading...') : (locale==='ar' ? 'اختيار صورة' : 'Choose Image')}
                   </Button>
-                  {editImageUrl && (<img src={editImageUrl} alt="cat" className="h-12 w-12 object-cover rounded border" />)}
+                  {editImageUrl && (<Image src={editImageUrl} alt="cat" width={48} height={48} className="h-12 w-12 object-cover rounded border" />)}
                   <Input value={editImageUrl} onChange={(e)=> setEditImageUrl(e.target.value)} placeholder={locale==='ar' ? 'أو ألصق رابط الصورة' : 'Or paste image URL'} />
                   <input ref={editImageInputRef} type="file" accept="image/*" hidden onChange={handleEditImageSelected} />
                 </div>

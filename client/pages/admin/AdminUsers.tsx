@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useTranslation } from '../../hooks/useTranslation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 
 import {
@@ -98,7 +98,7 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
     } finally { setActionLoadingId(null); }
   };
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     // Map filters to API query
     const roleParam = selectedRole === 'all' ? undefined : (selectedRole === 'customer' ? 'Customer' : selectedRole === 'vendor' ? 'Merchant' : selectedRole === 'technician' ? 'Technician' : 'Admin');
     const statusParam = selectedStatus === 'all' ? undefined : selectedStatus;
@@ -132,11 +132,11 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
     } else {
       setUsers([]);
     }
-  };
-  useEffect(() => { (async () => { await reload(); hideFirstOverlay(); })(); }, []);
+  }, [selectedRole, selectedStatus]);
+  useEffect(() => { (async () => { await reload(); hideFirstOverlay(); })(); }, [reload, hideFirstOverlay]);
 
   // Re-fetch when role/status filters change
-  useEffect(() => { reload(); }, [selectedRole, selectedStatus]);
+  useEffect(() => { void reload(); }, [reload]);
 
   // Apply UI filters (role, status, search)
   const filteredUsers = users.filter(user => {

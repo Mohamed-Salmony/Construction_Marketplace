@@ -118,7 +118,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
       } finally { if (!cancelled) { setLoading(false); hideFirstOverlay(); } }
     })();
     return () => { cancelled = true; };
-  }, [isAr]);
+  }, [isAr, hideFirstOverlay]);
 
   const slugify = (s: string) => {
     return String(s || '')

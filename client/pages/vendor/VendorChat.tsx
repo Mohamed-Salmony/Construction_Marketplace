@@ -55,7 +55,7 @@ export default function VendorChat({ setCurrentPage, ...context }: Partial<Route
         } finally { try { hideFirstOverlay(); } catch {} }
       })();
     } else { try { hideFirstOverlay(); } catch {} }
-  }, []);
+  }, [hideFirstOverlay, technicianName]);
 
   // Load conversation details if only cid known (optional)
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function VendorChat({ setCurrentPage, ...context }: Partial<Route
         }
       } catch {}
     })();
-  }, [conversationId]);
+  }, [conversationId, technicianId, vendorId, serviceId]);
 
   // Poll messages
   useEffect(() => {

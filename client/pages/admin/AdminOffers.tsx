@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { RouteContext } from '../../components/Router';
 import Header from '../../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -24,7 +25,7 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
 
   const [onlyOffers, setOnlyOffers] = useState<boolean>(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       // Test admin endpoint first
@@ -82,9 +83,9 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
       setError(isAr ? 'تعذر جلب المنتجات' : 'Failed to fetch products');
       setItems([]);
     } finally { setLoading(false); }
-  };
+  }, [isAr]);
 
-  useEffect(() => { (async () => { await load(); hideFirstOverlay(); })(); }, []);
+  useEffect(() => { (async () => { await load(); hideFirstOverlay(); })(); }, [load, hideFirstOverlay]);
 
   const setDiscount = async (p: ProductDto, newDiscount: number | null) => {
     try {
@@ -244,9 +245,8 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
                   <CardContent>
                     <div className="flex items-start gap-4">
                       <div className="w-20 h-20 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         {Array.isArray(p.images) && p.images.length > 0 ? (
-                          <img src={p.images[0].imageUrl} alt={(isAr?p.nameAr:p.nameEn) || ''} className="w-full h-full object-cover" />
+                          <Image src={p.images[0].imageUrl} alt={(isAr?p.nameAr:p.nameEn) || ''} width={80} height={80} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-xs text-muted-foreground">{isAr? 'لا صورة' : 'No image'}</span>
                         )}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+
 import Swal from 'sweetalert2';
 import { RouteContext } from '../components/Router';
 import Header from '../components/Header';
@@ -16,7 +17,7 @@ export default function MyOrders({ user, setCurrentPage, goBack, showLoading, hi
   const { locale } = useTranslation();
   const [orders, setOrders] = useState<OrderDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const reload = async () => {
+  const reload = useCallback(async () => {
     setLoading(true);
     try {
       showLoading?.(locale==='ar' ? 'جاري تحميل الطلبات...' : 'Loading orders...');
@@ -26,9 +27,9 @@ export default function MyOrders({ user, setCurrentPage, goBack, showLoading, hi
       hideLoading?.();
       setLoading(false);
     }
-  };
+  }, [locale, showLoading, hideLoading]);
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); }, [reload]);
 
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {

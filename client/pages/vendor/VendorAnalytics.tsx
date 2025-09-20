@@ -91,8 +91,8 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
         .catch(() => {});
       return () => { active = false; };
     }
-  }, []);
-  
+  }, [hideFirstOverlay]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -117,7 +117,7 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
       if (!cancelled) { setMounted(true); setLoading(false); hideFirstOverlay(); }
     })();
     return () => { cancelled = false; };
-  }, []);
+  }, [hideFirstOverlay]);
 
   if (!mounted) return null;
 

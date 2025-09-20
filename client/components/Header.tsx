@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from '../hooks/useTranslation';
 import type { RouteContext } from './Router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { logout as apiLogout } from '@/services/auth';
 import { getVendorMessageCount, getRecentVendorMessages, getCustomerMessageCount, getCustomerRecentMessages } from '@/services/rentals';
 import { getVendorProjectMessageCount, getVendorProjectRecentMessages, getCustomerProjectMessageCount, getCustomerProjectRecentMessages } from '@/services/projectChat';
@@ -21,6 +21,12 @@ interface HeaderProps extends Partial<RouteContext> {
 export default function Header({ currentPage, setCurrentPage, cartItems, user, setUser, goBack }: HeaderProps) {
   const { t, locale } = useTranslation();
   const cartCount = (cartItems || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+  // Role flags (declared early so hooks below can use them safely)
+  const role = (user?.role || '').toString().toLowerCase();
+  const isAdmin = role === 'admin';
+  const isVendor = role === 'vendor';
+  const isWorker = role === 'worker' || role === 'technician';
+  const isCustomerRole = !isVendor && !isAdmin && !isWorker && !!user; // treat any other logged-in role as customer
   // Robust navigation: uses context when available, otherwise falls back to URL param
   const go = (page: string) => {
     if (setCurrentPage) return setCurrentPage(page);
@@ -35,8 +41,11 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
     }
   };
 
+  // Track latest chat timestamp for change detection (used in loadChats)
+  const [lastChatTs, setLastChatTs] = useState<number>(0);
+
   // Load chat-only messages for the dedicated chat icon
-  const loadChats = async () => {
+  const loadChats = useCallback(async () => {
     try {
       const notif = await listMyNotifications();
       let mappedChat: any[] = [];
@@ -71,7 +80,7 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
         }
       } catch {}
     } catch { setChatItems([]); setChatUnreadCount(0); }
-  };
+  }, [locale, lastChatTs]);
   // Unified notification badge: count unread notifications
   useEffect(() => {
     let timer: any;
@@ -118,7 +127,7 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
     timer = setInterval(fetchCount, 10000);
     chatTimer = setInterval(loadChats, 5000);
     return () => { if (timer) clearInterval(timer); if (chatTimer) clearInterval(chatTimer); };
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, role, isCustomerRole, user, loadChats]);
   const displayName = [user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' ') || (user?.name || '');
   const isHome = (() => {
     if (currentPage) return currentPage === 'home';
@@ -142,11 +151,6 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   })();
   const hideBack = current === 'vendor-dashboard' || current === 'admin-dashboard';
   const [mobileOpen, setMobileOpen] = useState(false);
-  const role = (user?.role || '').toString().toLowerCase();
-  const isAdmin = role === 'admin';
-  const isVendor = role === 'vendor';
-  const isWorker = role === 'worker' || role === 'technician';
-  const isCustomerRole = !isVendor && !isAdmin && !isWorker && !!user; // treat any other logged-in role as customer
   // Restrict header content on admin pages: only greeting, logout, language, and notifications
   const isRestricted = isAdmin && current.startsWith('admin-');
   const [notifOpen, setNotifOpen] = useState(false);
@@ -156,7 +160,6 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   const [chatOpen, setChatOpen] = useState(false);
   const [chatItems, setChatItems] = useState<any[]>([]);
   const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
-  const [lastChatTs, setLastChatTs] = useState<number>(0);
   const loadNotifications = async () => {
     try {
       if (role === 'vendor') {

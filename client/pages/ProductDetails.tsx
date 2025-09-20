@@ -223,6 +223,8 @@ export default function ProductDetails({
   };
 
   const images = deriveImages(product);
+  const productId = String((product as any)?.id || '');
+  const categoryId = String((product as any)?.categoryId || '');
   // If product has no images, we'll optionally fall back to category image further below
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   // displayedImages will be recalculated after we (optionally) fetch a category image; define a placeholder now
@@ -314,9 +316,8 @@ export default function ProductDetails({
     let cancelled = false;
     (async () => {
       try {
-        const cid = (product as any)?.categoryId;
-        if (!cid) { setCategoryName(""); return; }
-        const { ok, data } = await getCategoryById(String(cid));
+        if (!categoryId) { setCategoryName(""); return; }
+        const { ok, data } = await getCategoryById(String(categoryId));
         if (ok && data && !cancelled) {
           setCategoryName(String((data as any)?.nameAr || (data as any)?.nameEn || ''));
           const cimg = (data as any)?.imageUrl || (data as any)?.ImageUrl || '';
@@ -325,7 +326,7 @@ export default function ProductDetails({
       } catch { setCategoryName(""); }
     })();
     return () => { cancelled = true; };
-  }, [JSON.stringify((product as any)?.categoryId)]);
+  }, [categoryId]);
 
   // Final displayed images with category fallback
   displayedImages = images.length ? images : (categoryImage ? [categoryImage] : []);
@@ -335,7 +336,7 @@ export default function ProductDetails({
     if (selectedImageIndex > Math.max(0, displayedImages.length - 1)) {
       setSelectedImageIndex(0);
     }
-  }, [displayedImages.length]);
+  }, [displayedImages.length, selectedImageIndex]);
 
   // Load reviews when product id becomes available
   useEffect(() => {
@@ -348,7 +349,7 @@ export default function ProductDetails({
             if (idParam && /^[a-fA-F0-9]{24}$/.test(idParam)) return idParam;
           } catch {}
           try {
-            const raw = String((product as any)?.id || '').trim();
+            const raw = String(productId || '').trim();
             if (!raw) return '';
             const oid = raw.match(/^[a-fA-F0-9]{24}(?=\b|\|)/);
             return oid && oid[0] ? oid[0] : raw.split('|')[0];
@@ -375,7 +376,7 @@ export default function ProductDetails({
         }
       } catch {}
     })();
-  }, [String((product as any)?.id || '')]);
+  }, [productId, reviewsLoadedFor]);
 
   const submitReview = async () => {
     const currentUser = (rest as any)?.user;

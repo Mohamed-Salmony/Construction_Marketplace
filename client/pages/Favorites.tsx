@@ -89,7 +89,7 @@ export default function Favorites(props: Partial<RouteContext>) {
         window.removeEventListener('favorites_updated', onCustom as any);
       }
     };
-  }, [props.user?.id, (props.wishlistItems || []).length]);
+  }, [props.user, props.wishlistItems]);
 
   // One-time migration: if guest and favorites are empty but context wishlist has items, migrate them to localStorage
   useEffect(() => {

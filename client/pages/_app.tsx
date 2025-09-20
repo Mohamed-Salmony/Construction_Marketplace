@@ -12,9 +12,3 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     </>
   );
 }
-
-// Force SSR for all pages to avoid static prerender/export of dynamic routes
-MyApp.getInitialProps = async (appContext: AppContext) => {
-  const appProps = await App.getInitialProps(appContext);
-  return { ...appProps };
-};

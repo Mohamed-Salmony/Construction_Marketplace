@@ -204,7 +204,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       }
       try { (context as any)?.hideLoading?.(); } catch {}
     }
-  }, [isAr]); // ✅ Only include stable dependencies
+  }, [isAr, context]); // include context to satisfy exhaustive-deps
 
   // ✅ Load data once on mount
   React.useEffect(() => { 

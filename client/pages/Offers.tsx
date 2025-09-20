@@ -6,6 +6,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { getProducts, type ProductDto } from "@/services/products";
 
 export default function Offers({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -44,7 +45,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
       }
     })();
     return () => { cancelled = true; };
-  }, [locale]);
+  }, [locale, context]);
 
   return (
     <div className="min-h-screen bg-background" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
@@ -73,9 +74,8 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
               <Card key={p.id} className="group hover:shadow transition-all relative">
                 <CardHeader>
                   <div className="h-40 bg-muted rounded-lg mb-2 flex items-center justify-center overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     {p.images && p.images.length > 0 ? (
-                      <img src={p.images[0].imageUrl} alt={String(locale==='ar'?p.nameAr:p.nameEn)} className="w-full h-full object-cover" />
+                      <Image src={p.images[0].imageUrl} alt={String(locale==='ar'?p.nameAr:p.nameEn)} width={640} height={160} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-12 w-12 text-muted-foreground" />
                     )}

@@ -11,6 +11,8 @@ import { getConversation, listMessages, sendMessage } from "@/services/chat";
 export default function TechnicianChat({ setCurrentPage, ...context }: Partial<RouteContext>) {
   const { locale } = useTranslation();
   const isAr = locale === 'ar';
+  const userRole = String((context as any)?.user?.role || '').toLowerCase();
+  const userName = String((context as any)?.user?.name || '').trim();
 
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string>("");
@@ -36,10 +38,10 @@ export default function TechnicianChat({ setCurrentPage, ...context }: Partial<R
         if (!conversationId) return;
         const c = await getConversation(String(conversationId));
         if (c.ok && c.data) {
-          setServiceId(String((c.data as any).serviceRequestId || serviceId));
-          setVendorId((c.data as any).vendorId || vendorId);
+          setServiceId(String((c.data as any).serviceRequestId || ''));
+          setVendorId((c.data as any).vendorId || '');
           setVendorName((c.data as any).vendorName || "");
-          setTechId((c.data as any).technicianId || techId);
+          setTechId((c.data as any).technicianId || '');
         }
       } catch {}
     })();
@@ -47,11 +49,10 @@ export default function TechnicianChat({ setCurrentPage, ...context }: Partial<R
 
   // Fallback vendor name from context if server didn't provide it
   useEffect(() => {
-    if (!vendorName && (context as any)?.user?.role && String((context as any)?.user?.role).toLowerCase()==='vendor') {
-      const nm = String((context as any)?.user?.name || '').trim();
-      if (nm) setVendorName(nm);
+    if (!vendorName && userRole==='vendor') {
+      if (userName) setVendorName(userName);
     }
-  }, [vendorName, (context as any)?.user?.name, (context as any)?.user?.role]);
+  }, [vendorName, userRole, userName]);
 
   useEffect(() => {
     let timer: any;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Search, Filter, Package, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -100,7 +100,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [showLoading, hideLoading, hideFirstOverlay, locale]);
 
   // Load categories dynamically (public endpoint; no auth required)
   useEffect(() => {
@@ -118,10 +118,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       } catch {}
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [locale]);
 
   // Filter products based on search and filters
-  const filterProducts = () => {
+  const filterProducts = useCallback(() => {
     let filtered = products;
 
     if (searchTerm) {
@@ -145,12 +145,12 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
     }
 
     setFilteredProducts(filtered);
-  };
+  }, [products, searchTerm, selectedCategory, selectedStatus, selectedBrand]);
 
   // Update filters when dependencies change
   useEffect(() => {
     filterProducts();
-  }, [searchTerm, selectedCategory, selectedStatus, selectedBrand, products]);
+  }, [filterProducts]);
 
   // Export current filtered products to CSV
   const handleExportCSV = () => {

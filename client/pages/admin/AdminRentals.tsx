@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { Button } from '../../components/ui/button';
@@ -34,10 +34,10 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
 
   const getCurrencySymbol = (currency?: string): string => {
     if (locale === 'ar') return 'ر.س';
-    return currency || 'SAR';
+    return currency && String(currency).trim() ? String(currency).trim() : 'SAR';
   };
 
-  const fetchCustomerName = async (customerId: string) => {
+  const fetchCustomerName = useCallback(async (customerId: string) => {
     if (customerNames[customerId]) return customerNames[customerId];
     
     try {
@@ -54,9 +54,9 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
     }
     
     return customerId;
-  };
+  }, [customerNames]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       if (firstLoadRef.current && typeof (rest as any)?.showLoading === 'function') {
@@ -76,15 +76,15 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
         firstLoadRef.current = false;
       }
     }
-  };
+  }, [locale, rest]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (selected && selected.customerId) {
       fetchCustomerName(selected.customerId);
     }
-  }, [selected]);
+  }, [selected, fetchCustomerName]);
 
   const onApprove = async (id: number | string) => { await approveRental(String(id)); await load(); };
   const onDecline = async (id: number | string) => { await declineRental(String(id)); await load(); };
@@ -141,7 +141,7 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
                       </div>
                       <div className="mt-2 text-sm text-muted-foreground">
                         <div className="text-xs">{locale==='ar'? 'سعر اليوم' : 'Daily Price'}</div>
-                        <div className="font-medium">{r.dailyRate} {getCurrencySymbol(selected.currency)}</div>
+                        <div className="font-medium">{r.dailyRate} {getCurrencySymbol(r?.currency)}</div>
                       </div>
                       <div className="mt-3 flex items-center justify-between gap-2" onClick={(e)=>e.stopPropagation()}>
                         <Button size="sm" variant="default" onClick={()=> onApprove(r._id || r.id)}>{locale==='ar'? 'اعتماد' : 'Approve'}</Button>
@@ -186,7 +186,7 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
                       </div>
                       <div className="mt-2 text-sm text-muted-foreground">
                         <div className="text-xs">{locale==='ar'? 'سعر اليوم' : 'Daily Price'}</div>
-                        <div className="font-medium">{r.dailyRate} {getCurrencySymbol(selected.currency)}</div>
+                        <div className="font-medium">{r.dailyRate} {getCurrencySymbol(r?.currency)}</div>
                       </div>
                       <div className="mt-3 flex items-center justify-end gap-2" onClick={(e)=>e.stopPropagation()}>
                         <Button size="sm" variant="destructive" onClick={()=> onDeleteApproved(r._id || r.id)}>{locale==='ar'? 'حذف' : 'Delete'}</Button>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Header from '../../components/Header';
 import type { RouteContext } from '../../components/Router';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -54,7 +55,7 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
         } else { setCategories([]); }
       } catch { setCategories([]); }
     })();
-  }, []);
+  }, [hideFirstOverlay]);
   const reload = async () => {
     try {
       const { ok, data } = await getProducts({ page: 1, pageSize: 200 });
@@ -258,9 +259,8 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
                 <div key={r.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
                     <div className="w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       {r.imageUrl ? (
-                        <img src={r.imageUrl} alt={r.name} className="w-full h-full object-cover" />
+                        <Image src={r.imageUrl} alt={r.name} width={56} height={56} className="w-full h-full object-cover" />
                       ) : (
                         <Package className="h-7 w-7 text-muted-foreground" />
                       )}

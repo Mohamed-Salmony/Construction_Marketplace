@@ -91,7 +91,7 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
     finally { setViewLoading(false); }
   };
 
-  useEffect(() => { (async () => { await load(); hideFirstOverlay(); })(); }, []);
+  useEffect(() => { (async () => { await load(); hideFirstOverlay(); })(); }, [hideFirstOverlay]);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();

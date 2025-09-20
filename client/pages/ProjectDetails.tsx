@@ -52,7 +52,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState<BidDto[]>([]);
   const [catalog, setCatalog] = useState<ProjectCatalog | null>(null);
-  const currentUserId = (rest as any)?.user?.id ? String((rest as any).user.id) : '';
+  const userId = (rest as any)?.user?.id ? String((rest as any).user.id) : '';
   const isLoggedIn = Boolean((rest as any)?.user);
   const isVendor = ((rest as any)?.user?.role === 'vendor');
 
@@ -130,13 +130,13 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
   useEffect(() => {
     try {
       if (!project || !isVendor) { setHasSubmitted(false); setMyProposal(null); return; }
-      const vendorId = (rest as any)?.user?.id ? String((rest as any).user.id) : '';
+      const vendorId = userId;
       const mine = proposals.find((b:any)=> String(b.projectId)===String(project.id) && (!!vendorId ? String(b.merchantId||'')===vendorId : false));
       setHasSubmitted(!!mine);
       setMyProposal(mine || null);
       if (mine && !editingProposalId) setEditingProposalId(String(mine.id));
     } catch { setHasSubmitted(false); setMyProposal(null); }
-  }, [project, (rest as any)?.user?.id, isVendor, proposals, editingProposalId]);
+  }, [project, userId, isVendor, proposals, editingProposalId, rest]);
 
   const typeLabel = useMemo(() => {
     const fromCatalog = productTypes.find(pt => pt.id === (project?.ptype || project?.type))?.[locale==='ar'?'ar':'en'] || '';

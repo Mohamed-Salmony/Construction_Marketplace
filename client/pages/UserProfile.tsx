@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
+
 import { User, Edit, Save, X, MapPin, Mail, CreditCard, Shield, Package, Heart, History, Phone, Calendar, Camera } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toastSuccess, toastError, toastInfo } from '../utils/alerts';
@@ -15,6 +16,8 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useTranslation } from '../hooks/useTranslation';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import Image from 'next/image';
+
 // Remove authMock usage; simple local validator
 import { getProfile, updateProfile, changePassword as apiChangePassword, deleteAccount as apiDeleteAccount } from '@/services/auth';
 import { api } from '@/lib/api';
@@ -185,6 +188,7 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
   // Fetch profile from backend on mount (if token/session available); fallback remains local
   // We do a best-effort fetch; failure just keeps current local state
   React.useEffect(() => {
+
     let cancelled = false;
     const load = async () => {
       try {
@@ -258,7 +262,7 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
             licenseImageUrl: (data as any)?.licenseImageUrl || '',
           };
           setEditedUser(merged);
-          // sync Router user minimal fields
+          // sync Router user as well
           setUser?.({ id: merged.id, name: merged.name, email: merged.email || '', role: uiRole } as any);
           // No localStorage persistence needed; Router handles session separately
         }
@@ -266,7 +270,7 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
     };
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [setUser, user]);
 
   // LocalStorage helpers for per-user data (orders only; addresses are backend)
   const addrKey = '';
@@ -312,7 +316,7 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
         else setAddresses([]);
       } catch { setAddresses([]); }
     })();
-  }, [user?.id]);
+  }, [user]);
 
   // Persist on changes (when user exists)
   const persistOrders = (next: typeof orders) => { setOrders(next); };
@@ -338,7 +342,7 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
         }
       } catch { setOrders([]); }
     })();
-  }, [user?.id]);
+  }, [user]);
 
   // Save profile handler (missing)
   const handleSave = async () => {
@@ -443,15 +447,15 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
     createdAt?: string;
   };
   const [techOffers, setTechOffers] = useState<TechOffer[]>([]);
-  const refreshOffers = async () => {
+  const refreshOffers = useCallback(async () => {
     try {
       if (!technicianId) { setTechOffers([]); return; }
       const { ok, data } = await getTechnicianOffers(String(technicianId));
       if (ok && Array.isArray(data)) setTechOffers(data as any);
       else setTechOffers([]);
     } catch { setTechOffers([]); }
-  };
-  React.useEffect(() => { void refreshOffers(); }, [technicianId]);
+  }, [technicianId]);
+  React.useEffect(() => { void refreshOffers(); }, [technicianId, refreshOffers]);
   // Service lookup for labels
   const [servicesLookup] = useState<Record<string, any>>(() => {
     try {
@@ -896,9 +900,8 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
                         className={`relative w-full md:w-1/2 lg:w-1/3 border rounded-md overflow-hidden bg-gray-50 dark:bg-gray-800 ${isEditing ? 'cursor-pointer group' : ''}`}
                         onClick={() => { if (isEditing) licenseFileRef.current?.click(); }}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         {editedUser.licenseImageUrl ? (
-                          <img src={editedUser.licenseImageUrl} alt={locale==='en' ? 'License image' : 'صورة الرخصة'} className="w-full h-auto object-contain" />
+                          <Image src={editedUser.licenseImageUrl} alt={locale==='en' ? 'License image' : 'صورة الرخصة'} width={800} height={600} className="w-full h-auto object-contain" />
                         ) : (
                           <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">
                             {locale==='en' ? 'No license image uploaded' : 'لا توجد صورة رخصة'}

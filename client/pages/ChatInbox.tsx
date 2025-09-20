@@ -372,7 +372,7 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
       }
     } catch {}
     return () => { cancelled = true; clearInterval(timer); if (typeof window !== 'undefined') window.removeEventListener('chat_incoming', onIncoming as any); };
-  }, [context?.user?.id]);
+  }, [context?.user?.id, context?.user?.role]);
 
   const filteredProjects = useMemo(() => {
     if (!q) return projectItems;

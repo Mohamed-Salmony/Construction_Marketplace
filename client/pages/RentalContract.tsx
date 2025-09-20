@@ -89,7 +89,7 @@ export default function RentalContractPage({ setCurrentPage, ...rest }: Props) {
     load();
     const timer = setInterval(load, 15000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [rental?.id]);
+  }, [rental?.id, locale]);
 
   const images = rental?.imageUrl ? [rental.imageUrl] : [''];
   const baseDays = Number(rental?.rentalDays || 1);
@@ -146,7 +146,7 @@ export default function RentalContractPage({ setCurrentPage, ...rest }: Props) {
         toastSuccess(locale==='ar'? 'لديك رد من التاجر، يمكنك الرد هنا' : 'You have a merchant reply. You can respond here.', locale==='ar');
       }
     } catch {}
-  }, [rental?.id]);
+  }, [rental?.id, locale]);
 
   const sendMessage = async () => {
     const text = message.trim();

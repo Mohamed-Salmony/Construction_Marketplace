@@ -283,13 +283,15 @@ export default function ProductListing({
     };
     load();
     return () => { cancelled = true; };
-  }, [searchTerm, sortBy, rest?.searchFilters?.categoryId, selectedCategoryId, categories]);
+  }, [searchTerm, sortBy, rest?.searchFilters?.categoryId, selectedCategoryId, categories, locale, rest, rest?.searchFilters]);
 
-  // Load categories from backend once
+  // Load categories from backend; guard with ref to avoid repeating unless locale changes
+  const categoriesLoadedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        if (categoriesLoadedRef.current && !cancelled) return;
         const { ok, data } = await getAllCategories();
         if (ok && data) {
           let arr: any[] = [];
@@ -308,7 +310,10 @@ export default function ProductListing({
             }))
             .filter((c:any) => !!c.id);
           try { console.debug('[categories] loaded', normalized.length); } catch {}
-          if (!cancelled) setCategories(normalized as any);
+          if (!cancelled) {
+            setCategories(normalized as any);
+            categoriesLoadedRef.current = true;
+          }
         } else if (!cancelled) {
           setCategories([] as any);
         }
@@ -317,19 +322,20 @@ export default function ProductListing({
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [locale]);
 
   // Apply incoming normalized group from homepage (engines | tires | electrical | tools)
   useEffect(() => {
-    if (rest?.searchFilters) {
-      const { partCategory } = rest.searchFilters;
+    const sf = rest?.searchFilters;
+    if (sf) {
+      const { partCategory } = sf;
       if (partCategory) {
         setSelectedGroup(partCategory);
         // Reset category filter when group is set to avoid conflicts
         setSelectedCategoryId('all');
       }
     }
-  }, [rest?.searchFilters]);
+  }, [rest, rest?.searchFilters, rest?.searchFilters?.partCategory]);
 
   useEffect(() => {
     let filtered = products;

@@ -84,7 +84,7 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
   }, [projectId, isAr]);
 
   React.useEffect(() => { void load(); }, [load]);
-  React.useEffect(() => { if (!loading) hideFirstOverlay(); }, [loading]);
+  React.useEffect(() => { if (!loading) hideFirstOverlay(); }, [loading, hideFirstOverlay]);
 
   const back = () => {
     setCurrentPage && setCurrentPage('admin-all-projects');

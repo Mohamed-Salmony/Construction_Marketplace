@@ -36,7 +36,7 @@ export default function AdminPendingProjects({ setCurrentPage, ...rest }: Partia
     }
   }, [isAr]);
 
-  React.useEffect(() => { (async ()=>{ await load(); hideFirstOverlay(); })(); }, [load]);
+  React.useEffect(() => { (async ()=>{ await load(); hideFirstOverlay(); })(); }, [load, hideFirstOverlay]);
 
   const normalizeStatus = (raw: any): string => {
     if (raw === undefined || raw === null) return '';

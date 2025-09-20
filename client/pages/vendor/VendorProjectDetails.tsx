@@ -113,7 +113,7 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
         try { hideFirstOverlay(); } catch {}
       }
     })();
-  }, []);
+  }, [hideFirstOverlay]);
 
   // Check if current vendor already submitted a bid via backend
   useEffect(() => {

@@ -163,7 +163,9 @@ export default function BestSellingProducts({ setSelectedProduct, setCurrentPage
 
                 <div className="flex items-center gap-2 mb-3">
                   <span className="font-bold text-lg">{formatCurrency(product.price, locale === 'en' ? 'en' : 'ar')}</span>
-                  <span className="text-sm text-muted-foreground line-through">{formatCurrency(product.originalPrice, locale === 'en' ? 'en' : 'ar')}</span>
+                  {typeof product.originalPrice === 'number' && product.originalPrice > product.price && (
+                    <span className="text-sm text-muted-foreground line-through">{formatCurrency(product.originalPrice, locale === 'en' ? 'en' : 'ar')}</span>
+                  )}
                 </div>
 
                 {!isVendor && (

@@ -338,7 +338,7 @@ export default function Router() {
         }
       } catch {}
     })();
-  }, [user?.id]);
+  }, [user]);
 
   // Wishlist: server-backed (requires auth) with enrichment (image/name/price)
   useEffect(() => {
@@ -396,7 +396,7 @@ export default function Router() {
         } else setWishlistItems([]);
       } catch { setWishlistItems([]); }
     })();
-  }, [user?.id]);
+  }, [user]);
 
   const normalizeProductIdForApi = (val: any): string | number | null => {
     try {
@@ -583,7 +583,7 @@ export default function Router() {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       }, 0);
     }
-  }, [currentPage]);
+  }, [currentPage, selectedProduct]);
 
   // No prevPage persistence in localStorage; keep in-memory only
 
@@ -678,7 +678,7 @@ export default function Router() {
         // no-op
       }
     }
-  }, [currentPage]);
+  }, [currentPage, selectedProduct]);
 
   // Auth/role guard: enforce access to protected routes
   useEffect(() => {
@@ -756,7 +756,7 @@ export default function Router() {
         }
       }
     }
-  }, [currentPage, user, sessionChecked]);
+  }, [currentPage, user, sessionChecked, authChecked, verificationRecheckedAt]);
 
   if (!mounted) return null;
 

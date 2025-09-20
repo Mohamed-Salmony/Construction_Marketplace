@@ -62,7 +62,7 @@ export default function VendorOrders({ setCurrentPage, ...context }: VendorOrder
   useEffect(() => {
     filterOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, selectedStatus, orders]);
+  }, [searchTerm, selectedStatus, orders, hideFirstOverlay]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -108,7 +108,7 @@ export default function VendorOrders({ setCurrentPage, ...context }: VendorOrder
       } catch {}
       finally { hideFirstOverlay(); }
     })();
-  }, []);
+  }, [hideFirstOverlay]);
 
   if (!mounted) return null;
 

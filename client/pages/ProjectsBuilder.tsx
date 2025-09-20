@@ -135,7 +135,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
 
   useEffect(() => {
     setHasToken(!!getAuthToken());
-  }, []);
+  }, [hideFirstOverlay]);
 
   // Load admin-configured options once (legacy lists + unified catalog)
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       finally { if (!cancelled) { try { hideFirstOverlay(); } catch {} } }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [hideFirstOverlay]);
 
   useEffect(() => {
     // Auto-calc PPM with priority: material-level price (from selected subtype) -> legacy base rules
@@ -196,7 +196,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       if (!cols.find(c => c.id === color)) setColor(cols[0]?.id || '');
       if (!subs.find(s => s.id === psubtype)) setPsubtype(subs[0]?.id || '');
     }
-  }, [ptype, psubtype, catalog]);
+  }, [ptype, psubtype, catalog, material, color]);
 
   // Prefill from edit draft if exists
   useEffect(() => {

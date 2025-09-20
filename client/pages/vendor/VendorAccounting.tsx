@@ -29,7 +29,7 @@ export default function VendorAccounting({ setCurrentPage, ...context }: Partial
     finally {
       try { hideFirstOverlay(); } catch {}
     }
-  }, [vendorId]);
+  }, [vendorId, hideFirstOverlay]);
 
   const active = !!sub?.active;
   const currency = locale === "ar" ? "ر.س" : "SAR";

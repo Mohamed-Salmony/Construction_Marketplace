@@ -50,7 +50,7 @@ export default function RentalChat(context: Partial<RouteContext> = {}) {
     load();
     const t = setInterval(load, 15000);
     return () => { cancelled = true; clearInterval(t); };
-  }, [rentalId]);
+  }, [rentalId, useTechChannel]);
 
   useEffect(() => {
     // focus editor when navigated here

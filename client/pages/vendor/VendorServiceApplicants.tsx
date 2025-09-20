@@ -56,7 +56,7 @@ export default function VendorServiceApplicants({ setCurrentPage, ...context }: 
       }
     })();
     return () => { cancelled = true; };
-  }, [vendorId]);
+  }, [vendorId, hideFirstOverlay]);
 
   // Build a user-friendly technician label without exposing raw ID
   const techLabel = (r: OfferDto, isAr: boolean) => {
