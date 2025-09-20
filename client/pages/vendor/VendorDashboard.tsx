@@ -46,7 +46,8 @@ import { confirmDialog } from "../../utils/alerts";
 import { getMyProducts } from "@/services/products";
 import { listVendorOrders as apiListVendorOrders } from "@/services/orders";
 import { listVendorServices } from "@/services/servicesCatalog";
-import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar } from "recharts";
+// Recharts is browser-only; load it dynamically on the client to avoid SSR/prerender issues
+// We'll require it after mount and gate rendering until it's available
 
 // All dashboard content is derived dynamically from backend
 
@@ -57,6 +58,16 @@ import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tool
 export default function VendorDashboard({ setCurrentPage, ...context }: Partial<RouteContext>) {
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [R, setR] = useState<any>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let active = true;
+      import('recharts')
+        .then((mod) => { if (active) setR(mod as any); })
+        .catch(() => {});
+      return () => { active = false; };
+    }
+  }, []);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -639,15 +650,17 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
                   <CardTitle>{t("vaSalesTrend")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={perfSeries}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="key" />
-                      <YAxis />
-                      <Tooltip formatter={(value: any) => [`${Number(value||0).toLocaleString(locale==='ar'?'ar-EG':'en-US')}` , t('vaTotalSales')]} />
-                      <Area type="monotone" dataKey="sales" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {R && (
+                    <R.ResponsiveContainer width="100%" height={300}>
+                      <R.AreaChart data={perfSeries}>
+                        <R.CartesianGrid strokeDasharray="3 3" />
+                        <R.XAxis dataKey="key" />
+                        <R.YAxis />
+                        <R.Tooltip formatter={(value: any) => [`${Number(value||0).toLocaleString(locale==='ar'?'ar-EG':'en-US')}` , t('vaTotalSales')]} />
+                        <R.Area type="monotone" dataKey="sales" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                      </R.AreaChart>
+                    </R.ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
 
@@ -657,15 +670,17 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
                   <CardTitle>{t("vaOrdersAndViews")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={perfSeries}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="key" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="orders" stroke="#82ca9d" strokeWidth={2} name={t('vaOrdersLabel')} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {R && (
+                    <R.ResponsiveContainer width="100%" height={300}>
+                      <R.LineChart data={perfSeries}>
+                        <R.CartesianGrid strokeDasharray="3 3" />
+                        <R.XAxis dataKey="key" />
+                        <R.YAxis />
+                        <R.Tooltip />
+                        <R.Line type="monotone" dataKey="orders" stroke="#82ca9d" strokeWidth={2} name={t('vaOrdersLabel')} />
+                      </R.LineChart>
+                    </R.ResponsiveContainer>
+                  )}
                   {/* Summary KPIs */}
                   <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
                     <div>
@@ -724,16 +739,18 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
                 <CardTitle>{t('vaCustomersStats')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={custSeries}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="key" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="new" fill="#8884d8" name={locale === 'ar' ? 'عملاء جدد' : 'New Customers'} />
-                    <Bar dataKey="returning" fill="#82ca9d" name={locale === 'ar' ? 'عملاء عائدون' : 'Returning Customers'} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {R && (
+                  <R.ResponsiveContainer width="100%" height={300}>
+                    <R.BarChart data={custSeries}>
+                      <R.CartesianGrid strokeDasharray="3 3" />
+                      <R.XAxis dataKey="key" />
+                      <R.YAxis />
+                      <R.Tooltip />
+                      <R.Bar dataKey="new" fill="#8884d8" name={locale === 'ar' ? 'عملاء جدد' : 'New Customers'} />
+                      <R.Bar dataKey="returning" fill="#82ca9d" name={locale === 'ar' ? 'عملاء عائدون' : 'Returning Customers'} />
+                    </R.BarChart>
+                  </R.ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

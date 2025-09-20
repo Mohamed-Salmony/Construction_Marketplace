@@ -29,11 +29,13 @@ const nextConfig = {
 
   reactStrictMode: true,
   
-  // Performance optimizations
+  // Performance optimizations (avoid optimizePackageImports due to SSR/prerender issues with some icon libs)
   experimental: {
     optimizeCss: true,
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    // optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
+  // Ensure certain ESM-only packages are transpiled for SSR compatibility
+  transpilePackages: ['lucide-react', '@radix-ui/react-icons'],
   
   // Compiler optimizations
   compiler: {
