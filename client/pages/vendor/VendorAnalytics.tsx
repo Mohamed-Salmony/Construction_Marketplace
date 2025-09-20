@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+// Recharts must be client-only in pages/ during prerender/export
+// We'll require it after mount and gate rendering until it's available
 import { RouteContext } from '../../components/Router';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
@@ -80,6 +81,18 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
   const ordersGrowth = getGrowthPercentage(salesData, 'orders');
   const viewsGrowth = getGrowthPercentage(salesData, 'views');
 
+  // Load recharts on client only
+  const [R, setR] = useState<any>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let active = true;
+      import('recharts')
+        .then((mod) => { if (active) setR(mod as any); })
+        .catch(() => {});
+      return () => { active = false; };
+    }
+  }, []);
+  
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -225,6 +238,7 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
             <TabsTrigger value="categories">{t('vaTabCategories')}</TabsTrigger>
           </TabsList>
 
+          {/* Sales tab: Area + Line charts */}
           <TabsContent value="sales" className="space-y-6">
             <div className="grid lg:grid-cols-2 gap-6">
               <Card>
@@ -232,26 +246,17 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
                   <CardTitle>{t('vaSalesTrend')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={salesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value, name) => [
-                          `${(value as number).toLocaleString(locale === 'en' ? 'en' : 'ar')} ${name === 'sales' ? (locale === 'en' ? 'SAR' : 'ر.س') : ''}`,
-                          name === 'sales' ? t('vaTotalSales') : t('vaOrdersLabel')
-                        ]}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="sales" 
-                        stroke="#8884d8" 
-                        fill="#8884d8" 
-                        fillOpacity={0.3}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {R && (
+                    <R.ResponsiveContainer width="100%" height={300}>
+                      <R.AreaChart data={salesData}>
+                        <R.CartesianGrid strokeDasharray="3 3" />
+                        <R.XAxis dataKey="month" />
+                        <R.YAxis />
+                        <R.Tooltip />
+                        <R.Area type="monotone" dataKey="sales" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                      </R.AreaChart>
+                    </R.ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
 
@@ -260,33 +265,24 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
                   <CardTitle>{t('vaOrdersAndViews')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={salesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line 
-                        type="monotone" 
-                        dataKey="orders" 
-                        stroke="#82ca9d" 
-                        strokeWidth={2}
-                        name={t('vaOrdersLabel')}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="views" 
-                        stroke="#ffc658" 
-                        strokeWidth={2}
-                        name={t('vaViewsLabel')}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {R && (
+                    <R.ResponsiveContainer width="100%" height={300}>
+                      <R.LineChart data={salesData}>
+                        <R.CartesianGrid strokeDasharray="3 3" />
+                        <R.XAxis dataKey="month" />
+                        <R.YAxis />
+                        <R.Tooltip />
+                        <R.Line type="monotone" dataKey="orders" stroke="#82ca9d" strokeWidth={2} name={t('vaOrdersLabel')} />
+                        <R.Line type="monotone" dataKey="views" stroke="#ffc658" strokeWidth={2} name={t('vaViewsLabel')} />
+                      </R.LineChart>
+                    </R.ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
+          {/* Products tab: list */}
           <TabsContent value="products" className="space-y-6">
             <Card>
               <CardHeader>
@@ -319,26 +315,30 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
             </Card>
           </TabsContent>
 
+          {/* Customers tab: bar chart */}
           <TabsContent value="customers" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>{t('vaCustomersStats')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={customerData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="new" fill="#8884d8" name={locale === 'en' ? 'New Customers' : 'عملاء جدد'} />
-                    <Bar dataKey="returning" fill="#82ca9d" name={locale === 'en' ? 'Returning Customers' : 'عملاء عائدون'} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {R && (
+                  <R.ResponsiveContainer width="100%" height={300}>
+                    <R.BarChart data={customerData}>
+                      <R.CartesianGrid strokeDasharray="3 3" />
+                      <R.XAxis dataKey="month" />
+                      <R.YAxis />
+                      <R.Tooltip />
+                      <R.Bar dataKey="new" fill="#8884d8" name={locale === 'en' ? 'New Customers' : 'عملاء جدد'} />
+                      <R.Bar dataKey="returning" fill="#82ca9d" name={locale === 'en' ? 'Returning Customers' : 'عملاء عائدون'} />
+                    </R.BarChart>
+                  </R.ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Categories tab: pie + legend list */}
           <TabsContent value="categories" className="space-y-6">
             <div className="grid lg:grid-cols-2 gap-6">
               <Card>
@@ -346,25 +346,27 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
                   <CardTitle>{t('vaSalesByCategory')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={catSales}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {catSales.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {R && (
+                    <R.ResponsiveContainer width="100%" height={300}>
+                      <R.PieChart>
+                        <R.Pie
+                          data={catSales}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {catSales.map((entry, index) => (
+                            <R.Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </R.Pie>
+                        <R.Tooltip />
+                      </R.PieChart>
+                    </R.ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
 
@@ -398,6 +400,7 @@ export default function VendorAnalytics({ setCurrentPage, ...context }: VendorAn
             </div>
           </TabsContent>
         </Tabs>
+
         <Footer setCurrentPage={safeSetCurrentPage} />
       </div>
     </div>
