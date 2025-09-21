@@ -484,7 +484,7 @@ export default function ProductDetails({
       } catch { setCategoryName(""); }
     })();
     return () => { cancelled = true; };
-  }, [JSON.stringify((product as any)?.categoryId)]);
+  }, [product, JSON.stringify((product as any)?.categoryId)]);
 
   // Final displayed images with category fallback
   displayedImages = images.length ? images : (categoryImage ? [categoryImage] : []);
@@ -494,7 +494,7 @@ export default function ProductDetails({
     if (selectedImageIndex > Math.max(0, displayedImages.length - 1)) {
       setSelectedImageIndex(0);
     }
-  }, [displayedImages.length]);
+  }, [selectedImageIndex, displayedImages.length]);
 
   // Load reviews when product id becomes available
   useEffect(() => {
@@ -534,7 +534,7 @@ export default function ProductDetails({
         }
       } catch {}
     })();
-  }, [String((product as any)?.id || '')]);
+  }, [product, reviewsLoadedFor, String((product as any)?.id || '')]);
 
   const submitReview = async () => {
     const currentUser = (rest as any)?.user;

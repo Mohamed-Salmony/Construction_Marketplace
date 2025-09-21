@@ -209,7 +209,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       try { if (autoHideTimer) clearTimeout(autoHideTimer); } catch {}
       try { (context as any)?.hideLoading?.(); } catch {}
     }
-  }, [isAr]);
+  }, [context, isAr]);
 
   // ✅ Load data once on mount
   React.useEffect(() => { 

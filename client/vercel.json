@@ -3,14 +3,12 @@
     "outputDirectory": ".next",
     "installCommand": "npm ci",
     "framework": "nextjs",
+    "cleanUrls": true,
+    "trailingSlash": false,
     "rewrites": [
       {
         "source": "/api/:path*",
         "destination": "https://construction-marketplace.onrender.com/api/:path*"
-      },
-      {
-        "source": "/:locale/_vercel/insights/:path*",
-        "destination": "/_vercel/insights/:path*"
       }
     ],
     "headers": [
@@ -28,8 +26,28 @@
           {
             "key": "X-XSS-Protection",
             "value": "1; mode=block"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
           }
         ]
+      },
+      {
+        "source": "/(.*).html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      }
+    ],
+    "redirects": [
+      {
+        "source": "/index.html",
+        "destination": "/",
+        "permanent": true
       }
     ]
   }

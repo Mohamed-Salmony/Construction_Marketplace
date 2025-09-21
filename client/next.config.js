@@ -27,7 +27,10 @@ const nextConfig = {
     ],
   },
 
-  reactStrictMode: true,
+  reactStrictMode: false,
+  swcMinify: true,
+  poweredByHeader: false,
+  generateEtags: false,
   
   // Performance optimizations (avoid optimizePackageImports due to SSR/prerender issues with some icon libs)
   experimental: {
