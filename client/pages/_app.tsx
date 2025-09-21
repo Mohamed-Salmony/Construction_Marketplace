@@ -40,9 +40,17 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   );
 }
 
+
 // Opt out of automatic static optimization so Next.js does not attempt to prerender/export
 // pages that rely on runtime-only features (auth, window/localStorage, charts, etc.).
 MyApp.getInitialProps = async (appContext: AppContext) => {
   const appProps = await App.getInitialProps(appContext);
   return { ...appProps } as any;
 };
+
+// Force SSR for all pages to avoid static prerender/export of dynamic routes
+MyApp.getInitialProps = async (appContext: AppContext) => {
+  const appProps = await App.getInitialProps(appContext);
+  return { ...appProps };
+};
+
