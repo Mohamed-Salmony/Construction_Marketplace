@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm ci --prefer-offline --no-audit && next build",
     "start": "next start",
     "serve": "node server.js",
     "render-build": "npm ci && next build",
