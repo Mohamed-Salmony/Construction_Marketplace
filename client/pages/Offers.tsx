@@ -7,7 +7,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import { getProducts, type ProductDto } from "@/services/products";
+import { getProducts, type ProductDto } from "../services/products";
 
 export default function Offers({ setCurrentPage, ...context }: Partial<RouteContext>) {
   const { t, locale } = useTranslation();

@@ -10,7 +10,7 @@ import { Dialog } from '../../components/ui/dialog';
 import ProductForm from '../../components/vendor/ProductForm';
 import { Package, Search, Filter, Plus, Edit, Trash2, Store, Tag, ArrowRight, Clock } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
-import { getProducts, createProduct, updateProduct, deleteProduct, getAllCategories, getProductById } from '@/services/products';
+import { getProducts, createProduct, updateProduct, deleteProduct, getAllCategories, getProductById } from '../../services/products';
 import { getPendingProducts, approveProduct as approveProductAdmin, rejectProduct as rejectProductAdmin } from '@/services/admin';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 

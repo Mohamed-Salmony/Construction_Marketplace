@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { RouteContext } from '../../components/Router';
-import { getAllCategories, type CategoryDto, createCategory, updateCategory, deleteCategory } from '../../services/products';
+import { getAllCategories, type CategoryDto, createCategory, updateCategory, deleteCategory } from '@/services/products';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';

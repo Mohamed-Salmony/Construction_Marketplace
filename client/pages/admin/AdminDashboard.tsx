@@ -29,7 +29,7 @@ import { toastSuccess, toastError } from '../../utils/alerts';
 import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser } from '@/services/admin';
 import { getAdminPendingServices, approveService, rejectService } from '@/services/services';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { getProductById } from '@/services/products';
+import { getProductById } from '../../services/products';
 
 type Trend = 'up' | 'down';
 

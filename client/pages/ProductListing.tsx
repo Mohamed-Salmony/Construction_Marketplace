@@ -35,12 +35,12 @@ import { RouteContext } from "../components/Router";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import { getAllCategories, type CategoryDto } from "@/services/products";
+import { getAllCategories, type CategoryDto } from "../services/products";
 import { useTranslation } from "../hooks/useTranslation";
 import { Dialog, DialogTrigger } from "../components/ui/dialog";
 import ProductForm from "../components/vendor/ProductForm";
 import { confirmDialog } from "../utils/alerts";
-import { getProducts } from "@/services/products";
+import { getProducts } from "../services/products";
 import { addFavorite, removeFavorite, isFavorite } from "../lib/favorites";
 
 // Categories come from backend

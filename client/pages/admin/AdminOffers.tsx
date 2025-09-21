@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { useTranslation } from '../../hooks/useTranslation';
-import { getProducts, getAllCategories, type ProductDto } from '@/services/products';
+import { getProducts, getAllCategories, type ProductDto } from '../../services/products';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 import { adminGetProducts, adminUpdateProduct, adminSetProductDiscount, approveProduct } from '@/services/admin';
 import { api } from '@/lib/api';

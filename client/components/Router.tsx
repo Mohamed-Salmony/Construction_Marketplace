@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { routes } from "./routes";
 import { getCart as apiGetCart, addItem as apiAddItem, updateItemQuantity as apiUpdateItemQuantity, removeItem as apiRemoveItem, clearCart as apiClearCart } from "@/services/cart";
 import Homepage from "../pages/Homepage";
@@ -8,7 +8,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { getProfile } from "@/services/auth";
 import { toastInfo, toastError } from "../utils/alerts";
 import { getWishlist as apiGetWishlist, addToWishlist as apiAddToWishlist, removeFromWishlist as apiRemoveFromWishlist, toggleWishlist as apiToggleWishlist } from "@/services/wishlist";
-import { getProductById } from "@/services/products";
+import { getProductById } from "../services/products";
 import LoadingOverlay from "./LoadingOverlay";
 
 export type UserRole = "customer" | "vendor" | "worker" | "admin";
@@ -194,8 +194,18 @@ export default function Router() {
   const [loadingOpen, setLoadingOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | undefined>(undefined);
   const [loadingSub, setLoadingSub] = useState<string | undefined>(undefined);
-  const showLoading = (message?: string, subMessage?: string) => { setLoadingMsg(message); setLoadingSub(subMessage); setLoadingOpen(true); };
-  const hideLoading = () => { setLoadingOpen(false); setLoadingMsg(undefined); setLoadingSub(undefined); };
+  // Memoize to keep stable identity across renders so effects in pages that list
+  // these functions as dependencies do not re-run continuously
+  const showLoading = useCallback((message?: string, subMessage?: string) => {
+    setLoadingMsg(message);
+    setLoadingSub(subMessage);
+    setLoadingOpen(true);
+  }, []);
+  const hideLoading = useCallback(() => {
+    setLoadingOpen(false);
+    setLoadingMsg(undefined);
+    setLoadingSub(undefined);
+  }, []);
 
   const addToCart = (item: CartItem & { [key: string]: any }) => {
     // Build a composite client-side ID so different variants (e.g., installation) or rentals don't merge

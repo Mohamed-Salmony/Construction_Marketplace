@@ -33,7 +33,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { useTranslation } from "../hooks/useTranslation";
-import { getProductById, getProductBySlug, getCategoryById } from "@/services/products";
+import { getProductById, getProductBySlug, getCategoryById } from "../services/products";
 import { getReviews, addReview, type ReviewDto } from "@/services/reviews";
 
 // Remove static related products and reviews; page is fully backend-driven
