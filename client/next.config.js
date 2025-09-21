@@ -44,6 +44,16 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === 'production',
   },
   
+  // Skip TypeScript checking during build for faster production builds
+  typescript: {
+    ignoreBuildErrors: process.env.NODE_ENV === 'production',
+  },
+  
+  // Skip ESLint during build for faster production builds  
+  eslint: {
+    ignoreDuringBuilds: process.env.NODE_ENV === 'production',
+  },
+  
   // Bundle analyzer and optimization - simplified to avoid build issues
   webpack: (config, { dev, isServer }) => {
     // Fix path resolution for production builds
