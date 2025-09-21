@@ -120,6 +120,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                             specifications: {},
                             compatibility: [],
                             addonInstallation: null
+
                           }); 
                         } catch {}
                         setCurrentPage && setCurrentPage('product-details');
