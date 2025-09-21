@@ -27,8 +27,9 @@ import { useTranslation } from '../../hooks/useTranslation';
 // useStableCallback removed to avoid build issues
 import React from 'react';
 import { toastSuccess, toastError } from '../../utils/alerts';
-import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser } from '@/services/admin';
-import { getAdminPendingServices, approveService, rejectService } from '@/services/services';
+import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser, approveService as approveServiceAdmin, rejectService as rejectServiceAdmin } from '@/services/admin';
+import { getAdminPendingServices } from '@/services/services';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { getProductById } from '../../services/products';
 
@@ -40,7 +41,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
 
   // State
   const [pendingMerchants, setPendingMerchants] = React.useState<Array<{ id: string; email: string; name: string; companyName?: string; createdAt?: string }>>([]);
-  const [pendingServices, setPendingServices] = React.useState<Array<{ id: string; title: string; description?: string; vendorId?: string; createdAt?: string }>>([]);
+  const [pendingServices, setPendingServices] = React.useState<Array<{ id: string | number; title: string; description?: string; vendorId?: string; createdAt?: string }>>([]);
   const [pendingProducts, setPendingProducts] = React.useState<any[]>([]);
   const [pendingServicesError, setPendingServicesError] = React.useState<string | null>(null);
   const [pendingProductsError, setPendingProductsError] = React.useState<string | null>(null);
@@ -119,7 +120,8 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       setCommDraft({ products: String(productsC), projectsMerchants: String(projectsMerchantsC), servicesTechnicians: String(servicesTechC) });
 
       if (srv.ok && srv.data && Array.isArray((srv.data as any).items)) {
-        currentPendingServices = (srv.data as any).items;
+        // Normalize id for Mongo/ObjectId or numeric backends
+        currentPendingServices = ((srv.data as any).items as any[]).map((it:any)=> ({ ...it, id: it.id ?? it._id ?? it.serviceId ?? it.ServiceId }));
         setPendingServices(currentPendingServices);
         setPendingServicesError(null);
       } else {
@@ -267,9 +269,9 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
     } 
   };
 
-  const doApproveService = async (id: string) => { 
+  const doApproveService = async (id: string | number) => { 
     try { 
-      const r = await approveService(Number(id)); 
+      const r = await approveServiceAdmin(String(id)); 
       if (r.ok) { 
         toastSuccess(isAr? 'تم اعتماد الخدمة':'Service approved', isAr); 
         await loadAll(); 
@@ -282,9 +284,9 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
     } 
   };
 
-  const doRejectService = async (id: string) => { 
+  const doRejectService = async (id: string | number) => { 
     try { 
-      const r = await rejectService(Number(id), ''); 
+      const r = await rejectServiceAdmin(String(id), ''); 
       if (r.ok) { 
         toastSuccess(isAr? 'تم رفض الخدمة':'Service rejected', isAr); 
         await loadAll(); 
@@ -497,28 +499,29 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
 
               {/* Pending services */}
               {pendingServices.map((s) => (
-                <div key={s.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg">
+                <div key={String((s as any).id ?? (s as any)._id)} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg">
                   <div>
-                    <p className="font-medium text-sm">{s.title}</p>
-                    <p className="text-xs text-muted-foreground">{(s.description || '').slice(0, 100)}</p>
+                    <p className="font-medium text-sm">{(() => { const k=String(s.title||'').toLowerCase(); if (isAr){ if(k==='plumber') return 'سباك'; if(k==='electrician') return 'كهربائي'; if(k==='carpenter') return 'نجار'; if(k==='painter') return 'دهان'; if(k==='gypsum'||k==='gypsum_installer') return 'جبس'; if(k==='marble'||k==='marble_installer') return 'رخام'; } return s.title || (isAr ? 'الخدمة' : 'Service'); })()}</p>
+                    {s.description && (<p className="text-xs text-muted-foreground">{String(s.description).slice(0, 100)}</p>)}
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <Badge variant="secondary">{t('service')}</Badge>
+                      <Badge className="bg-orange-100 text-orange-700">{isAr ? 'في انتظار الموافقة' : 'Pending approval'}</Badge>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => doApproveService(s.id)}>
+                    <Button size="sm" variant="outline" onClick={() => doApproveService((s as any).id ?? (s as any)._id)}>
                       <CheckCircle className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => doRejectService(s.id)}>
+                    <Button size="sm" variant="outline" onClick={() => doRejectService((s as any).id ?? (s as any)._id)}>
                       <Ban className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               ))}
+
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
           <Card>
             <CardHeader>
               <CardTitle>{t('quickActions')}</CardTitle>

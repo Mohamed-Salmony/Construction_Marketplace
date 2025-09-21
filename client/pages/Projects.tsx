@@ -16,6 +16,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import {
   Select,
@@ -32,7 +33,7 @@ import Footer from "../components/Footer";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { useTranslation } from "../hooks/useTranslation";
 import type { RouteContext } from "../components/routerTypes";
-import { getOpenProjects, getProjects, getMyProjects, createProject, deleteProject } from "@/services/projects";
+import { getOpenProjects, getProjects, getMyProjects, createProject, deleteProject, getProjectById } from "@/services/projects";
 import { getProjectCatalog, type ProjectCatalog } from "@/services/options";
 import { toastError, toastInfo } from "../utils/alerts";
 import { useFirstLoadOverlay } from "../hooks/useFirstLoadOverlay";
@@ -146,6 +147,44 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
     selectedAcc: string[];
     description: string;
   };
+
+  const openInlineDetails = async (pid: string | number) => {
+    try {
+      setDetailsOpen(true);
+      setDetailsLoading(true);
+      setDetailsProject(null);
+      const idStr = String(pid ?? '').trim();
+      const valid = /^[a-fA-F0-9]{24}$/.test(idStr) || /^\d+$/.test(idStr);
+      if (!valid) { setDetailsLoading(false); setDetailsProject(null); return; }
+      const r = await getProjectById(idStr);
+      if (r.ok && r.data) {
+        const data: any = r.data as any;
+        const it0 = Array.isArray(data.items) && data.items.length ? data.items[0] : {};
+        const merged = {
+          ...data,
+          ptype: data.ptype ?? data.type ?? it0.ptype ?? it0.type ?? '',
+          type: data.type ?? it0.type ?? data.ptype ?? it0.ptype ?? '',
+          material: data.material ?? it0.material ?? '',
+          width: Number(data.width ?? it0.width ?? 0) || 0,
+          height: Number(data.height ?? it0.height ?? 0) || 0,
+          quantity: Number(data.quantity ?? it0.quantity ?? 0) || 0,
+          days: Number(data.days ?? it0.days ?? 0) || 0,
+          pricePerMeter: Number(data.pricePerMeter ?? it0.pricePerMeter ?? 0) || 0,
+          total: Number(data.total ?? it0.total ?? 0) || 0,
+          selectedAcc: Array.isArray(data.selectedAcc) ? data.selectedAcc : (Array.isArray(it0.selectedAcc) ? it0.selectedAcc : []),
+          accessories: Array.isArray(data.accessories) ? data.accessories : (Array.isArray(it0.accessories) ? it0.accessories : []),
+          description: data.description ?? it0.description ?? '',
+        };
+        setDetailsProject(merged);
+      } else {
+        setDetailsProject(null);
+      }
+    } catch {
+      setDetailsProject(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
   const blankBuilder = (): Builder => ({
     id: `b-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     ptype: '',
@@ -206,21 +245,12 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
   const [fAcc, setFAcc] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 0]);
 
-  // Remove all localStorage-based project loading; rely on backend only
-  useEffect(() => {
-    setHydrated(true);
-    setHasToken(hasAnyAuth());
-    const onStorage = () => setHasToken(hasAnyAuth());
-    const onFocus = () => setHasToken(hasAnyAuth());
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [hasAnyAuth]);
+  // Inline details dialog state
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsProject, setDetailsProject] = useState<any | null>(null);
 
-  // Load admin project catalog for resolving accessory names per type
+  // Load admin product catalog to resolve localized names
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -233,52 +263,90 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
     return () => { cancelled = true; };
   }, []);
 
-  // Load user's projects from backend when authenticated (non-vendor)
+  // Helpers to resolve labels from catalog first, then local lists, then raw id
+  const resolveTypeLabel = useCallback((typeId: string): string => {
+    try {
+      if (!typeId) return '';
+      const fromCat = catalog?.products?.find(p => p.id === typeId);
+      if (fromCat) return (locale==='ar' ? (fromCat.ar || fromCat.id) : (fromCat.en || fromCat.id));
+      const fromLocal = productTypes.find(pt => pt.id === typeId);
+      if (fromLocal) return (locale==='ar' ? fromLocal.ar : fromLocal.en);
+      return typeId;
+    } catch { return typeId; }
+  }, [catalog, locale]);
+
+  const resolveMaterialLabel = useCallback((typeId: string, materialId: string): string => {
+    try {
+      if (!materialId) return '';
+      // Try catalog under the product's subtypes materials
+      const prod = catalog?.products?.find(p => p.id === typeId);
+      const mats = ([] as any[]).concat(...((prod?.subtypes || []).map((s:any)=> s?.materials || [])));
+      const found = mats.find((m:any)=> m?.id === materialId);
+      if (found) return (locale==='ar' ? (found.ar || found.id) : (found.en || found.id));
+      const fromLocal = materials.find(m => m.id === materialId);
+      if (fromLocal) return (locale==='ar' ? fromLocal.ar : fromLocal.en);
+      return materialId;
+    } catch { return materialId; }
+  }, [catalog, locale]);
+
+  // Remove all localStorage-based project loading; rely on backend only
   useEffect(() => {
     let cancelled = false;
+    setHydrated(true);
+    setHasToken(hasAnyAuth());
+    const onStorage = () => setHasToken(hasAnyAuth());
+    const onFocus = () => setHasToken(hasAnyAuth());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+
     (async () => {
       try {
-        // Only fetch when we actually have a token; avoid spamming 401s
         if (!hasToken || isVendor) return;
-        // debug once
-        try { if (!(window as any).__projectsAuthDebug) { (window as any).__projectsAuthDebug = true; console.debug('[projects] fetching my projects; hasToken=', hasToken); } } catch {}
-        const { ok, data, status } = await getMyProjects() as any;
-        if (!cancelled && ok && Array.isArray(data)) {
-          // Map backend ProjectDto into minimal structure used by UI where possible
-          const mapped = (data as any[]).map((p:any) => ({
-            id: p.id,
-            ownerId: currentUserId,
-            type: p.type || p.ptype || '',
-            psubtype: p.psubtype || '',
-            material: p.material || '',
-            color: p.color || '',
-            width: Number(p.width)||0,
-            height: Number(p.height)||0,
-            quantity: Number(p.quantity)||0,
-            pricePerMeter: Number(p.pricePerMeter)||0,
-            selectedAcc: Array.isArray(p.selectedAcc) ? p.selectedAcc : [],
-            accessories: Array.isArray(p.accessories) ? p.accessories : [],
-            description: p.description || '',
-            total: Number(p.total)||0,
-            createdAt: p.createdAt || new Date().toISOString(),
-            updatedAt: p.updatedAt || undefined,
-            days: p.days || 0,
-            status: p.status || p.Status || '',
-          }));
+        const my = await getMyProjects();
+        if (!cancelled && my.ok && Array.isArray(my.data)) {
+          const mapped = (my.data as any[]).map((p:any) => {
+            const rawStatus = p.status ?? p.Status ?? p.state ?? p.State ?? '';
+            const byApproval = (p.isApproved === false || p.approved === false) ? 'PendingApproval' : (p.isApproved === true || p.approved === true ? (rawStatus || 'Published') : rawStatus);
+            const status = normalizeStatus(byApproval || rawStatus);
+            const firstItem = Array.isArray(p.items) && p.items.length ? p.items[0] : {};
+            const typeVal = p.type || p.ptype || firstItem.ptype || firstItem.type || '';
+            const materialVal = p.material || firstItem.material || '';
+            const widthVal = Number(p.width ?? firstItem.width ?? 0) || 0;
+            const heightVal = Number(p.height ?? firstItem.height ?? 0) || 0;
+            const qtyVal = Number(p.quantity ?? firstItem.quantity ?? 0) || 0;
+            const ppmVal = Number(p.pricePerMeter ?? firstItem.pricePerMeter ?? 0) || 0;
+            const selAcc = Array.isArray(p.selectedAcc) ? p.selectedAcc : Array.isArray(firstItem.selectedAcc) ? firstItem.selectedAcc : [];
+            const accs = Array.isArray(p.accessories) ? p.accessories : Array.isArray(firstItem.accessories) ? firstItem.accessories : [];
+            return ({
+              id: p.id ?? p._id,
+              ownerId: currentUserId,
+              type: typeVal,
+              material: materialVal,
+              width: widthVal,
+              height: heightVal,
+              quantity: qtyVal,
+              pricePerMeter: ppmVal,
+              selectedAcc: selAcc,
+              accessories: accs,
+              description: p.description || '',
+              total: Number(p.total)||0,
+              createdAt: p.createdAt || new Date().toISOString(),
+              updatedAt: p.updatedAt || undefined,
+              days: p.days || 0,
+              status,
+            });
+          });
           setUserProjects(mapped);
-        } else if (!cancelled && status === 401) {
-          // If we think user is authenticated (token/cookie present), avoid misleading toast
-          if (!hasAnyAuth()) {
-            toastError(locale==='ar' ? 'يرجى تسجيل الدخول لعرض مشاريعك.' : 'Please sign in to view your projects.');
-          } else {
-            // Silent fail; could be role mismatch or expired token — UI will still render without banner
-            console.warn('[projects] 401 while authenticated; possible role mismatch or expired token');
-          }
         }
-      } catch {}
+      } catch {} 
       finally { if (!cancelled) setLoadedMine(true); }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [hasToken, isVendor, currentUserId, locale, hasAnyAuth]);
 
   // Fetch open projects from backend (read-only showcase)
@@ -555,7 +623,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
     const area = Math.max(0, width) * Math.max(0, height);
     const acc = accessoriesCatalog.filter(a => selectedAcc.includes(a.id));
     if (editingId) {
-      setUserProjects(prev => prev.map(p => p.id === editingId ? {
+      setUserProjects(prev => prev.map((p:any) => p.id === editingId ? {
         ...p,
         type: ptype,
         material,
@@ -573,13 +641,11 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       setShowBuilder(false);
       return;
     }
-    // Persist via backend API (Customer only)
     try {
       const title = `${ptype || ''} ${material || ''}`.trim() || (locale==='ar' ? 'مشروع' : 'Project');
       const payload: any = {
         title,
         description,
-        // Additional UI-specific fields (mapped on server with defaults)
         type: ptype,
         material,
         width,
@@ -588,35 +654,63 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
         days: 0,
         pricePerMeter,
         total,
-        items: acc,
+        items: [
+          {
+            ptype,
+            type: ptype,
+            material,
+            width,
+            height,
+            quantity,
+            days: 0,
+            pricePerMeter,
+            selectedAcc,
+            accessories: acc,
+            total,
+            description,
+          },
+        ],
       };
       const res = await createProject(payload);
       if (!res.ok) {
         alert(locale==='ar' ? 'غير مصرح. يرجى تسجيل الدخول بحساب عميل.' : 'Unauthorized. Please sign in with a Customer account.');
         return;
       }
-      // Refresh my projects from backend
       try {
         const my = await getMyProjects();
         if (my.ok && Array.isArray(my.data)) {
-          const mapped = (my.data as any[]).map((p:any) => ({
-            id: p.id,
-            ownerId: currentUserId,
-            type: p.type || p.ptype || '',
-            material: p.material || '',
-            width: Number(p.width)||0,
-            height: Number(p.height)||0,
-            quantity: Number(p.quantity)||0,
-            pricePerMeter: Number(p.pricePerMeter)||0,
-            selectedAcc: Array.isArray(p.selectedAcc) ? p.selectedAcc : [],
-            accessories: Array.isArray(p.accessories) ? p.accessories : [],
-            description: p.description || '',
-            total: Number(p.total)||0,
-            createdAt: p.createdAt || new Date().toISOString(),
-            updatedAt: p.updatedAt || undefined,
-            days: p.days || 0,
-            status: p.status || p.Status || '',
-          }));
+          const mapped = (my.data as any[]).map((p:any) => {
+            const rawStatus = p.status ?? p.Status ?? p.state ?? p.State ?? '';
+            const byApproval = (p.isApproved === false || p.approved === false) ? 'PendingApproval' : (p.isApproved === true || p.approved === true ? (rawStatus || 'Published') : rawStatus);
+            const status = normalizeStatus(byApproval || rawStatus);
+            const firstItem = Array.isArray(p.items) && p.items.length ? p.items[0] : {};
+            const typeVal = p.type || p.ptype || firstItem.ptype || firstItem.type || '';
+            const materialVal = p.material || firstItem.material || '';
+            const widthVal = Number(p.width ?? firstItem.width ?? 0) || 0;
+            const heightVal = Number(p.height ?? firstItem.height ?? 0) || 0;
+            const qtyVal = Number(p.quantity ?? firstItem.quantity ?? 0) || 0;
+            const ppmVal = Number(p.pricePerMeter ?? firstItem.pricePerMeter ?? 0) || 0;
+            const selAcc = Array.isArray(p.selectedAcc) ? p.selectedAcc : Array.isArray(firstItem.selectedAcc) ? firstItem.selectedAcc : [];
+            const accs = Array.isArray(p.accessories) ? p.accessories : Array.isArray(firstItem.accessories) ? firstItem.accessories : [];
+            return ({
+              id: p.id,
+              ownerId: currentUserId,
+              type: typeVal,
+              material: materialVal,
+              width: widthVal,
+              height: heightVal,
+              quantity: qtyVal,
+              pricePerMeter: ppmVal,
+              selectedAcc: selAcc,
+              accessories: accs,
+              description: p.description || '',
+              total: Number(p.total)||0,
+              createdAt: p.createdAt || new Date().toISOString(),
+              updatedAt: p.updatedAt || undefined,
+              days: p.days || 0,
+              status,
+            });
+          });
           setUserProjects(mapped);
         }
       } catch {}
@@ -1076,15 +1170,17 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-3">{locale==='ar' ? 'المشاريع' : ' Projects'}</h3>
                 <div className="space-y-3">
-                  {filteredUserProjects.map((up) => {
+                  {filteredUserProjects.map((up, idx) => {
                     const rawStatus = (up.status || up.Status || '');
                     const norm = normalizeStatus(rawStatus);
                     const statusLc = norm.toLowerCase();
                     const isPending = ['draft','inbidding'].includes(statusLc) || ['pending','pendingapproval','inreview','underreview'].includes(statusLc);
-                    const isLocked = ['inprogress','published','bidselected','completed'].includes(statusLc);
+                    // After admin approval (Published) user can edit/delete; also allow during InBidding
+                    const isLocked = ['inprogress','bidselected','completed'].includes(statusLc);
                     const localizedStatus = (() => {
                       if (!norm) return locale==='ar' ? 'غير معروف' : 'Unknown';
                       if (statusLc==='draft') return locale==='ar' ? 'مسودة' : 'Draft';
+                      if (statusLc==='pending' || statusLc==='pendingapproval' || statusLc==='inreview' || statusLc==='underreview') return locale==='ar' ? 'قيد الاعتماد' : 'Pending Approval';
                       if (statusLc==='inbidding') return locale==='ar' ? 'مفتوح للمناقصات' : 'In Bidding';
                       if (statusLc==='inprogress') return locale==='ar' ? 'قيد التنفيذ' : 'In Progress';
                       if (statusLc==='published') return locale==='ar' ? 'منشور' : 'Published';
@@ -1094,12 +1190,12 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                       return String(norm);
                     })();
                     return (
-                  <Card key={up.id}>
+                  <Card key={`${String(up.id)}-${idx}`}>
                     <CardContent className="p-4 flex items-center justify-between gap-4">
                       <div>
-                        <div className="font-medium">{locale==='ar' ? 'نوع' : 'Type'}: {productTypes.find(p=>p.id===(up.ptype || up.type))?.[locale==='ar'?'ar':'en']}</div>
+                        <div className="font-medium">{locale==='ar' ? 'نوع' : 'Type'}: {resolveTypeLabel(String(up.ptype || up.type || ''))}</div>
                         <div className="text-sm text-muted-foreground">
-                          {locale==='ar' ? 'خامة' : 'Material'}: {materials.find(m=>m.id===up.material)?.[locale==='ar'?'ar':'en']} • {up.width}×{up.height} m • {locale==='ar' ? 'الكمية' : 'Qty'}: {up.quantity}
+                          {locale==='ar' ? 'خامة' : 'Material'}: {resolveMaterialLabel(String(up.ptype || up.type || ''), String(up.material || ''))} • {up.width}×{up.height} m • {locale==='ar' ? 'الكمية' : 'Qty'}: {up.quantity}
                         </div>
                         <div className="mt-1">
                           <Badge variant={isPending ? 'secondary' : (isLocked ? 'default' : 'outline')}>
@@ -1136,11 +1232,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                         <div className="text-sm text-muted-foreground">{locale==='ar' ? 'الإجمالي' : 'Total'}</div>
                         <div className="text-lg font-semibold text-primary">{currency} {up.total.toLocaleString(locale==='ar'?'ar-EG':'en-US')}</div>
                         <div className="mt-2 flex items-center gap-2 justify-end">
-                          <Button size="sm" variant="outline" onClick={() => {
-                            try { window.localStorage.setItem('selected_project_id', String(up.id)); } catch {}
-                            setCurrentPage && setCurrentPage('project-details');
-                            window?.scrollTo?.({ top: 0, behavior: 'smooth' });
-                          }} aria-label={locale==='ar' ? 'التفاصيل' : 'Details'}>
+                          <Button size="sm" variant="outline" onClick={() => openInlineDetails(up.id)} aria-label={locale==='ar' ? 'التفاصيل' : 'Details'}>
                             <Eye className="w-4 h-4 ml-1" /> {locale==='ar' ? 'التفاصيل' : 'Details'}
                           </Button>
                           <Button size="sm" variant="secondary" disabled={isLocked} onClick={() => {
@@ -1154,6 +1246,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                                 width: up.width || 0,
                                 height: up.height || 0,
                                 quantity: up.quantity || 1,
+                                days: Number(up.days) || 1,
                                 // normalize accessories ids
                                 selectedAcc: Array.isArray(up.selectedAcc)
                                   ? up.selectedAcc
@@ -1204,7 +1297,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                                   const my = await getMyProjects();
                                   if (my.ok && Array.isArray(my.data)) {
                                     const mapped = (my.data as any[]).map((p:any) => ({
-                                      id: p.id,
+                                      id: p.id ?? p._id,
                                       ownerId: currentUserId,
                                       type: p.type || p.ptype || '',
                                       psubtype: p.psubtype || '',
@@ -1253,6 +1346,72 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       </div>
 
       <Footer setCurrentPage={setCurrentPage as any} />
+
+      {/* Inline Details Dialog */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-3xl bg-white/95 backdrop-blur-sm">
+          <DialogHeader>
+            <DialogTitle>{locale==='ar' ? 'تفاصيل المشروع' : 'Project Details'}</DialogTitle>
+          </DialogHeader>
+          {detailsLoading ? (
+            <div className="p-2 text-sm text-muted-foreground">{locale==='ar' ? 'جارٍ التحميل...' : 'Loading...'}</div>
+          ) : !detailsProject ? (
+            <div className="p-2 text-sm text-red-600">{locale==='ar' ? 'تعذر تحميل التفاصيل' : 'Failed to load details'}</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'النوع:' : 'Type:'}</span> {resolveTypeLabel(String(detailsProject.ptype || detailsProject.type || '')) || (detailsProject.type||'-')}</div>
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'الخامة:' : 'Material:'}</span> {resolveMaterialLabel(String(detailsProject.ptype || detailsProject.type || ''), String(detailsProject.material || '')) || detailsProject.material || '-'}</div>
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'الأبعاد:' : 'Dimensions:'}</span> {detailsProject.width} × {detailsProject.height} m</div>
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'الكمية:' : 'Quantity:'}</span> {detailsProject.quantity}</div>
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'أيام التنفيذ:' : 'Days:'}</span> {detailsProject.days || '-'}</div>
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'سعر المتر:' : 'Price/m²:'}</span> {detailsProject.pricePerMeter || 0} {locale==='ar' ? 'ر.س' : 'SAR'}</div>
+                <div><span className="text-muted-foreground">{locale==='ar' ? 'الإجمالي:' : 'Total:'}</span> {(detailsProject.total || 0).toLocaleString(locale==='ar'?'ar-EG':'en-US')} {locale==='ar' ? 'ر.س' : 'SAR'}</div>
+                {(() => {
+                  const rawStatus = detailsProject?.status || detailsProject?.Status || detailsProject?.state || detailsProject?.State || '';
+                  const byApproval = (detailsProject?.isApproved === false || detailsProject?.approved === false)
+                    ? 'PendingApproval'
+                    : ((detailsProject?.isApproved === true || detailsProject?.approved === true) ? (rawStatus || 'Published') : rawStatus);
+                  const norm = normalizeStatus(byApproval || rawStatus).toLowerCase();
+                  const localized = (() => {
+                    if (!norm) return locale==='ar' ? 'غير معروف' : 'Unknown';
+                    if (norm==='draft') return locale==='ar' ? 'مسودة' : 'Draft';
+                    if (['pending','pendingapproval','inreview','underreview'].includes(norm)) return locale==='ar' ? 'قيد الاعتماد' : 'Pending Approval';
+                    if (norm==='inbidding') return locale==='ar' ? 'مفتوح للمناقصات' : 'In Bidding';
+                    if (norm==='published') return locale==='ar' ? 'منشور' : 'Published';
+                    if (norm==='inprogress') return locale==='ar' ? 'قيد التنفيذ' : 'In Progress';
+                    if (norm==='bidselected') return locale==='ar' ? 'تم اختيار عرض' : 'Bid Selected';
+                    if (norm==='completed') return locale==='ar' ? 'مكتمل' : 'Completed';
+                    if (norm==='cancelled' || norm==='canceled') return locale==='ar' ? 'ملغي' : 'Cancelled';
+                    return norm;
+                  })();
+                  return (
+                    <div><span className="text-muted-foreground">{locale==='ar' ? 'الحالة:' : 'Status:'}</span> {localized}</div>
+                  );
+                })()}
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground mb-1">{locale==='ar' ? 'الملحقات' : 'Accessories'}</div>
+                {(() => {
+                  const ids: string[] = Array.isArray(detailsProject.selectedAcc) ? detailsProject.selectedAcc : [];
+                  const names = ids.map((id:string)=> accessoriesCatalog.find(a=>a.id===id)?.[locale==='ar'?'ar':'en'] || id).filter(Boolean);
+                  return names.length ? (
+                    <div className="flex flex-wrap gap-2">{names.map((n,i)=>(<span key={i} className="px-2 py-1 rounded border text-xs">{n}</span>))}</div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">{locale==='ar' ? 'بدون' : 'None'}</div>
+                  );
+                })()}
+              </div>
+              {detailsProject.description && (
+                <div>
+                  <div className="text-sm text-muted-foreground mb-1">{locale==='ar' ? 'الوصف' : 'Description'}</div>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/30 border rounded p-3">{detailsProject.description}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

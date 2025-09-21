@@ -656,6 +656,7 @@ export default function Router() {
         const needsServiceId = currentPage === 'technician-service-details';
         const needsProjectId = currentPage === 'technician-project-details';
         const needsProductId = currentPage === 'product-details';
+        const needsProjectDetailsId = currentPage === 'project-details';
         if (!needsServiceId) url.searchParams.delete('serviceId');
         if (!needsProjectId) url.searchParams.delete('projectId');
         // For product details, persist id or slug for shareable deep links
@@ -669,6 +670,12 @@ export default function Router() {
             url.searchParams.set('slug', pslug);
             url.searchParams.delete('id');
           }
+        } else if (needsProjectDetailsId) {
+          // Persist selected project id so deep link/refresh works
+          let pid = '';
+          try { pid = window.localStorage.getItem('selected_project_id') || ''; } catch {}
+          if (pid) url.searchParams.set('id', pid); else url.searchParams.delete('id');
+          url.searchParams.delete('slug');
         } else {
           url.searchParams.delete('id');
           url.searchParams.delete('slug');

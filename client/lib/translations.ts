@@ -24,6 +24,10 @@ export const translations = {
     quantity: "الكمية",
     total: "المجموع",
 
+    // Entities
+    service: "خدمة",
+    product: "منتج",
+
     // Homepage
     heroTitle: "أفضل خدمات ومنتجات المقاولات في المملكة",
     heroSubtitle:
@@ -285,7 +289,7 @@ export const translations = {
     mapLocationContact: "خريطة الموقع",
     general: "استفسار عام",
     order: "استفسار عن طلب",
-    product: "استفسار عن منتج",
+    productInquiry: "استفسار عن منتج",
     technical: "مشكلة تقنية",
     complaint: "شكوى",
     suggestion: "اقتراح",
@@ -752,6 +756,10 @@ export const translations = {
     total: "Total",
     buyFast: "Buy Now",
     fullName: "Full Name",
+
+    // Entities
+    service: "Service",
+    product: "Product",
 
     // Homepage
     heroTitle: "Best Construction Services and Products in Saudi Arabia",

@@ -10,4 +10,7 @@ const bidSchema = new mongoose.Schema({
   status: { type: String, default: 'pending' }, // pending | accepted | rejected
 }, { timestamps: true });
 
+// Ensure a vendor can only submit one bid per project
+bidSchema.index({ projectId: 1, merchantId: 1 }, { unique: true });
+
 export const Bid = mongoose.models.Bid || mongoose.model('Bid', bidSchema);

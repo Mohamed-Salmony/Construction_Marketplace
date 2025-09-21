@@ -53,7 +53,7 @@ export default function TechnicianServices({ setCurrentPage, ...context }: Props
       (context as any)?.hideLoading?.();
     });
     return () => { cancelled = true; };
-  }, [context, isAr]); // Include dependencies as indicated by ESLint
+  }, [isAr]);
 
   // Inform unverified workers and block the page
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function TechnicianServices({ setCurrentPage, ...context }: Props
       (context as any)?.hideLoading?.();
     });
     return () => { cancelled = true; };
-  }, [context, isAr, technicianId]); // Include dependencies as indicated by ESLint
+  }, [isAr, technicianId]);
 
   // Build fast lookup for requests already submitted by this technician
   const submittedServices = useMemo(() => {

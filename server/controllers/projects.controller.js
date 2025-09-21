@@ -31,15 +31,54 @@ export async function create(req, res) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
   const body = req.body || {};
-  const p = await Project.create({
-    title: body.title,
-    description: body.description,
-    customerId: req.user._id,
-    categoryId: body.categoryId || null,
-    status: 'Draft',
-    views: 0,
-  });
-  res.status(201).json(p);
+  try {
+    // Normalize items array
+    const items = Array.isArray(body.items) ? body.items : [];
+    const main = items.length ? items[0] : {};
+
+    // Prefer explicit root fields; fallback to first item
+    const ptype = body.ptype ?? body.type ?? main.ptype ?? main.type;
+    const type = body.type ?? main.type ?? ptype; // keep both for compatibility
+    const material = body.material ?? main.material;
+    const width = body.width ?? main.width;
+    const height = body.height ?? main.height;
+    const quantity = body.quantity ?? main.quantity;
+    const days = body.days ?? main.days;
+    const pricePerMeter = body.pricePerMeter ?? main.pricePerMeter;
+    const total = body.total ?? main.total;
+    const selectedAcc = Array.isArray(body.selectedAcc) ? body.selectedAcc : (Array.isArray(main.selectedAcc) ? main.selectedAcc : []);
+    const accessories = Array.isArray(body.accessories) ? body.accessories : (Array.isArray(main.accessories) ? main.accessories : []);
+
+    const doc = await Project.create({
+      title: body.title,
+      description: body.description,
+      customerId: req.user._id,
+      categoryId: body.categoryId || null,
+      status: 'Draft',
+      views: 0,
+
+      // root convenience fields
+      ptype,
+      type,
+      material,
+      width,
+      height,
+      quantity,
+      days,
+      pricePerMeter,
+      total,
+      selectedAcc,
+      accessories,
+
+      // items array as received
+      items,
+    });
+
+    res.status(201).json(doc);
+  } catch (e) {
+    console.error('Create Project error:', e);
+    res.status(500).json({ success: false, message: 'Failed to create project' });
+  }
 }
 
 export async function update(req, res) {
@@ -72,8 +111,16 @@ export async function createBid(req, res) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
   const { price, days, message } = req.body || {};
-  const b = await Bid.create({ projectId: req.params.projectId, merchantId: req.user._id, price, days, message });
-  res.status(201).json(b);
+  try {
+    const b = await Bid.create({ projectId: req.params.projectId, merchantId: req.user._id, price, days, message });
+    return res.status(201).json(b);
+  } catch (e) {
+    if (e && (e.code === 11000 || String(e.message||'').includes('duplicate key'))) {
+      return res.status(409).json({ success: false, message: 'You have already submitted a bid for this project.' });
+    }
+    console.error('Create Bid error:', e);
+    return res.status(500).json({ success: false, message: 'Failed to submit bid' });
+  }
 }
 
 export const validateCreateProject = [

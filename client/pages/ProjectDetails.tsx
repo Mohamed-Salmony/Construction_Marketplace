@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -80,17 +81,44 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
         if (!id) {
           try { id = localStorage.getItem('selected_project_id'); } catch {}
         }
-        if (!id) { setLoading(false); return; }
+        const isValidId = (val: any) => {
+          const s = String(val ?? '').trim();
+          if (!s || s === 'undefined' || s === 'null') return false;
+          if (/^[a-fA-F0-9]{24}$/.test(s)) return true; // Mongo OID
+          if (/^\d+$/.test(s)) return true; // numeric
+          return false;
+        };
+        if (!isValidId(id)) {
+          setLoading(false);
+          try { setCurrentPage && setCurrentPage('projects'); } catch {}
+          return;
+        }
         // Load from backend only (use admin endpoint for admins)
         try {
           const isAdmin = ((rest as any)?.user?.role === 'admin');
           const resp = isAdmin
-            ? await getAdminProjectById(Number(id))
+            ? await getAdminProjectById(String(id))
             : await getProjectById(String(id));
           const ok = (resp as any).ok;
-          const data = (resp as any).data;
+          const data = (resp as any).data as any;
           if (!cancelled && ok && data) {
-            setProject(data as any);
+            const it0 = Array.isArray((data as any).items) && (data as any).items.length ? (data as any).items[0] : {};
+            const merged = {
+              ...data,
+              ptype: data.ptype ?? data.type ?? it0.ptype ?? it0.type ?? '',
+              type: data.type ?? it0.type ?? data.ptype ?? it0.ptype ?? '',
+              material: data.material ?? it0.material ?? '',
+              width: Number(data.width ?? it0.width ?? 0) || 0,
+              height: Number(data.height ?? it0.height ?? 0) || 0,
+              quantity: Number(data.quantity ?? it0.quantity ?? 0) || 0,
+              days: Number(data.days ?? it0.days ?? 0) || 0,
+              pricePerMeter: Number(data.pricePerMeter ?? it0.pricePerMeter ?? 0) || 0,
+              total: Number(data.total ?? it0.total ?? 0) || 0,
+              selectedAcc: Array.isArray(data.selectedAcc) ? data.selectedAcc : (Array.isArray(it0.selectedAcc) ? it0.selectedAcc : []),
+              accessories: Array.isArray(data.accessories) ? data.accessories : (Array.isArray(it0.accessories) ? it0.accessories : []),
+              description: data.description ?? it0.description ?? '',
+            };
+            setProject(merged);
           }
         } catch {}
         // Load admin catalog to resolve accessories names and materials per type
@@ -102,8 +130,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
         try {
           // Prefer same id used to fetch project
           const pidStr = String(id || localStorage.getItem('selected_project_id') || '');
-
-          if (pidStr) {
+          if (isValidId(pidStr)) {
             const r = await getProjectBids(pidStr);
             if (!cancelled && r.ok && Array.isArray(r.data)) {
               const mapped = (r.data as any[]).map((b:any) => {

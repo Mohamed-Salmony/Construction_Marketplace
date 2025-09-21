@@ -80,6 +80,7 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
             const currency = p.currency ?? p.Currency;
             return {
               ...p,
+              id: p.id ?? p._id, // ensure id exists
               type,
               material,
               width,
@@ -223,7 +224,7 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
                       size="sm"
                       onClick={() => {
                         try {
-                          window.localStorage.setItem('selected_vendor_project_id', String(p.id));
+                          window.localStorage.setItem('selected_vendor_project_id', String(p.id ?? p._id ?? ''));
                         } catch {}
                         setCurrentPage && setCurrentPage('vendor-project-details');
                       }}
@@ -383,7 +384,12 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
                 (async () => {
                   try {
                     setSaving(true);
-                    const res = await createBid(String(selectedProject.id), { price: Number(offerPrice), days: Number(offerDays), message: offerMessage });
+                    const pid = String(selectedProject.id ?? selectedProject._id ?? '');
+                    if (!pid) {
+                      Swal.fire({ icon: 'error', title: locale==='ar' ? 'تعذر تحديد المشروع' : 'Project not identified' });
+                      return;
+                    }
+                    const res = await createBid(pid, { price: Number(offerPrice), days: Number(offerDays), message: offerMessage });
                     if (res.ok) {
                       try { const { ok, data } = await getMyBids(); if (ok && Array.isArray(data)) setMyBids(data as any[]); } catch {}
                       setProposalOpen(false);
