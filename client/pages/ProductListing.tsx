@@ -283,7 +283,7 @@ export default function ProductListing({
     };
     load();
     return () => { cancelled = true; };
-  }, [searchTerm, sortBy, rest?.searchFilters?.categoryId, selectedCategoryId, categories, locale, rest, rest?.searchFilters]);
+  }, [searchTerm, sortBy, rest?.searchFilters?.categoryId, selectedCategoryId, categories, locale]);
 
   // Load categories from backend; guard with ref to avoid repeating unless locale changes
   const categoriesLoadedRef = useRef(false);
@@ -335,7 +335,7 @@ export default function ProductListing({
         setSelectedCategoryId('all');
       }
     }
-  }, [rest, rest?.searchFilters, rest?.searchFilters?.partCategory]);
+  }, [rest?.searchFilters?.partCategory]);
 
   useEffect(() => {
     let filtered = products;
