@@ -859,7 +859,7 @@ export default function ProductDetails({
               {/* Subtotal reflecting quantity and installation per unit */}
               <div className="flex items-center justify-between text-sm bg-muted/30 rounded-md px-3 py-2">
                 <span className="text-muted-foreground">
-                  {locale === 'ar' ? 'الإجمالي (يشمل التركيب إن وجد)' : 'Subtotal (incl. installation if selected)'}
+                  {locale === 'ar' ? 'الإجمالي' : 'Subtotal'}
                 </span>
                 <span className="font-semibold text-primary">
                   {subtotal} {currency}
@@ -963,23 +963,7 @@ export default function ProductDetails({
                   ))}
                 </ul>
 
-                {product.installationTips && (
-                  <>
-                    <h3 className="font-medium mb-4 mt-6">
-                      {locale === 'en' ? 'Installation Tips' : 'نصائح التركيب'}
-                    </h3>
-                    <ol className="space-y-2">
-                      {product.installationTips.map((tip: string, index: number) => (
-                        <li key={index} className="flex gap-2">
-                          <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground text-sm rounded-full flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </>
-                )}
+                {/* Installation tips removed as requested */}
               </CardContent>
             </Card>
           </TabsContent>
