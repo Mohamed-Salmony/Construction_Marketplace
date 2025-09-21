@@ -19,7 +19,7 @@ services:
 
   # Frontend Service
   - type: web
-    name: construction-marketplace-frontend
+    name: construction-marketplace-1
     env: node
     rootDir: client
     plan: free
@@ -32,7 +32,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://construction-marketpla.onrender.com
-      # Add more environment variables as needed:
-      # - key: NEXT_TELEMETRY_DISABLED
-      #   value: 1
+        value: https://construction-marketplace.onrender.com
+      - key: NEXT_TELEMETRY_DISABLED
+        value: 1
