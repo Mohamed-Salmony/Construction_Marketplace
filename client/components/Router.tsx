@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { routes } from "./routes";
 import { getCart as apiGetCart, addItem as apiAddItem, updateItemQuantity as apiUpdateItemQuantity, removeItem as apiRemoveItem, clearCart as apiClearCart } from "@/services/cart";
 import Homepage from "../pages/Homepage";
@@ -8,7 +8,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { getProfile } from "@/services/auth";
 import { toastInfo, toastError } from "../utils/alerts";
 import { getWishlist as apiGetWishlist, addToWishlist as apiAddToWishlist, removeFromWishlist as apiRemoveFromWishlist, toggleWishlist as apiToggleWishlist } from "@/services/wishlist";
-import { getProductById } from "../services/products";
+import { getProductById } from "@/services/products";
 import LoadingOverlay from "./LoadingOverlay";
 
 export type UserRole = "customer" | "vendor" | "worker" | "admin";
@@ -194,18 +194,8 @@ export default function Router() {
   const [loadingOpen, setLoadingOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | undefined>(undefined);
   const [loadingSub, setLoadingSub] = useState<string | undefined>(undefined);
-  // Memoize to keep stable identity across renders so effects in pages that list
-  // these functions as dependencies do not re-run continuously
-  const showLoading = useCallback((message?: string, subMessage?: string) => {
-    setLoadingMsg(message);
-    setLoadingSub(subMessage);
-    setLoadingOpen(true);
-  }, []);
-  const hideLoading = useCallback(() => {
-    setLoadingOpen(false);
-    setLoadingMsg(undefined);
-    setLoadingSub(undefined);
-  }, []);
+  const showLoading = (message?: string, subMessage?: string) => { setLoadingMsg(message); setLoadingSub(subMessage); setLoadingOpen(true); };
+  const hideLoading = () => { setLoadingOpen(false); setLoadingMsg(undefined); setLoadingSub(undefined); };
 
   const addToCart = (item: CartItem & { [key: string]: any }) => {
     // Build a composite client-side ID so different variants (e.g., installation) or rentals don't merge
@@ -348,7 +338,7 @@ export default function Router() {
         }
       } catch {}
     })();
-  }, [user]);
+  }, [user?.id]);
 
   // Wishlist: server-backed (requires auth) with enrichment (image/name/price)
   useEffect(() => {
@@ -406,7 +396,7 @@ export default function Router() {
         } else setWishlistItems([]);
       } catch { setWishlistItems([]); }
     })();
-  }, [user]);
+  }, [user?.id]);
 
   const normalizeProductIdForApi = (val: any): string | number | null => {
     try {
@@ -593,7 +583,7 @@ export default function Router() {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       }, 0);
     }
-  }, [currentPage, selectedProduct]);
+  }, [currentPage]);
 
   // No prevPage persistence in localStorage; keep in-memory only
 
@@ -688,7 +678,7 @@ export default function Router() {
         // no-op
       }
     }
-  }, [currentPage, selectedProduct]);
+  }, [currentPage]);
 
   // Auth/role guard: enforce access to protected routes
   useEffect(() => {
@@ -766,7 +756,25 @@ export default function Router() {
         }
       }
     }
-  }, [currentPage, user, sessionChecked, authChecked, verificationRecheckedAt]);
+  }, [currentPage, user, sessionChecked]);
+
+  // Listen for SPA navigation events dispatched by components that may not have setCurrentPage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      try {
+        const ce = e as CustomEvent<{ page?: string }>;
+        const page = ce?.detail?.page;
+        if (page && typeof page === 'string') {
+          navigate(page);
+        }
+      } catch {}
+    };
+    window.addEventListener('spa_navigate' as any, handler as any);
+    return () => {
+      window.removeEventListener('spa_navigate' as any, handler as any);
+    };
+  }, []);
 
   if (!mounted) return null;
 
