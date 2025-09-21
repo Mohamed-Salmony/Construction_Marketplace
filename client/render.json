@@ -1,0 +1,41 @@
+{
+  "buildCommand": "npm ci && npm run build",
+  "startCommand": "node server.js",
+  "envs": {
+    "production": {
+      "NODE_ENV": "production",
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "NEXT_PUBLIC_API_BASE_URL": "https://construction-marketplace.onrender.com"
+    }
+  },
+  "build": {
+    "nodeVersion": "20",
+    "skipPruning": false,
+    "buildScript": "./render-build.sh"
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ]
+}

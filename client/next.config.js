@@ -19,10 +19,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
       },
-      // Allow API-served absolute image URLs (production)
+      // Allow API-served absolute image URLs (production - Render backend)
       {
         protocol: 'https',
-        hostname: 'construction-marketplace.onrender.com',
+        hostname: 'construction-marketplace-backend.onrender.com',
       },
     ],
   },
@@ -32,10 +32,9 @@ const nextConfig = {
   poweredByHeader: false,
   generateEtags: false,
   
-  // Performance optimizations (avoid optimizePackageImports due to SSR/prerender issues with some icon libs)
+  // Performance optimizations
   experimental: {
-    // optimizeCss: true, // Disabled - causes 'critters' module error on Vercel
-    // optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    // Keep experimental features minimal for Render compatibility
   },
   // Ensure certain ESM-only packages are transpiled for SSR compatibility
   transpilePackages: ['lucide-react', '@radix-ui/react-icons'],
@@ -67,11 +66,7 @@ const nextConfig = {
 
   async redirects() {
     return [
-      {
-        source: '/:locale/_vercel/insights/:path*',
-        destination: '/_vercel/insights/:path*',
-        permanent: false,
-      },
+      // Add any necessary redirects here
     ];
   },
 }
