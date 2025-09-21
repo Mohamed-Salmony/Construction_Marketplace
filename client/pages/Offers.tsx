@@ -101,7 +101,27 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                       variant="outline"
                       onClick={() => {
                         try { window.localStorage.setItem('selected_product_id', String(p.id)); } catch {}
-                        try { (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({ id: p.id }); } catch {}
+                        try { 
+                          (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
+                            id: p.id,
+                            name: { ar: p.nameAr, en: p.nameEn },
+                            price: p.discountPrice || p.price,
+                            originalPrice: p.price,
+                            images: p.images?.map((img: any) => img.imageUrl) || [],
+                            description: { ar: p.descriptionAr, en: p.descriptionEn },
+                            brand: { ar: p.brandAr || 'عام', en: p.brandEn || 'Generic' },
+                            inStock: true,
+                            stockCount: p.stockQuantity || 99,
+                            rating: 4.5,
+                            reviewCount: 0,
+                            features: [],
+                            partNumber: p.partNumber || '',
+                            warranty: { ar: 'سنة', en: '1 year' },
+                            specifications: p.specifications || {},
+                            compatibility: p.compatibility || [],
+                            addonInstallation: p.addonInstallation
+                          }); 
+                        } catch {}
                         setCurrentPage && setCurrentPage('product-details');
                       }}
                    >
