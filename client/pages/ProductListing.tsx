@@ -283,7 +283,7 @@ export default function ProductListing({
     };
     load();
     return () => { cancelled = true; };
-  }, [searchTerm, sortBy, rest?.searchFilters?.categoryId, selectedCategoryId, categories, locale]);
+  }, [searchTerm, sortBy, selectedCategoryId, categories, locale]);
 
   // Load categories from backend; guard with ref to avoid repeating unless locale changes
   const categoriesLoadedRef = useRef(false);
@@ -336,6 +336,18 @@ export default function ProductListing({
       }
     }
   }, [rest?.searchFilters?.partCategory]);
+
+  // Sync selectedCategoryId from router's searchFilters.categoryId when it changes (primitive-only dependency)
+  useEffect(() => {
+    const cid = rest?.searchFilters?.categoryId ? String(rest.searchFilters.categoryId) : undefined;
+    if (cid && cid !== 'all' && cid !== selectedCategoryId) {
+      setSelectedCategoryId(cid);
+      // When setting an explicit category from router, clear group and search term to avoid conflicts
+      setSelectedGroup('');
+      setSearchTerm('');
+    }
+    // If router clears categoryId, do not force local state; user selection persists
+  }, [rest?.searchFilters?.categoryId]);
 
   useEffect(() => {
     let filtered = products;
