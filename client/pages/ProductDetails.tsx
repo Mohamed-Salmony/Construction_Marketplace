@@ -87,6 +87,38 @@ export default function ProductDetails({
     let cancelled = false;
     const load = async () => {
       try {
+        // Helpers to normalize varying backend field names across environments
+        const pickStr = (obj: any, keys: string[], fallback: string = ''): string => {
+          try {
+            for (const k of keys) {
+              const v = obj?.[k];
+              if (typeof v === 'string' && v.trim().length) return v.trim();
+            }
+          } catch {}
+          return fallback;
+        };
+        const pickNum = (obj: any, keys: string[], fallback: number = 0): number => {
+          try {
+            for (const k of keys) {
+              const v = obj?.[k];
+              const n = Number(v);
+              if (Number.isFinite(n)) return n;
+            }
+          } catch {}
+          return fallback;
+        };
+        const pickBool = (obj: any, keys: string[], fallback: boolean = false): boolean => {
+          try {
+            for (const k of keys) {
+              const v = obj?.[k];
+              if (typeof v === 'boolean') return v;
+              if (v === 1 || v === '1' || v === 'true' || v === 'True') return true;
+              if (v === 0 || v === '0' || v === 'false' || v === 'False') return false;
+            }
+          } catch {}
+          return fallback;
+        };
+
         // 1) Prefer URL param id if present
         let urlId: string | number | null = null;
         let urlSlug: string | null = null;
@@ -115,32 +147,60 @@ export default function ProductDetails({
               setLoadError(err);
             }
           }
-          if (res.ok && res.data && !cancelled) setRemoteProduct({
-            id: (res.data as any).id || String(cleanId),
-            name: { ar: (res.data as any).nameAr || '', en: (res.data as any).nameEn || '' },
-            brand: { ar: (res.data as any).brandAr || (res.data as any).brand || 'عام', en: (res.data as any).brandEn || (res.data as any).brand || 'Generic' },
-            categoryId: (res.data as any).categoryId,
-            price: Number((typeof (res.data as any).discountPrice === 'number' && (res.data as any).discountPrice > 0 && (res.data as any).discountPrice < Number((res.data as any).price ?? 0))
-              ? (res.data as any).discountPrice
-              : (res.data as any).price ?? 0),
-            originalPrice: Number((res.data as any).price ?? 0),
-            rating: Number((res.data as any).averageRating ?? 0),
-            reviewCount: Number((res.data as any).reviewCount ?? 0),
-            images: Array.isArray((res.data as any).images) ? ((res.data as any).images.map((im:any)=> im?.imageUrl).filter(Boolean)) : (((res.data as any).imageUrl ? [(res.data as any).imageUrl] : [])),
-            inStock: Number((res.data as any).stockQuantity ?? 0) > 0,
-            stockCount: Number((res.data as any).stockQuantity ?? 0),
-            isNew: false,
-            isOnSale: false,
-            compatibility: [],
-            partNumber: (res.data as any).sku || (res.data as any).partNumber || '',
-            warranty: { ar: (res.data as any).warrantyAr || (res.data as any).warranty || 'سنة', en: (res.data as any).warrantyEn || (res.data as any).warranty || '1 year' },
-            description: { ar: (res.data as any).descriptionAr || '', en: (res.data as any).descriptionEn || '' },
-            features: Array.isArray((res.data as any).features) ? (res.data as any).features : [],
-            installationTips: Array.isArray((res.data as any).installationTips) ? (res.data as any).installationTips : [],
-            specifications: typeof (res.data as any).specifications === 'object' && (res.data as any).specifications !== null ? (res.data as any).specifications : {},
-            compatibilityBackend: Array.isArray((res.data as any).compatibility) ? (res.data as any).compatibility : [],
-            addonInstallation: (res.data as any)?.addonInstallation,
-          });
+          if (res.ok && res.data && !cancelled) {
+            try { (window as any).__lastProductRaw = res.data; } catch {}
+            const d: any = res.data as any;
+            const stockQ = pickNum(d, ['stockQuantity','stock','quantity','availableQuantity'], 0);
+            const price = pickNum(d, ['discountPrice','price'], Number(d?.price ?? 0));
+            const origPrice = pickNum(d, ['price'], 0);
+            const nameAr = pickStr(d, ['nameAr','name_ar','nameAR','name_arabic','arabicName']);
+            const nameEn = pickStr(d, ['nameEn','name_en','nameEN','englishName','name']);
+            // Description fields may arrive nested as an object with ar/en keys
+            let descAr = pickStr(d, ['descriptionAr','description_ar','descAr','desc_ar','description','detailsAr','details_ar']);
+            let descEn = pickStr(d, ['descriptionEn','description_en','descEn','desc_en','description','detailsEn','details_en']);
+            try {
+              if (!descAr || !descEn) {
+                const desc = (d as any)?.description;
+                if (desc && typeof desc === 'object') {
+                  descAr = descAr || String(desc.ar || desc['ar-SA'] || desc['ar_EG'] || desc.arabic || '');
+                  descEn = descEn || String(desc.en || desc['en-US'] || desc['en_GB'] || desc.english || '');
+                }
+              }
+            } catch {}
+            const rating = pickNum(d, ['averageRating','rating'], 0);
+            const reviewCount = pickNum(d, ['reviewCount','reviewsCount','reviews'], 0);
+            const partNumber = pickStr(d, ['sku','partNumber','part_number']);
+            const warrantyAr = pickStr(d, ['warrantyAr','warranty_ar','warranty'], 'سنة');
+            const warrantyEn = pickStr(d, ['warrantyEn','warranty_en','warranty'], '1 year');
+            const categoryId = pickStr(d, ['categoryId','category_id']);
+
+            setRemoteProduct({
+              id: d.id || String(cleanId),
+              name: { ar: nameAr, en: nameEn },
+              brand: { ar: d?.brandAr || d?.brand || 'عام', en: d?.brandEn || d?.brand || 'Generic' },
+              categoryId,
+              price,
+              originalPrice: origPrice,
+              rating,
+              reviewCount,
+              images: Array.isArray(d?.images)
+                ? (d.images.map((im:any)=> im?.imageUrl || im?.url || im?.src).filter(Boolean))
+                : ((d?.imageUrl || d?.image || d?.thumbnail || d?.mainImage) ? [String(d?.imageUrl || d?.image || d?.thumbnail || d?.mainImage)] : []),
+              inStock: stockQ > 0 || pickBool(d, ['inStock','available'], false),
+              stockCount: stockQ,
+              isNew: false,
+              isOnSale: false,
+              compatibility: [],
+              partNumber,
+              warranty: { ar: warrantyAr, en: warrantyEn },
+              description: { ar: descAr, en: descEn },
+              features: Array.isArray(d?.features) ? d.features : [],
+              installationTips: Array.isArray(d?.installationTips) ? d.installationTips : [],
+              specifications: typeof d?.specifications === 'object' && d?.specifications !== null ? d.specifications : {},
+              compatibilityBackend: Array.isArray(d?.compatibility) ? d.compatibility : [],
+              addonInstallation: d?.addonInstallation,
+            });
+          }
           return;
         }
         // If we didn't have a URL id but we have a slug in URL, try slug
@@ -155,7 +215,57 @@ export default function ProductDetails({
             }
           }
           if (rSlug.ok && rSlug.data && !cancelled) {
-            setRemoteProduct(rSlug.data as any);
+            try { (window as any).__lastProductRaw = rSlug.data; } catch {}
+            const d: any = rSlug.data as any;
+            const stockQ = pickNum(d, ['stockQuantity','stock','quantity','availableQuantity'], 0);
+            const price = pickNum(d, ['discountPrice','price'], Number(d?.price ?? 0));
+            const origPrice = pickNum(d, ['price'], 0);
+            const nameAr = pickStr(d, ['nameAr','name_ar','nameAR','name_arabic','arabicName']);
+            const nameEn = pickStr(d, ['nameEn','name_en','nameEN','englishName','name']);
+            let descAr = pickStr(d, ['descriptionAr','description_ar','descAr','desc_ar','description','detailsAr','details_ar']);
+            let descEn = pickStr(d, ['descriptionEn','description_en','descEn','desc_en','description','detailsEn','details_en']);
+            try {
+              if (!descAr || !descEn) {
+                const desc = (d as any)?.description;
+                if (desc && typeof desc === 'object') {
+                  descAr = descAr || String(desc.ar || desc['ar-SA'] || desc['ar_EG'] || desc.arabic || '');
+                  descEn = descEn || String(desc.en || desc['en-US'] || desc['en_GB'] || desc.english || '');
+                }
+              }
+            } catch {}
+            const rating = pickNum(d, ['averageRating','rating'], 0);
+            const reviewCount = pickNum(d, ['reviewCount','reviewsCount','reviews'], 0);
+            const partNumber = pickStr(d, ['sku','partNumber','part_number']);
+            const warrantyAr = pickStr(d, ['warrantyAr','warranty_ar','warranty'], 'سنة');
+            const warrantyEn = pickStr(d, ['warrantyEn','warranty_en','warranty'], '1 year');
+            const categoryId = pickStr(d, ['categoryId','category_id']);
+
+            setRemoteProduct({
+              id: d.id || d._id || urlSlug,
+              name: { ar: nameAr, en: nameEn },
+              brand: { ar: d?.brandAr || d?.brand || 'عام', en: d?.brandEn || d?.brand || 'Generic' },
+              categoryId,
+              price,
+              originalPrice: origPrice,
+              rating,
+              reviewCount,
+              images: Array.isArray(d?.images)
+                ? (d.images.map((im:any)=> im?.imageUrl || im?.url || im?.src).filter(Boolean))
+                : ((d?.imageUrl || d?.image || d?.thumbnail || d?.mainImage) ? [String(d?.imageUrl || d?.image || d?.thumbnail || d?.mainImage)] : []),
+              inStock: stockQ > 0 || (d?.inStock === true) || (d?.available === true),
+              stockCount: stockQ,
+              isNew: false,
+              isOnSale: false,
+              compatibility: Array.isArray(d?.compatibility) ? d.compatibility : [],
+              partNumber,
+              warranty: { ar: warrantyAr, en: warrantyEn },
+              description: { ar: descAr, en: descEn },
+              features: Array.isArray(d?.features) ? d.features : [],
+              installationTips: Array.isArray(d?.installationTips) ? d.installationTips : [],
+              specifications: typeof d?.specifications === 'object' && d?.specifications !== null ? d.specifications : {},
+              compatibilityBackend: Array.isArray(d?.compatibility) ? d.compatibility : [],
+              addonInstallation: d?.addonInstallation,
+            });
             return;
           }
         }
@@ -167,7 +277,56 @@ export default function ProductDetails({
             const r2 = await getProductById(cid);
             console.debug('[ProductDetails] Fallback fetch by selectedProduct.id status:', r2?.status, 'ok:', r2?.ok);
             if (r2.ok && r2.data && !cancelled) {
-              setRemoteProduct({ ...r2.data });
+              const d: any = r2.data as any;
+              const stockQ = pickNum(d, ['stockQuantity','stock','quantity','availableQuantity'], 0);
+              const price = pickNum(d, ['discountPrice','price'], Number(d?.price ?? 0));
+              const origPrice = pickNum(d, ['price'], 0);
+              const nameAr = pickStr(d, ['nameAr','name_ar','nameAR','name_arabic','arabicName']);
+              const nameEn = pickStr(d, ['nameEn','name_en','nameEN','englishName','name']);
+              let descAr = pickStr(d, ['descriptionAr','description_ar','descAr','desc_ar','description','detailsAr','details_ar']);
+              let descEn = pickStr(d, ['descriptionEn','description_en','descEn','desc_en','description','detailsEn','details_en']);
+              try {
+                if (!descAr || !descEn) {
+                  const desc = (d as any)?.description;
+                  if (desc && typeof desc === 'object') {
+                    descAr = descAr || String(desc.ar || desc['ar-SA'] || desc['ar_EG'] || desc.arabic || '');
+                    descEn = descEn || String(desc.en || desc['en-US'] || desc['en_GB'] || desc.english || '');
+                  }
+                }
+              } catch {}
+              const rating = pickNum(d, ['averageRating','rating'], 0);
+              const reviewCount = pickNum(d, ['reviewCount','reviewsCount','reviews'], 0);
+              const partNumber = pickStr(d, ['sku','partNumber','part_number']);
+              const warrantyAr = pickStr(d, ['warrantyAr','warranty_ar','warranty'], 'سنة');
+              const warrantyEn = pickStr(d, ['warrantyEn','warranty_en','warranty'], '1 year');
+              const categoryId = pickStr(d, ['categoryId','category_id']);
+
+              setRemoteProduct({
+                id: d.id || d._id || cid,
+                name: { ar: nameAr, en: nameEn },
+                brand: { ar: d?.brandAr || d?.brand || 'عام', en: d?.brandEn || d?.brand || 'Generic' },
+                categoryId,
+                price,
+                originalPrice: origPrice,
+                rating,
+                reviewCount,
+                images: Array.isArray(d?.images)
+                  ? (d.images.map((im:any)=> im?.imageUrl || im?.url || im?.src).filter(Boolean))
+                  : ((d?.imageUrl || d?.image || d?.thumbnail || d?.mainImage) ? [String(d?.imageUrl || d?.image || d?.thumbnail || d?.mainImage)] : []),
+                inStock: stockQ > 0 || (d?.inStock === true) || (d?.available === true),
+                stockCount: stockQ,
+                isNew: false,
+                isOnSale: false,
+                compatibility: Array.isArray(d?.compatibility) ? d.compatibility : [],
+                partNumber,
+                warranty: { ar: warrantyAr, en: warrantyEn },
+                description: { ar: descAr, en: descEn },
+                features: Array.isArray(d?.features) ? d.features : [],
+                installationTips: Array.isArray(d?.installationTips) ? d.installationTips : [],
+                specifications: typeof d?.specifications === 'object' && d?.specifications !== null ? d.specifications : {},
+                compatibilityBackend: Array.isArray(d?.compatibility) ? d.compatibility : [],
+                addonInstallation: d?.addonInstallation,
+              });
               return;
             }
           } catch {}
@@ -223,8 +382,6 @@ export default function ProductDetails({
   };
 
   const images = deriveImages(product);
-  const productId = String((product as any)?.id || '');
-  const categoryId = String((product as any)?.categoryId || '');
   // If product has no images, we'll optionally fall back to category image further below
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   // displayedImages will be recalculated after we (optionally) fetch a category image; define a placeholder now
@@ -236,9 +393,9 @@ export default function ProductDetails({
         )
       : 0;
 
-  // Normalize availability strictly based on actual values; avoid any placeholder defaults
-  const normalizedInStock = !!product && ((product as any).inStock !== false) && ((((product as any).stockCount ?? (product as any).stock ?? 0) as number) > 0);
-  const normalizedStockCount = (product as any)?.stockCount ?? (product as any)?.stock ?? 0;
+  // Normalize availability in case product from other pages lacks these fields
+  const normalizedInStock = !!product && ((product as any).inStock !== false) && ((((product as any).stockCount ?? (product as any).stock ?? 1) as number) > 0);
+  const normalizedStockCount = (product as any)?.stockCount ?? (product as any)?.stock ?? 99;
 
   const textName = getText(product?.name || '').toLowerCase();
   const textCat = '';
@@ -316,8 +473,9 @@ export default function ProductDetails({
     let cancelled = false;
     (async () => {
       try {
-        if (!categoryId) { setCategoryName(""); return; }
-        const { ok, data } = await getCategoryById(String(categoryId));
+        const cid = (product as any)?.categoryId;
+        if (!cid) { setCategoryName(""); return; }
+        const { ok, data } = await getCategoryById(String(cid));
         if (ok && data && !cancelled) {
           setCategoryName(String((data as any)?.nameAr || (data as any)?.nameEn || ''));
           const cimg = (data as any)?.imageUrl || (data as any)?.ImageUrl || '';
@@ -326,7 +484,7 @@ export default function ProductDetails({
       } catch { setCategoryName(""); }
     })();
     return () => { cancelled = true; };
-  }, [categoryId]);
+  }, [JSON.stringify((product as any)?.categoryId)]);
 
   // Final displayed images with category fallback
   displayedImages = images.length ? images : (categoryImage ? [categoryImage] : []);
@@ -336,7 +494,7 @@ export default function ProductDetails({
     if (selectedImageIndex > Math.max(0, displayedImages.length - 1)) {
       setSelectedImageIndex(0);
     }
-  }, [displayedImages.length, selectedImageIndex]);
+  }, [displayedImages.length]);
 
   // Load reviews when product id becomes available
   useEffect(() => {
@@ -349,7 +507,7 @@ export default function ProductDetails({
             if (idParam && /^[a-fA-F0-9]{24}$/.test(idParam)) return idParam;
           } catch {}
           try {
-            const raw = String(productId || '').trim();
+            const raw = String((product as any)?.id || '').trim();
             if (!raw) return '';
             const oid = raw.match(/^[a-fA-F0-9]{24}(?=\b|\|)/);
             return oid && oid[0] ? oid[0] : raw.split('|')[0];
@@ -376,7 +534,7 @@ export default function ProductDetails({
         }
       } catch {}
     })();
-  }, [productId, reviewsLoadedFor]);
+  }, [String((product as any)?.id || '')]);
 
   const submitReview = async () => {
     const currentUser = (rest as any)?.user;
@@ -698,10 +856,10 @@ export default function ProductDetails({
                 </div>
               )}
 
-              {/* Subtotal reflecting quantity and optional installation per unit */}
+              {/* Subtotal reflecting quantity and installation per unit */}
               <div className="flex items-center justify-between text-sm bg-muted/30 rounded-md px-3 py-2">
                 <span className="text-muted-foreground">
-                  {locale === 'ar' ? 'الإجمالي' : 'Subtotal'}
+                  {locale === 'ar' ? 'الإجمالي (يشمل التركيب إن وجد)' : 'Subtotal (incl. installation if selected)'}
                 </span>
                 <span className="font-semibold text-primary">
                   {subtotal} {currency}
@@ -795,7 +953,33 @@ export default function ProductDetails({
               <CardContent className="p-6">
                 <p className="mb-6">{getText(product.description)}</p>
 
-                {/* Show only the actual product description as requested; remove generic features and installation tips */}
+                <h3 className="font-medium mb-4">{t("features")}</h3>
+                <ul className="space-y-2">
+                  {product.features?.map((feature: string, index: number) => (
+                    <li key={index} className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-500" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {product.installationTips && (
+                  <>
+                    <h3 className="font-medium mb-4 mt-6">
+                      {locale === 'en' ? 'Installation Tips' : 'نصائح التركيب'}
+                    </h3>
+                    <ol className="space-y-2">
+                      {product.installationTips.map((tip: string, index: number) => (
+                        <li key={index} className="flex gap-2">
+                          <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground text-sm rounded-full flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -912,4 +1096,10 @@ export default function ProductDetails({
       <Footer setCurrentPage={setCurrentPage!} />
     </div>
   );
+}
+
+
+// Force SSR to prevent static export
+export async function getServerSideProps() {
+  return { props: {} };
 }

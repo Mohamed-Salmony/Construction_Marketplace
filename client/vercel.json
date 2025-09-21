@@ -1,0 +1,35 @@
+{
+    "buildCommand": "npm run build",
+    "outputDirectory": ".next",
+    "installCommand": "npm ci",
+    "framework": "nextjs",
+    "rewrites": [
+      {
+        "source": "/api/:path*",
+        "destination": "https://construction-marketplace.onrender.com/api/:path*"
+      },
+      {
+        "source": "/:locale/_vercel/insights/:path*",
+        "destination": "/_vercel/insights/:path*"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/(.*)",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "X-XSS-Protection",
+            "value": "1; mode=block"
+          }
+        ]
+      }
+    ]
+  }

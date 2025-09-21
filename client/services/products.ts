@@ -70,25 +70,50 @@ export async function getProducts(filter: SearchFilterDto = {}) {
   if (filter.sortBy) params.set('SortBy', filter.sortBy);
   if (filter.sortDirection) params.set('SortDescending', String(filter.sortDirection === 'desc'));
   const qs = params.toString();
-  return api.get<PagedResultDto<ProductDto>>(`/api/Products${qs ? `?${qs}` : ''}`);
+  const primary = await api.get<PagedResultDto<ProductDto>>(`/api/Products${qs ? `?${qs}` : ''}`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<PagedResultDto<ProductDto>>(`/api/products${qs ? `?${qs}` : ''}`);
+    return alt;
+  }
+  return primary;
 }
 
 // Featured products for homepage
 export async function getFeaturedProducts() {
-  return api.get(`/api/Products/featured`);
+  const primary = await api.get(`/api/Products/featured`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get(`/api/products/featured`);
+    return alt;
+  }
+  return primary;
 }
 
 export async function getProductById(id: string | number) {
-  return api.get<ProductDto>(`/api/Products/${String(id)}`);
+  const primary = await api.get<ProductDto>(`/api/Products/${String(id)}`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<ProductDto>(`/api/products/${encodeURIComponent(String(id))}`);
+    return alt;
+  }
+  return primary;
 }
 
 export async function getProductBySlug(slug: string) {
-  return api.get<ProductDto>(`/api/Products/slug/${encodeURIComponent(slug)}`);
+  const primary = await api.get<ProductDto>(`/api/Products/slug/${encodeURIComponent(slug)}`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<ProductDto>(`/api/products/slug/${encodeURIComponent(slug)}`);
+    return alt;
+  }
+  return primary;
 }
 
 // Rentals listing from backend
 export async function getAvailableForRent() {
-  return api.get<ProductDto[]>(`/api/Products/rentals`);
+  const primary = await api.get<ProductDto[]>(`/api/Products/rentals`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<ProductDto[]>(`/api/products/rentals`);
+    return alt;
+  }
+  return primary;
 }
 
 // Match server DTO at Server/DTOs/BusinessDTOs.cs -> CategoryDto
@@ -106,8 +131,22 @@ export type CategoryDto = {
   sortOrder?: number;
 };
 
-export async function getRootCategories() { return api.get<CategoryDto[]>(`/api/Categories`); }
-export async function getAllCategories() { return api.get<CategoryDto[]>(`/api/Categories/all`); }
+export async function getRootCategories() {
+  const primary = await api.get<CategoryDto[]>(`/api/Categories`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<CategoryDto[]>(`/api/categories`);
+    return alt;
+  }
+  return primary;
+}
+export async function getAllCategories() {
+  const primary = await api.get<CategoryDto[]>(`/api/Categories/all`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<CategoryDto[]>(`/api/categories/all`);
+    return alt;
+  }
+  return primary;
+}
 
 // Admin: Categories CRUD
 export type CreateOrUpdateCategoryPayload = {
@@ -135,7 +174,12 @@ export async function deleteCategory(id: string | number) {
 
 // Mutations and additional endpoints
 export async function getCategoryById(id: string | number) {
-  return api.get<CategoryDto>(`/api/Categories/${String(id)}`);
+  const primary = await api.get<CategoryDto>(`/api/Categories/${String(id)}`);
+  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
+    const alt = await api.get<CategoryDto>(`/api/categories/${encodeURIComponent(String(id))}`);
+    return alt;
+  }
+  return primary;
 }
 
 export type CreateOrUpdateProductDto = {
