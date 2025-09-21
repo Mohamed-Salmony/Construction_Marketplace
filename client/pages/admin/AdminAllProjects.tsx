@@ -79,7 +79,7 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loading, query, isAr]); // Keep essential dependencies
 
   React.useEffect(() => { 
     let mounted = true;
@@ -91,7 +91,7 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     };
     loadData();
     return () => { mounted = false; };
-  }, []);
+  }, [load, hideFirstOverlay]);
 
   const filtered = React.useMemo(() => {
     const s = status;

@@ -84,7 +84,7 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
       setError(isAr ? 'تعذر جلب المنتجات' : 'Failed to fetch products');
       setItems([]);
     } finally { setLoading(false); }
-  }, []);
+  }, [loading, isAr]); // Keep essential dependencies
 
   useEffect(() => { 
     let mounted = true;
@@ -96,7 +96,7 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
     };
     loadData();
     return () => { mounted = false; };
-  }, []);
+  }, [load, hideFirstOverlay]);
 
   const setDiscount = async (p: ProductDto, newDiscount: number | null) => {
     try {

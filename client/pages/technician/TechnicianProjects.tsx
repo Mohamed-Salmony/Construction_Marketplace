@@ -54,7 +54,7 @@ export default function TechnicianProjects({ setCurrentPage, ...context }: Props
     })().finally(() => {
       (context as any)?.hideLoading?.();
     });
-  }, [context, isAr]);
+  }, []); // Remove dependencies to prevent reload loops
 
   // Load my offers for submitted set
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function TechnicianProjects({ setCurrentPage, ...context }: Props
     })().finally(() => {
       (context as any)?.hideLoading?.();
     });
-  }, [technicianId, context, isAr]);
+  }, []); // Remove dependencies to prevent reload loops
 
   const labelForProductType = (id: string) => {
     const map: any = {

@@ -101,7 +101,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
       } finally { if (!cancelled) { try { hideFirstOverlay(); } catch {} } }
     })();
     return () => { cancelled = true; };
-  }, [locale, hideFirstOverlay]);
+  }, []); // Remove dependencies to prevent reload loops
 
   // Load commission rates for rentals (uses products commission rate)
   useEffect(() => {

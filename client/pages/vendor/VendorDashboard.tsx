@@ -67,7 +67,7 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
         .catch(() => {});
       return () => { active = false; };
     }
-  }, [context, locale]);
+  }, []); // Remove dependencies to prevent reload loops
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -185,7 +185,7 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
       }).catch(() => {/* no-op */});
     })();
     return () => { cancelled = true; };
-  }, [context, locale]);
+  }, []); // Remove dependencies to prevent reload loops
 
   // Helpers to derive constraints from target snapshot (project)
   const deriveProjectBaseTotal = (snap: any): number => {

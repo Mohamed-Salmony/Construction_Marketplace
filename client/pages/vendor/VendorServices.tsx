@@ -49,9 +49,16 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
       setLoading(false);
       if (firstLoadRef.current) { hideFirstOverlay(); firstLoadRef.current = false; }
     }
-  }, [locale, hideFirstOverlay]);
+  }, []); // Remove dependencies to prevent reload loops
 
-  useEffect(() => { void loadServices(); }, [loadServices]);
+  useEffect(() => { 
+    let mounted = true;
+    const load = async () => {
+      if (mounted) await loadServices();
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
 
   const labelForServiceType = (id: string) => {

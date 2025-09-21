@@ -45,17 +45,27 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
   const [categories, setCategories] = useState<Array<{ id: number | string; name: string }>>([]);
 
   useEffect(() => {
-    (async () => { await reload(); hideFirstOverlay(); })();
+    let mounted = true;
+    (async () => { 
+      if (mounted) {
+        await reload(); 
+        hideFirstOverlay(); 
+      }
+    })();
     (async () => {
       try {
         const r = await getAllCategories();
-        if (r.ok && Array.isArray(r.data)) {
-
+        if (r.ok && Array.isArray(r.data) && mounted) {
           setCategories(r.data.map((c: any) => ({ id: c._id || c.id, name: (c.nameAr || c.nameEn || String(c._id || c.id)) })));
-        } else { setCategories([]); }
-      } catch { setCategories([]); }
+        } else if (mounted) { 
+          setCategories([]); 
+        }
+      } catch { 
+        if (mounted) setCategories([]); 
+      }
     })();
-  }, [hideFirstOverlay]);
+    return () => { mounted = false; };
+  }, []); // Remove dependency to prevent reload loops
   const reload = async () => {
     try {
       const { ok, data } = await getProducts({ page: 1, pageSize: 200 });

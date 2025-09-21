@@ -77,7 +77,7 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
         firstLoadRef.current = false;
       }
     }
-  }, []);
+  }, [loading, locale]); // Keep essential dependencies
 
   useEffect(() => { 
     let mounted = true;
@@ -86,7 +86,7 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
     };
     loadData();
     return () => { mounted = false; };
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (selected && selected.customerId) {

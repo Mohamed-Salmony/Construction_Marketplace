@@ -27,7 +27,7 @@ export default function MyOrders({ user, setCurrentPage, goBack, showLoading, hi
       hideLoading?.();
       setLoading(false);
     }
-  }, [locale, showLoading, hideLoading]);
+  }, []); // Remove dependencies to prevent reload loops
 
   useEffect(() => { reload(); }, [reload]);
 
