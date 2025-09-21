@@ -5,7 +5,7 @@ import { Package } from "lucide-react";
 import { useTranslation } from "../hooks/useTranslation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { getProducts, type ProductDto } from "../services/products";
 
@@ -17,35 +17,42 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
   const [error, setError] = useState<string | null>(null);
   const firstLoadRef = useRef(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        if (firstLoadRef.current && typeof (context as any)?.showLoading === 'function') {
-          (context as any).showLoading(
-            locale==='ar' ? 'جاري تحميل العروض' : 'Loading offers',
-            locale==='ar' ? 'يرجى الانتظار' : 'Please wait'
-          );
-        }
-        const r = await getProducts({ page: 1, pageSize: 500, sortBy: 'CreatedAt', sortDirection: 'desc' as any });
-        if (!cancelled) {
-          const items = ((r.data as any)?.items ?? (r.data as any)?.Items ?? []) as ProductDto[];
-          const discounted = items.filter(p => typeof p.discountPrice === 'number' && p.discountPrice! > 0 && p.discountPrice! < p.price && p.isApproved);
-          setProducts(discounted);
-        }
-      } catch {
-        if (!cancelled) setError(locale==='ar' ? 'فشل تحميل العروض' : 'Failed to load offers');
-      } finally {
-        if (!cancelled) setLoading(false);
-        if (firstLoadRef.current && typeof (context as any)?.hideLoading === 'function') {
-          (context as any).hideLoading();
-          firstLoadRef.current = false;
-        }
+  // ✅ Load data function (stable)
+  const loadOffers = useCallback(async () => {
+    try {
+      setLoading(true);
+      if (firstLoadRef.current && typeof (context as any)?.showLoading === 'function') {
+        (context as any).showLoading(
+          locale==='ar' ? 'جاري تحميل العروض' : 'Loading offers',
+          locale==='ar' ? 'يرجى الانتظار' : 'Please wait'
+        );
       }
-    })();
-    return () => { cancelled = true; };
-  }, [context, locale]); // Include dependencies as indicated by ESLint
+      const r = await getProducts({ page: 1, pageSize: 500, sortBy: 'CreatedAt', sortDirection: 'desc' as any });
+      const items = ((r.data as any)?.items ?? (r.data as any)?.Items ?? []) as ProductDto[];
+      const discounted = items.filter(p => typeof p.discountPrice === 'number' && p.discountPrice! > 0 && p.discountPrice! < p.price && p.isApproved);
+      setProducts(discounted);
+    } catch {
+      setError(locale==='ar' ? 'فشل تحميل العروض' : 'Failed to load offers');
+    } finally {
+      setLoading(false);
+      if (firstLoadRef.current && typeof (context as any)?.hideLoading === 'function') {
+        (context as any).hideLoading();
+        firstLoadRef.current = false;
+      }
+    }
+  }, [locale]); // Only depend on locale
+
+  // ✅ Load data once on mount
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (mounted) {
+        await loadOffers();
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [loadOffers]);
 
   return (
     <div className="min-h-screen bg-background" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
