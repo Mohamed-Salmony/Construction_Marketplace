@@ -6,7 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
-import { getProducts, type ProductDto } from "../services/products";
+import { getProducts, getProductById, type ProductDto } from "../services/products";
 
 export default function Offers({ setCurrentPage, ...context }: Partial<RouteContext>) {
   const { t, locale } = useTranslation();
@@ -80,56 +80,117 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
               <Card 
                 key={p.id} 
                 className="group hover:shadow-lg transition-all cursor-pointer hover:scale-105"
-                onClick={() => {
+                onClick={async () => {
                   try { window.localStorage.setItem('selected_product_id', String(p.id)); } catch {}
+                  
+                  // Show loading state
+                  if (typeof (context as any)?.showLoading === 'function') {
+                    (context as any).showLoading(
+                      locale==='ar' ? 'جاري تحميل تفاصيل المنتج' : 'Loading product details',
+                      locale==='ar' ? 'يرجى الانتظار' : 'Please wait'
+                    );
+                  }
+                  
                   try { 
-                    // Transform data similar to ProductListing format
-                    const imgs = Array.isArray(p.images) ? p.images : [];
-                    const primaryUrl = imgs.find((im: any) => im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl;
-                    const basePrice = Number(p.price || 0);
-                    const disc = p.discountPrice;
-                    const hasValidDiscount = typeof disc === 'number' && disc > 0 && disc < basePrice;
-                    const currentPrice = hasValidDiscount ? Number(disc) : basePrice;
+                    // ✅ Fetch complete product details from API
+                    const productResponse = await getProductById(String(p.id));
                     
-                    // Derive brand from attributes if available
-                    const attrs = Array.isArray(p.attributes) ? p.attributes : [];
-                    const brandAttr = attrs.find((a:any) => {
-                      const nEn = String(a?.nameEn || '').toLowerCase();
-                      const nAr = String(a?.nameAr || '').toLowerCase();
-                      return ['brand','make','manufacturer','company'].includes(nEn) || ['العلامة التجارية','الماركة','ماركة','الشركة','الصانع'].includes(nAr);
-                    });
-                    const brandAr = String(brandAttr?.valueAr || brandAttr?.valueEn || '').trim();
-                    const brandEn = String(brandAttr?.valueEn || brandAttr?.valueAr || '').trim();
-                    
+                    if (productResponse.ok && productResponse.data) {
+                      // Use full product data from API
+                      const fullProduct = productResponse.data as any;
+                      
+                      // Transform the full product data
+                      const imgs = Array.isArray(fullProduct.images) ? fullProduct.images : [];
+                      const primaryUrl = imgs.find((im: any) => im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl;
+                      const basePrice = Number(p.price || 0);
+                      const disc = p.discountPrice;
+                      const hasValidDiscount = typeof disc === 'number' && disc > 0 && disc < basePrice;
+                      const currentPrice = hasValidDiscount ? Number(disc) : basePrice;
+                      
+                      // Derive brand from attributes if available
+                      const attrs = Array.isArray(fullProduct.attributes) ? fullProduct.attributes : [];
+                      const brandAttr = attrs.find((a:any) => {
+                        const nEn = String(a?.nameEn || '').toLowerCase();
+                        const nAr = String(a?.nameAr || '').toLowerCase();
+                        return ['brand','make','manufacturer','company'].includes(nEn) || ['العلامة التجارية','الماركة','ماركة','الشركة','الصانع'].includes(nAr);
+                      });
+                      const brandAr = String(brandAttr?.valueAr || brandAttr?.valueEn || '').trim();
+                      const brandEn = String(brandAttr?.valueEn || brandAttr?.valueAr || '').trim();
+                      
+                      (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
+                        id: String(fullProduct.id),
+                        slug: undefined,
+                        group: 'tools',
+                        name: { ar: fullProduct.nameAr || '', en: fullProduct.nameEn || '' },
+                        brand: { ar: brandAr || 'عام', en: brandEn || 'Generic' },
+                        category: { ar: fullProduct.categoryName || '', en: fullProduct.categoryName || '' },
+                        categoryId: String(fullProduct.categoryId || ''),
+                        subCategory: { ar: '', en: '' },
+                        price: currentPrice,
+                        originalPrice: basePrice,
+                        rating: Number(fullProduct.averageRating || 0),
+                        reviewCount: Number(fullProduct.reviewCount || 0),
+                        image: primaryUrl,
+                        images: imgs.map((img: any) => img.imageUrl).filter(Boolean),
+                        imageUrl: primaryUrl, // fallback
+                        inStock: Number(fullProduct.stockQuantity || 0) > 0,
+                        stockCount: Number(fullProduct.stockQuantity || 0),
+                        isNew: false,
+                        isOnSale: currentPrice < basePrice,
+                        compatibility: fullProduct.compatibility || [],
+                        partNumber: fullProduct.partNumber || '',
+                        warranty: { ar: 'سنة', en: '1 year' },
+                        description: { ar: fullProduct.descriptionAr || '', en: fullProduct.descriptionEn || '' },
+                        features: fullProduct.features || [],
+                        specifications: fullProduct.specifications || {},
+                        installationTips: fullProduct.installationTips || [],
+                        addonInstallation: fullProduct.addonInstallation || (fullProduct.allowCustomDimensions ? { enabled: true, feePerUnit: 50 } : null)
+                      }); 
+                    } else {
+                      // Fallback to basic data if API fails
+                      const imgs = Array.isArray(p.images) ? p.images : [];
+                      const primaryUrl = imgs.find((im: any) => im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl;
+                      const basePrice = Number(p.price || 0);
+                      const disc = p.discountPrice;
+                      const hasValidDiscount = typeof disc === 'number' && disc > 0 && disc < basePrice;
+                      const currentPrice = hasValidDiscount ? Number(disc) : basePrice;
+                      
+                      (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
+                        id: String(p.id),
+                        name: { ar: p.nameAr || '', en: p.nameEn || '' },
+                        price: currentPrice,
+                        originalPrice: basePrice,
+                        rating: Number(p.averageRating || 0),
+                        reviewCount: Number(p.reviewCount || 0),
+                        image: primaryUrl,
+                        images: imgs.map((img: any) => img.imageUrl).filter(Boolean),
+                        description: { ar: p.descriptionAr || '', en: p.descriptionEn || '' },
+                        brand: { ar: 'عام', en: 'Generic' },
+                        inStock: Number(p.stockQuantity || 0) > 0,
+                        stockCount: Number(p.stockQuantity || 0),
+                        compatibility: [],
+                        specifications: {},
+                        features: [],
+                        addonInstallation: null
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Failed to fetch product details:', error);
+                    // Fallback to basic product data
                     (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
                       id: String(p.id),
-                      slug: undefined,
-                      group: 'tools',
                       name: { ar: p.nameAr || '', en: p.nameEn || '' },
-                      brand: { ar: brandAr || 'عام', en: brandEn || 'Generic' },
-                      category: { ar: p.categoryName || '', en: p.categoryName || '' },
-                      categoryId: String(p.categoryId || ''),
-                      subCategory: { ar: '', en: '' },
-                      price: currentPrice,
-                      originalPrice: basePrice,
-                      rating: Number(p.averageRating || 0),
-                      reviewCount: Number(p.reviewCount || 0),
-                      image: primaryUrl,
-                      images: imgs.map((img: any) => img.imageUrl).filter(Boolean),
-                      imageUrl: primaryUrl, // fallback
-                      inStock: Number(p.stockQuantity || 0) > 0,
-                      stockCount: Number(p.stockQuantity || 0),
-                      isNew: false,
-                      isOnSale: currentPrice < basePrice,
-                      compatibility: [],
-                      partNumber: '',
-                      warranty: { ar: 'سنة', en: '1 year' },
+                      price: p.discountPrice || p.price,
+                      originalPrice: p.price,
                       description: { ar: p.descriptionAr || '', en: p.descriptionEn || '' },
-                      features: [],
-                      specifications: {},
-                      addonInstallation: p.allowCustomDimensions ? { enabled: true, feePerUnit: 50 } : null
-                    }); 
-                  } catch {}
+                    });
+                  } finally {
+                    // Hide loading state
+                    if (typeof (context as any)?.hideLoading === 'function') {
+                      (context as any).hideLoading();
+                    }
+                  }
+                  
                   setCurrentPage && setCurrentPage('product-details');
                 }}
               >
