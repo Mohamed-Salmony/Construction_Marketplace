@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import App, { type AppProps, type AppContext } from 'next/app';
+import { type AppProps } from 'next/app';
 import '../app/globals.css';
 import SafeAnalytics from '../components/SafeAnalytics';
 import GlobalErrorBoundary from '../components/GlobalErrorBoundary';
@@ -38,10 +38,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   );
 }
 
-
-// Force SSR for all pages to avoid static prerender/export of dynamic routes
-MyApp.getInitialProps = async (appContext: AppContext) => {
-  const appProps = await App.getInitialProps(appContext);
-  return { ...appProps };
-};
+// getInitialProps removed to enable Automatic Static Optimization
+// This improves performance and prevents reload loops
 

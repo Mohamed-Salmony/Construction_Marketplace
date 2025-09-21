@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Clock, CheckCircle, XCircle, AlertTriangle, User, Eye, Calendar } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertTriangle, User, Eye, Calendar, Package } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import useStableCallback from '../../hooks/useStableCallback';
 import { toastSuccess, toastError } from '../../utils/alerts';
@@ -51,19 +51,24 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
   }, [customerNames]);
 
   const load = useCallback(async () => {
+    console.log('AdminRentals: Starting to load rentals...');
     setLoading(true);
     try {
       const r = await getAllRentals();
+      console.log('AdminRentals: API response:', r);
       if (r.ok && Array.isArray(r.data)) {
+        console.log('AdminRentals: Setting items:', r.data.length, 'rentals');
         setItems(r.data as any[]);
       } else {
+        console.log('AdminRentals: No data or invalid response, setting empty array');
         setItems([]);
       }
     } catch (error) {
-      console.error('Failed to load rentals:', error);
+      console.error('AdminRentals: Failed to load rentals:', error);
       setItems([]);
     } finally { 
-      setLoading(false); 
+      setLoading(false);
+      console.log('AdminRentals: Loading finished');
     }
   }, []);
 
@@ -126,7 +131,13 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
                   >
                     <CardContent className="p-4">
                       <div className="relative mb-3">
-                        <Image src={r.imageUrl || '/placeholder.png'} alt={String(r.productName || '')} width={400} height={160} className="w-full h-40 object-cover rounded bg-gray-100" />
+                        {r.imageUrl ? (
+                          <Image src={r.imageUrl} alt={String(r.productName || '')} width={400} height={160} className="w-full h-40 object-cover rounded bg-gray-100" />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-500">
+                            <Package className="w-8 h-8" />
+                          </div>
+                        )}
                       </div>
                       <div className="font-medium line-clamp-1">{r.productName || `#${r.productId}`}</div>
                       <div className="text-xs text-muted-foreground">
@@ -171,7 +182,13 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
                   >
                     <CardContent className="p-4">
                       <div className="relative mb-3">
-                        <Image src={r.imageUrl || '/placeholder.png'} alt={String(r.productName || '')} width={400} height={160} className="w-full h-40 object-cover rounded bg-gray-100" />
+                        {r.imageUrl ? (
+                          <Image src={r.imageUrl} alt={String(r.productName || '')} width={400} height={160} className="w-full h-40 object-cover rounded bg-gray-100" />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-500">
+                            <Package className="w-8 h-8" />
+                          </div>
+                        )}
                       </div>
                       <div className="font-medium line-clamp-1">{r.productName || `#${r.productId}`}</div>
                       <div className="text-xs text-muted-foreground">
