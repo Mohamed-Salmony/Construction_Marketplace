@@ -159,6 +159,7 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
       // Show success message
       console.log('Discount saved successfully');
       await load();
+      console.log('Data reloaded after discount save');
       
     } catch (error: any) {
       console.error('Error setting discount:', error);

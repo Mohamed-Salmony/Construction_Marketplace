@@ -141,37 +141,54 @@ export default function AdminProductOptions(props: Partial<RouteContext>) {
     const ar = newCategoryAr.trim();
     const en = newCategoryEn.trim();
     if (!ar || !en) return;
-    const payload: any = {
-      nameAr: ar,
-      nameEn: en,
-      descriptionAr: newDescriptionAr.trim() || null,
-      descriptionEn: newDescriptionEn.trim() || null,
-      imageUrl: newImageUrl.trim() || null,
-      parentCategoryId: newParentId === '' ? null : String(newParentId),
-      isActive: newIsActive,
-      sortOrder: newSortOrder === '' ? undefined : Number(newSortOrder)
-    };
-    const { ok } = await createCategory(payload);
-    if (ok) {
-      setNewCategoryAr('');
-      setNewCategoryEn('');
-      setNewDescriptionAr('');
-      setNewDescriptionEn('');
-      setNewImageUrl('');
-      setNewParentId('');
-      setNewIsActive(true);
-      setNewSortOrder('');
-      await reload();
-    } else {
-      alert(locale==='ar' ? 'فشل إضافة الفئة' : 'Failed to add category');
+    try {
+      const payload: any = {
+        nameAr: ar,
+        nameEn: en,
+        descriptionAr: newDescriptionAr.trim() || null,
+        descriptionEn: newDescriptionEn.trim() || null,
+        imageUrl: newImageUrl.trim() || null,
+        parentCategoryId: newParentId === '' ? null : String(newParentId),
+        isActive: newIsActive,
+        sortOrder: newSortOrder === '' ? undefined : Number(newSortOrder)
+      };
+      const result = await createCategory(payload);
+      if (result?.ok !== false) {
+        setNewCategoryAr('');
+        setNewCategoryEn('');
+        setNewDescriptionAr('');
+        setNewDescriptionEn('');
+        setNewImageUrl('');
+        setNewParentId('');
+        setNewIsActive(true);
+        setNewSortOrder('');
+        await reload();
+        console.log('Category added successfully');
+      } else {
+        console.error('Create category failed:', result);
+        alert(locale==='ar' ? 'فشل إضافة الفئة' : 'Failed to add category');
+      }
+    } catch (error) {
+      console.error('Add category error:', error);
+      alert(locale==='ar' ? 'خطأ في إضافة الفئة' : 'Error adding category');
     }
   };
 
   const removeCategory = async (id: string | number) => {
     if (!confirm(locale==='ar' ? 'هل أنت متأكد من الحذف؟' : 'Are you sure to delete?')) return;
-    const { ok } = await deleteCategory(String(id));
-    if (ok) await reload();
-    else alert(locale==='ar' ? 'فشل حذف الفئة' : 'Failed to delete category');
+    try {
+      const result = await deleteCategory(String(id));
+      if (result?.ok !== false) {
+        await reload();
+        console.log('Category deleted successfully');
+      } else {
+        console.error('Delete category failed:', result);
+        alert(locale==='ar' ? 'فشل حذف الفئة' : 'Failed to delete category');
+      }
+    } catch (error) {
+      console.error('Delete category error:', error);
+      alert(locale==='ar' ? 'خطأ في حذف الفئة' : 'Error deleting category');
+    }
   };
 
   // Open edit dialog prefilled

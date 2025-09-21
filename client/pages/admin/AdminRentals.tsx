@@ -87,9 +87,48 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
     }
   }, [selected]); // Removed fetchCustomerName dependency to prevent loops
 
-  const onApprove = async (id: number | string) => { await approveRental(String(id)); await load(); };
-  const onDecline = async (id: number | string) => { await declineRental(String(id)); await load(); };
-  const onDeleteApproved = async (id: number | string) => { await removeRentalAdmin(String(id)); await load(); };
+  const onApprove = async (id: number | string) => { 
+    try {
+      const result = await approveRental(String(id)); 
+      if (result?.ok !== false) { // Only reload if not explicitly failed
+        await load(); 
+        toastSuccess(locale==='ar' ? 'تم الاعتماد بنجاح' : 'Approved successfully', locale==='ar');
+      } else {
+        toastError(locale==='ar' ? 'فشل في الاعتماد' : 'Failed to approve', locale==='ar');
+      }
+    } catch (error) {
+      console.error('Approve error:', error);
+      toastError(locale==='ar' ? 'خطأ في الاعتماد' : 'Approval error', locale==='ar');
+    }
+  };
+  const onDecline = async (id: number | string) => { 
+    try {
+      const result = await declineRental(String(id)); 
+      if (result?.ok !== false) { // Only reload if not explicitly failed
+        await load(); 
+        toastSuccess(locale==='ar' ? 'تم الرفض بنجاح' : 'Declined successfully', locale==='ar');
+      } else {
+        toastError(locale==='ar' ? 'فشل في الرفض' : 'Failed to decline', locale==='ar');
+      }
+    } catch (error) {
+      console.error('Decline error:', error);
+      toastError(locale==='ar' ? 'خطأ في الرفض' : 'Decline error', locale==='ar');
+    }
+  };
+  const onDeleteApproved = async (id: number | string) => { 
+    try {
+      const result = await removeRentalAdmin(String(id)); 
+      if (result?.ok !== false) { // Only reload if not explicitly failed
+        await load(); 
+        toastSuccess(locale==='ar' ? 'تم الحذف بنجاح' : 'Deleted successfully', locale==='ar');
+      } else {
+        toastError(locale==='ar' ? 'فشل في الحذف' : 'Failed to delete', locale==='ar');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      toastError(locale==='ar' ? 'خطأ في الحذف' : 'Delete error', locale==='ar');
+    }
+  };
 
   // Normalize groups
   const pendingItems = items.filter(r => String(r.status || '').toLowerCase() === 'pending');

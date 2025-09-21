@@ -327,13 +327,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                   <div className="text-[11px] text-red-600 mt-1">{isAr ? 'الاسم مطلوب (عربي أو إنجليزي)' : 'Name is required (Arabic or English)'}</div>
                 )}
               </div>
-              <div>
-                <label className="text-xs block mb-1">{isAr? 'السعر للمتر المربع':'Base price per m²'}</label>
-                <Input type="number" inputMode="decimal" value={Number(newProduct.basePricePerM2||0)} onChange={(e)=>setNewProduct(p=>({...p, basePricePerM2: Number(e.target.value||0)}))} />
-                {newProdPriceInvalid && (
-                  <div className="text-[11px] text-red-600 mt-1">{isAr ? 'أدخل سعرًا صحيحًا أكبر من صفر' : 'Enter a valid price greater than zero'}</div>
-                )}
-              </div>
+              {/* Removed base price field as requested */}
               <div className="col-span-1 md:col-span-2 lg:col-span-4 grid grid-cols-3 gap-3">
                 <label className="text-xs col-span-3">{isAr? 'الأبعاد المطلوبة':'Required dimensions'}</label>
                 <div className="flex items-center gap-2"><input type="checkbox" checked={!!newProduct.dimensions?.width} onChange={(e)=>setNewProduct(p=>({...p, dimensions:{ ...(p.dimensions||{}), width: e.target.checked }}))} /> <span>{isAr ? 'العرض' : 'Width'}</span></div>
@@ -392,7 +386,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                 </div>
                 <Input placeholder={isAr?'اسم الخامة (عربي)':'Material name (Arabic)'} value={npDraftMaterial.ar || ''} onChange={(e)=> setNpDraftMaterial(prev => ({ ...prev, ar: e.target.value }))} />
                 <Input placeholder={isAr?'اسم الخامة (إنجليزي)':'Material name (English)'} value={npDraftMaterial.en || ''} onChange={(e)=> setNpDraftMaterial(prev => ({ ...prev, en: e.target.value }))} />
-                <Input placeholder={isAr?'السعر للمتر المربع':'Price per m²'} type="number" inputMode="decimal" value={Number(npDraftMaterial.pricePerM2 || 0)} onChange={(e)=> setNpDraftMaterial(prev => ({ ...prev, pricePerM2: Number(e.target.value||0) }))} />
+                <Input placeholder={isAr?'السعر المتر المربع':'Price per m²'} type="number" inputMode="decimal" value={npDraftMaterial.pricePerM2 || ''} onChange={(e)=> setNpDraftMaterial(prev => ({ ...prev, pricePerM2: e.target.value ? Number(e.target.value) : undefined }))} />
                 <div className="col-span-1 md:col-span-4">
                   <Button size="sm" variant="outline" disabled={!npSelectedSubtypeForMaterial || !((npDraftMaterial.ar||npDraftMaterial.en||'').trim())} onClick={()=>{
                     const name = (npDraftMaterial.ar || npDraftMaterial.en || '').trim();
@@ -537,10 +531,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                     <label className="text-xs block mb-1">{isAr? 'الإنجليزي':'English'}</label>
                     <Input value={p.en || ''} onChange={(e)=>updateProduct(idx, { en: e.target.value })} />
                   </div>
-                  <div>
-                    <label className="text-xs block mb-1">{isAr? 'السعر للمتر المربع':'Base price per m²'}</label>
-                    <Input type="number" inputMode="decimal" value={Number(p.basePricePerM2 || 0)} onChange={(e)=>updateProduct(idx, { basePricePerM2: Number(e.target.value||0) })} />
-                  </div>
+                  {/* Removed base price field as requested */}
                   <div className="col-span-1 md:col-span-2 lg:col-span-4 grid grid-cols-3 gap-3">
                     <label className="text-xs col-span-3">{isAr? 'الأبعاد المطلوبة':'Required dimensions'}</label>
                     <div className="flex items-center gap-2"><input type="checkbox" checked={!!p.dimensions?.width} onChange={(e)=>updateProduct(idx, { dimensions: { ...(p.dimensions||{}), width: e.target.checked } })} /> <span>{isAr ? 'العرض' : 'Width'}</span></div>
@@ -592,9 +583,9 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                         ))}
                       </select>
                     </div>
-                    <Input placeholder={isAr?'اسم الخامة (عربي)':'Material name (Arabic)'} value={(draftMaterial[p.id]?.[selectedSubtypeForMaterial[p.id] || '']?.ar) || ''} onChange={(e)=> setDraftMaterial(prev => ({ ...prev, [p.id]: { ...(prev[p.id]||{}), [selectedSubtypeForMaterial[p.id] || '']: { ...(prev[p.id]?.[selectedSubtypeForMaterial[p.id] || '']||{ id:'', ar:'', en:'', pricePerM2:0 }), ar: e.target.value } } }))} />
-                    <Input placeholder={isAr?'اسم الخامة (إنجليزي)':'Material name (English)'} value={(draftMaterial[p.id]?.[selectedSubtypeForMaterial[p.id] || '']?.en) || ''} onChange={(e)=> setDraftMaterial(prev => ({ ...prev, [p.id]: { ...(prev[p.id]||{}), [selectedSubtypeForMaterial[p.id] || '']: { ...(prev[p.id]?.[selectedSubtypeForMaterial[p.id] || '']||{ id:'', ar:'', en:'', pricePerM2:0 }), en: e.target.value } } }))} />
-                    <Input placeholder={isAr?'السعر للمتر المربع':'Price per m²'} type="number" inputMode="decimal" value={Number((draftMaterial[p.id]?.[selectedSubtypeForMaterial[p.id] || '']?.pricePerM2) || 0)} onChange={(e)=> setDraftMaterial(prev => ({ ...prev, [p.id]: { ...(prev[p.id]||{}), [selectedSubtypeForMaterial[p.id] || '']: { ...(prev[p.id]?.[selectedSubtypeForMaterial[p.id] || '']||{ id:'', ar:'', en:'', pricePerM2:0 }), pricePerM2: Number(e.target.value||0) } } }))} />
+                    <Input placeholder={isAr?'اسم الخامة (عربي)':'Material name (Arabic)'} value={(draftMaterial[p.id]?.[selectedSubtypeForMaterial[p.id] || '']?.ar) || ''} onChange={(e)=> setDraftMaterial(prev => ({ ...prev, [p.id]: { ...(prev[p.id]||{}), [selectedSubtypeForMaterial[p.id] || '']: { ...(prev[p.id]?.[selectedSubtypeForMaterial[p.id] || '']||{ id:'', ar:'', en:'', pricePerM2:undefined }), ar: e.target.value } } }))} />
+                    <Input placeholder={isAr?'اسم الخامة (إنجليزي)':'Material name (English)'} value={(draftMaterial[p.id]?.[selectedSubtypeForMaterial[p.id] || '']?.en) || ''} onChange={(e)=> setDraftMaterial(prev => ({ ...prev, [p.id]: { ...(prev[p.id]||{}), [selectedSubtypeForMaterial[p.id] || '']: { ...(prev[p.id]?.[selectedSubtypeForMaterial[p.id] || '']||{ id:'', ar:'', en:'', pricePerM2:undefined }), en: e.target.value } } }))} />
+                    <Input placeholder={isAr?'السعر المتر المربع':'Price per m²'} type="number" inputMode="decimal" value={(draftMaterial[p.id]?.[selectedSubtypeForMaterial[p.id] || '']?.pricePerM2) || ''} onChange={(e)=> setDraftMaterial(prev => ({ ...prev, [p.id]: { ...(prev[p.id]||{}), [selectedSubtypeForMaterial[p.id] || '']: { ...(prev[p.id]?.[selectedSubtypeForMaterial[p.id] || '']||{ id:'', ar:'', en:'', pricePerM2:undefined }), pricePerM2: e.target.value ? Number(e.target.value) : undefined } } }))} />
                     <div className="col-span-1 md:col-span-1">
                       <Button size="sm" variant="outline" onClick={()=>{
                         const subId = selectedSubtypeForMaterial[p.id];
