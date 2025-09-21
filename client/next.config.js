@@ -78,12 +78,21 @@ const nextConfig = {
       { source: '/:locale/icon.svg', destination: '/icon.svg' },
       // Serve SVG favicon for /favicon.ico requests
       { source: '/favicon.ico', destination: '/favicon.svg' },
-      // Fix Vercel Insights path when locale prefixes are present (e.g., /ar/_vercel/insights/...)
-      { source: '/:locale/_vercel/insights/:path*', destination: '/_vercel/insights/:path*' },
+      { source: '/:locale/favicon.svg', destination: '/favicon.svg' },
       // Proxy API calls through the same origin to avoid cross-site CORS/cookie issues in production
       {
         source: '/api/:path*',
         destination: `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/:path*`,
+      },
+    ];
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/:locale/_vercel/insights/:path*',
+        destination: '/_vercel/insights/:path*',
+        permanent: false,
       },
     ];
   },

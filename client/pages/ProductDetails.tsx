@@ -484,7 +484,7 @@ export default function ProductDetails({
       } catch { setCategoryName(""); }
     })();
     return () => { cancelled = true; };
-  }, [product, JSON.stringify((product as any)?.categoryId)]);
+  }, [product]);
 
   // Final displayed images with category fallback
   displayedImages = images.length ? images : (categoryImage ? [categoryImage] : []);
@@ -534,7 +534,7 @@ export default function ProductDetails({
         }
       } catch {}
     })();
-  }, [product, reviewsLoadedFor, String((product as any)?.id || '')]);
+  }, [product, reviewsLoadedFor]);
 
   const submitReview = async () => {
     const currentUser = (rest as any)?.user;

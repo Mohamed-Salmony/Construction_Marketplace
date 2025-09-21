@@ -62,9 +62,12 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   const [commDraft, setCommDraft] = React.useState<{ products: string; projectsMerchants: string; servicesTechnicians: string }>({ products: '', projectsMerchants: '', servicesTechnicians: '' });
   const [quickActions, setQuickActions] = React.useState<Array<{ page: string; labelAr: string; labelEn: string; icon?: string; enabled?: boolean }>>([]);
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   // ✅ Avoid tying to changing context object (prevents repeated re-runs/re-flashes)
   const loadAll = React.useCallback(async () => {
+    if (isLoading) return; // Prevent multiple simultaneous calls
+    setIsLoading(true);
     // Safety timer declared outside try so we can clear in finally
     let autoHideTimer: any = null;
     try {
@@ -208,13 +211,21 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       // Clear safety timer if still pending, then ensure hidden
       try { if (autoHideTimer) clearTimeout(autoHideTimer); } catch {}
       try { (context as any)?.hideLoading?.(); } catch {}
+      setIsLoading(false);
     }
-  }, [context, isAr]);
+  }, []);
 
   // ✅ Load data once on mount
-  React.useEffect(() => { 
-    void loadAll(); 
-  }, [loadAll]);
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (mounted) {
+        await loadAll();
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const statsData: Array<{ title: string; value: string; change: string; icon: any; trend: Trend }> = [
     { title: t('totalUsers'), value: String(stats.totalUsers), change: '', icon: Users, trend: 'up' },

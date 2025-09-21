@@ -34,7 +34,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       <GlobalErrorBoundary>
         <Component {...pageProps} />
       </GlobalErrorBoundary>
-      {process.env.NODE_ENV === 'production' && (
+      {process.env.NODE_ENV === 'production' && typeof window !== 'undefined' && (
         <>
           <Analytics />
           <SpeedInsights />

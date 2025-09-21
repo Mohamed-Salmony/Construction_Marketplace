@@ -1,0 +1,26 @@
+# Development files
+.env.local
+.env.development
+.env.test
+
+# Build outputs
+.next
+out
+dist
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Analytics errors
+_vercel/insights/script.js

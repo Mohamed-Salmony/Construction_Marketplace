@@ -24,6 +24,7 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next({
     request: {
+      ...request,
       headers: requestHeaders,
     },
   })
@@ -31,7 +32,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip all internal paths (_next)
-    '/((?!_next|api|favicon.ico|robots.txt).*)',
+    // Skip all internal paths (_next, _vercel, static assets)
+    '/((?!_next|_vercel|api|favicon|icon|robots.txt|sitemap.xml|manifest.json|.*\\.).*)',
   ],
 }
