@@ -35,3 +35,5 @@ services:
         value: https://construction-marketplace.onrender.com
       - key: NEXT_TELEMETRY_DISABLED
         value: 1
+      - key: DEBUG
+        value: 1

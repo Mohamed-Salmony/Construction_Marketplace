@@ -46,7 +46,12 @@ const nextConfig = {
   
   // Bundle analyzer and optimization - simplified to avoid build issues
   webpack: (config, { dev, isServer }) => {
-    // Keep default webpack optimization for now
+    // Fix path resolution for production builds
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname),
+    };
+    
     return config;
   },
   
