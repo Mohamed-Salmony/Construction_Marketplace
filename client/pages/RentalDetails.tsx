@@ -27,7 +27,7 @@ import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { useTranslation } from '../hooks/useTranslation';
 import { WishlistItem } from '../components/Router';
 import { getRentalById } from '@/services/rentals';
-import { getProductById } from '@/services/products';
+import { getProductById } from '../services/products';
 import { toastSuccess, toastInfo } from '../utils/alerts';
 
 interface RentalDetailsProps {
