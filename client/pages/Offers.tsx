@@ -99,6 +99,16 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                       // Use full product data from API
                       const fullProduct = productResponse.data as any;
                       
+                      // Debug: Log the product data to check what we're getting
+                      console.log('Full product data from API:', {
+                        id: fullProduct.id,
+                        specifications: fullProduct.specifications,
+                        compatibility: fullProduct.compatibility,
+                        compatibilityBackend: fullProduct.compatibilityBackend,
+                        addonInstallation: fullProduct.addonInstallation,
+                        allowCustomDimensions: fullProduct.allowCustomDimensions
+                      });
+                      
                       // Transform the full product data
                       const imgs = Array.isArray(fullProduct.images) ? fullProduct.images : [];
                       const primaryUrl = imgs.find((im: any) => im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl;
@@ -117,7 +127,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                       const brandAr = String(brandAttr?.valueAr || brandAttr?.valueEn || '').trim();
                       const brandEn = String(brandAttr?.valueEn || brandAttr?.valueAr || '').trim();
                       
-                      (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
+                      const productToPass = {
                         id: String(fullProduct.id),
                         slug: undefined,
                         group: 'tools',
@@ -137,15 +147,27 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                         stockCount: Number(fullProduct.stockQuantity || 0),
                         isNew: false,
                         isOnSale: currentPrice < basePrice,
-                        compatibility: fullProduct.compatibility || [],
+                        compatibility: Array.isArray(fullProduct?.compatibility) ? fullProduct.compatibility : [],
+                        compatibilityBackend: Array.isArray(fullProduct?.compatibilityBackend) ? fullProduct.compatibilityBackend : (Array.isArray(fullProduct?.compatibility) ? fullProduct.compatibility : []),
                         partNumber: fullProduct.partNumber || '',
                         warranty: { ar: 'سنة', en: '1 year' },
                         description: { ar: fullProduct.descriptionAr || '', en: fullProduct.descriptionEn || '' },
-                        features: fullProduct.features || [],
-                        specifications: fullProduct.specifications || {},
-                        installationTips: fullProduct.installationTips || [],
+                        features: Array.isArray(fullProduct?.features) ? fullProduct.features : [],
+                        specifications: typeof fullProduct?.specifications === 'object' && fullProduct?.specifications !== null ? fullProduct.specifications : {},
+                        installationTips: Array.isArray(fullProduct?.installationTips) ? fullProduct.installationTips : [],
                         addonInstallation: fullProduct.addonInstallation || (fullProduct.allowCustomDimensions ? { enabled: true, feePerUnit: 50 } : null)
-                      }); 
+                      };
+                      
+                      // Debug: Log what we're passing to setSelectedProduct
+                      console.log('Product data being passed to ProductDetails:', {
+                        id: productToPass.id,
+                        specificationsCount: Object.keys(productToPass.specifications || {}).length,
+                        compatibilityCount: productToPass.compatibility?.length || 0,
+                        compatibilityBackendCount: productToPass.compatibilityBackend?.length || 0,
+                        addonInstallation: productToPass.addonInstallation
+                      });
+                      
+                      (context as any)?.setSelectedProduct && (context as any).setSelectedProduct(productToPass); 
                     } else {
                       // Fallback to basic data if API fails
                       const imgs = Array.isArray(p.images) ? p.images : [];
