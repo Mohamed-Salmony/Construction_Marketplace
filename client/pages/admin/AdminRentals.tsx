@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Clock, CheckCircle, XCircle, AlertTriangle, User, Eye, Calendar, Package } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
-import useStableCallback from '../../hooks/useStableCallback';
+// useStableCallback removed - not needed for simple load function
 import { toastSuccess, toastError } from '../../utils/alerts';
 import { getAllRentals, approveRental, declineRental, removeRentalAdmin } from '@/services/rentals';
 // getUserById service removed - not needed for basic functionality

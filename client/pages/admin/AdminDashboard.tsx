@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useTranslation } from '../../hooks/useTranslation';
-import useStableCallback from '../../hooks/useStableCallback';
+// useStableCallback removed to avoid build issues
 import React from 'react';
 import { toastSuccess, toastError } from '../../utils/alerts';
 import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser } from '@/services/admin';
@@ -65,8 +65,8 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // ✅ Stable loading function that can access latest values
-  const loadAll = useStableCallback(async () => {
+  // Simple loading function
+  const loadAll = React.useCallback(async () => {
     if (isLoading) return; // Prevent multiple simultaneous calls
     setIsLoading(true);
     
@@ -215,7 +215,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       try { (context as any)?.hideLoading?.(); } catch {}
       setIsLoading(false);
     }
-  });
+  }, [isLoading, isAr, context]);
 
   // ✅ Load data once on mount
   React.useEffect(() => {

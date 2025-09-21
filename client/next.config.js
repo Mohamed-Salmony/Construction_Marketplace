@@ -34,7 +34,7 @@ const nextConfig = {
   
   // Performance optimizations (avoid optimizePackageImports due to SSR/prerender issues with some icon libs)
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // Disabled - causes 'critters' module error on Vercel
     // optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   // Ensure certain ESM-only packages are transpiled for SSR compatibility
@@ -45,31 +45,9 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === 'production',
   },
   
-  // Bundle analyzer and optimization
+  // Bundle analyzer and optimization - simplified to avoid build issues
   webpack: (config, { dev, isServer }) => {
-    // Optimize bundle size
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          default: false,
-          vendors: false,
-          // Vendor chunk
-          vendor: {
-            name: 'vendor',
-            chunks: 'all',
-            test: /node_modules/,
-          },
-          // Common chunk
-          common: {
-            name: 'common',
-            minChunks: 2,
-            chunks: 'all',
-            enforce: true,
-          },
-        },
-      };
-    }
+    // Keep default webpack optimization for now
     return config;
   },
   

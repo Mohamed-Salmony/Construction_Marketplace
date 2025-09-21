@@ -49,7 +49,7 @@ export class GlobalErrorBoundary extends React.Component<
         </div>
       );
     }
-    return this.props.children as React.ReactElement;
+    return this.props.children;
   }
 }
 
