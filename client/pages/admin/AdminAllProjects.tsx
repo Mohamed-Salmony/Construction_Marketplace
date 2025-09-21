@@ -61,6 +61,7 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
   const [status, setStatus] = React.useState<string>('all');
 
   const load = React.useCallback(async () => {
+    if (loading) return; // Prevent multiple calls
     try {
       setLoading(true);
       setError(null);
@@ -78,9 +79,19 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     } finally {
       setLoading(false);
     }
-  }, [query, isAr]);
+  }, []);
 
-  React.useEffect(() => { (async ()=> { await load(); hideFirstOverlay(); })(); }, [load, hideFirstOverlay]);
+  React.useEffect(() => { 
+    let mounted = true;
+    const loadData = async () => {
+      if (mounted) {
+        await load(); 
+        hideFirstOverlay();
+      }
+    };
+    loadData();
+    return () => { mounted = false; };
+  }, []);
 
   const filtered = React.useMemo(() => {
     const s = status;

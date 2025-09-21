@@ -6,6 +6,11 @@ const defaultLocale = 'ar'
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
+  // Skip middleware for Vercel analytics and internal assets
+  if (pathname.includes('/_vercel/') || pathname.includes('/_next/') || pathname.includes('/api/')) {
+    return NextResponse.next()
+  }
+  
   // Check if there is any supported locale in the pathname
   const pathnameIsMissingLocale = locales.every(
     (locale) => !pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`
@@ -24,7 +29,6 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next({
     request: {
-      ...request,
       headers: requestHeaders,
     },
   })

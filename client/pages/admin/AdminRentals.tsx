@@ -57,6 +57,7 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
   }, [customerNames]);
 
   const load = useCallback(async () => {
+    if (loading) return; // Prevent multiple calls
     setLoading(true);
     try {
       if (firstLoadRef.current && typeof (rest as any)?.showLoading === 'function') {
@@ -76,9 +77,16 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
         firstLoadRef.current = false;
       }
     }
-  }, [locale, rest]);
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { 
+    let mounted = true;
+    const loadData = async () => {
+      if (mounted) await load();
+    };
+    loadData();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     if (selected && selected.customerId) {

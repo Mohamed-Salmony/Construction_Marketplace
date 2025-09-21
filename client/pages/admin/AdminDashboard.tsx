@@ -64,21 +64,14 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // ✅ Avoid tying to changing context object (prevents repeated re-runs/re-flashes)
+  // ✅ Loading function without dependencies to prevent loops
   const loadAll = React.useCallback(async () => {
     if (isLoading) return; // Prevent multiple simultaneous calls
     setIsLoading(true);
+    
     // Safety timer declared outside try so we can clear in finally
     let autoHideTimer: any = null;
     try {
-      // Use global loading overlay for consistent UX
-      (context as any)?.showLoading?.(isAr ? 'جاري تحميل البيانات...' : 'Loading data...');
-      // Auto-hide the overlay as a safety net; we will also hide explicitly in finally
-      try {
-        autoHideTimer = setTimeout(() => {
-          try { (context as any)?.hideLoading?.(); } catch {}
-        }, 600);
-      } catch {}
 
       const [mer, srv, prod, usersAll, usersActiveVendors, usersTech, overview, c1, c2, c3, qact] = await Promise.all([
         getPendingMerchants(),
@@ -201,16 +194,15 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      setPendingMerchants([]); 
-      setPendingServices([]); 
-      setPendingProducts([]); 
-      setPendingServicesError(isAr ? 'تعذر الاتصال بالخادم' : 'Failed to contact server');
-      setPendingProductsError(isAr ? 'تعذر الاتصال بالخادم' : 'Failed to contact server');
+      setPendingMerchants([]);
+      setPendingServices([]);
+      setPendingProducts([]);
+      setPendingServicesError('تعذر الاتصال بالخادم');
+      setPendingProductsError('تعذر الاتصال بالخادم');
       setPendingTechnicians([]);
     } finally {
       // Clear safety timer if still pending, then ensure hidden
       try { if (autoHideTimer) clearTimeout(autoHideTimer); } catch {}
-      try { (context as any)?.hideLoading?.(); } catch {}
       setIsLoading(false);
     }
   }, []);
