@@ -26,7 +26,6 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
   const [onlyOffers, setOnlyOffers] = useState<boolean>(false);
 
   const load = useCallback(async () => {
-    if (loading) return; // Prevent multiple calls
     try {
       setLoading(true);
       // Test admin endpoint first
@@ -84,7 +83,7 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
       setError(isAr ? 'تعذر جلب المنتجات' : 'Failed to fetch products');
       setItems([]);
     } finally { setLoading(false); }
-  }, [loading, isAr]); // Keep essential dependencies
+  }, [isAr]); // Removed loading to prevent infinite loops
 
   useEffect(() => { 
     let mounted = true;
@@ -96,7 +95,7 @@ export default function AdminOffers({ setCurrentPage, ...context }: Partial<Rout
     };
     loadData();
     return () => { mounted = false; };
-  }, [load, hideFirstOverlay]);
+  }, []); // Removed dependencies to prevent infinite loops
 
   const setDiscount = async (p: ProductDto, newDiscount: number | null) => {
     try {

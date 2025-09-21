@@ -61,7 +61,6 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
   const [status, setStatus] = React.useState<string>('all');
 
   const load = React.useCallback(async () => {
-    if (loading) return; // Prevent multiple calls
     try {
       setLoading(true);
       setError(null);
@@ -79,7 +78,7 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     } finally {
       setLoading(false);
     }
-  }, [loading, query, isAr]); // Keep essential dependencies
+  }, [query, isAr]); // Removed loading to prevent infinite loops
 
   React.useEffect(() => { 
     let mounted = true;
@@ -91,7 +90,7 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     };
     loadData();
     return () => { mounted = false; };
-  }, [load, hideFirstOverlay]);
+  }, []); // Removed dependencies to prevent infinite loops
 
   const filtered = React.useMemo(() => {
     const s = status;

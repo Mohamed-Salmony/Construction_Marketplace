@@ -74,7 +74,7 @@ export default function AdminProductOptions(props: Partial<RouteContext>) {
     };
     void load();
     return () => { mounted = false; };
-  }, [locale, hideFirstOverlay]);
+  }, [locale]); // Removed hideFirstOverlay to prevent infinite loops
 
   const handlePickNewImage = () => {
     newImageInputRef.current?.click();
