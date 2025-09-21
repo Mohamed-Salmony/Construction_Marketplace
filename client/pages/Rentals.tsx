@@ -11,7 +11,7 @@ import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { useTranslation } from '../hooks/useTranslation';
 import type { RouteContext } from '../components/routerTypes';
 import { toastError } from '../utils/alerts';
-import { getAvailableForRent, type ProductDto } from '@/services/products';
+import { getAvailableForRent, type ProductDto } from '../services/products';
 import { listPublicRentals, type RentalDto } from '@/services/rentals';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
@@ -136,7 +136,7 @@ export default function Rentals({ setCurrentPage, ...rest }: RentalsProps) {
       const name = String((r as any)?.productName || '').trim();
       if (!name) return '';
       // Try exact-name query first
-      const res = await (await import('@/services/products')).getProducts({ page: 1, pageSize: 5, query: name } as any) as any;
+      const res = await (await import('../services/products')).getProducts({ page: 1, pageSize: 5, query: name } as any) as any;
       if (res?.ok && res?.data) {
         const list: any[] = Array.isArray((res.data as any).items)
           ? (res.data as any).items

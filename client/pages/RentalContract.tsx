@@ -11,7 +11,7 @@ import { Label } from '../components/ui/label';
 import { useTranslation } from '../hooks/useTranslation';
 import { RouteContext } from '../components/Router';
 import { getRentalById, adjustRentalDays, sendRentalMessage, listRentalMessages } from '@/services/rentals';
-import { getProductById } from '@/services/products';
+import { getProductById } from '../services/products';
 import { toastSuccess, toastError } from '../utils/alerts';
 import LoadingOverlay from '../components/LoadingOverlay';
 
