@@ -83,24 +83,51 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                 onClick={() => {
                   try { window.localStorage.setItem('selected_product_id', String(p.id)); } catch {}
                   try { 
+                    // Transform data similar to ProductListing format
+                    const imgs = Array.isArray(p.images) ? p.images : [];
+                    const primaryUrl = imgs.find((im: any) => im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl;
+                    const basePrice = Number(p.price || 0);
+                    const disc = p.discountPrice;
+                    const hasValidDiscount = typeof disc === 'number' && disc > 0 && disc < basePrice;
+                    const currentPrice = hasValidDiscount ? Number(disc) : basePrice;
+                    
+                    // Derive brand from attributes if available
+                    const attrs = Array.isArray(p.attributes) ? p.attributes : [];
+                    const brandAttr = attrs.find((a:any) => {
+                      const nEn = String(a?.nameEn || '').toLowerCase();
+                      const nAr = String(a?.nameAr || '').toLowerCase();
+                      return ['brand','make','manufacturer','company'].includes(nEn) || ['العلامة التجارية','الماركة','ماركة','الشركة','الصانع'].includes(nAr);
+                    });
+                    const brandAr = String(brandAttr?.valueAr || brandAttr?.valueEn || '').trim();
+                    const brandEn = String(brandAttr?.valueEn || brandAttr?.valueAr || '').trim();
+                    
                     (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
-                      id: p.id,
-                      name: { ar: p.nameAr, en: p.nameEn },
-                      price: p.discountPrice || p.price,
-                      originalPrice: p.price,
-                      images: p.images?.map((img: any) => img.imageUrl) || [],
-                      description: { ar: p.descriptionAr, en: p.descriptionEn },
-                      brand: { ar: 'عام', en: 'Generic' },
-                      inStock: true,
-                      stockCount: p.stockQuantity || 99,
-                      rating: 4.5,
-                      reviewCount: 0,
-                      features: [],
+                      id: String(p.id),
+                      slug: undefined,
+                      group: 'tools',
+                      name: { ar: p.nameAr || '', en: p.nameEn || '' },
+                      brand: { ar: brandAr || 'عام', en: brandEn || 'Generic' },
+                      category: { ar: p.categoryName || '', en: p.categoryName || '' },
+                      categoryId: String(p.categoryId || ''),
+                      subCategory: { ar: '', en: '' },
+                      price: currentPrice,
+                      originalPrice: basePrice,
+                      rating: Number(p.averageRating || 0),
+                      reviewCount: Number(p.reviewCount || 0),
+                      image: primaryUrl,
+                      images: imgs.map((img: any) => img.imageUrl).filter(Boolean),
+                      imageUrl: primaryUrl, // fallback
+                      inStock: Number(p.stockQuantity || 0) > 0,
+                      stockCount: Number(p.stockQuantity || 0),
+                      isNew: false,
+                      isOnSale: currentPrice < basePrice,
+                      compatibility: [],
                       partNumber: '',
                       warranty: { ar: 'سنة', en: '1 year' },
+                      description: { ar: p.descriptionAr || '', en: p.descriptionEn || '' },
+                      features: [],
                       specifications: {},
-                      compatibility: [],
-                      addonInstallation: null
+                      addonInstallation: p.allowCustomDimensions ? { enabled: true, feePerUnit: 50 } : null
                     }); 
                   } catch {}
                   setCurrentPage && setCurrentPage('product-details');

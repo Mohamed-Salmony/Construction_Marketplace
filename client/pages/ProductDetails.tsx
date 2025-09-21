@@ -951,7 +951,21 @@ export default function ProductDetails({
           <TabsContent value="description" className="mt-6">
             <Card>
               <CardContent className="p-6">
-                <p className="mb-6">{getText(product.description)}</p>
+                <p className="mb-6">{(() => {
+                  const desc = getText(product.description);
+                  // Remove unwanted phrases from description
+                  return desc
+                    .replace(/جودة عالية/gi, '')
+                    .replace(/أسعار منافسة/gi, '')
+                    .replace(/خدمة سريعة/gi, '')
+                    .replace(/Quality/gi, '')
+                    .replace(/Competitive/gi, '')
+                    .replace(/Service/gi, '')
+                    .replace(/نصائح تركيب/gi, '')
+                    .replace(/Installation Tips/gi, '')
+                    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                    .trim();
+                })()}</p>
 
                 <h3 className="font-medium mb-4">{t("features")}</h3>
                 <ul className="space-y-2">
