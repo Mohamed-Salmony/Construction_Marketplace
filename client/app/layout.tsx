@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import './globals.css'
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/next'
+// Analytics disabled to prevent 404 errors and reload loops
+// import { Analytics } from '@vercel/analytics/react'
+// import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Toaster } from '../components/ui/sonner'
 
 export const metadata: Metadata = {
@@ -30,8 +31,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
         <Toaster position="top-center" richColors />
-        {isProd && <Analytics />}
-        {isProd && <SpeedInsights />}
+        {/* Analytics disabled to prevent errors */}
+        {/* {isProd && <Analytics />} */}
+        {/* {isProd && <SpeedInsights />} */}
       </body>
     </html>
   )

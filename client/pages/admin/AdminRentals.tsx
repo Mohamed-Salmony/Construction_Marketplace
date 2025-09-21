@@ -79,13 +79,13 @@ export default function AdminRentals({ setCurrentPage, ...rest }: Props) {
     };
     loadData();
     return () => { mounted = false; };
-  }, [load]);
+  }, []); // Removed load dependency to prevent infinite loops
 
   useEffect(() => {
     if (selected && selected.customerId) {
       fetchCustomerName(selected.customerId);
     }
-  }, [selected, fetchCustomerName]);
+  }, [selected]); // Removed fetchCustomerName dependency to prevent loops
 
   const onApprove = async (id: number | string) => { await approveRental(String(id)); await load(); };
   const onDecline = async (id: number | string) => { await declineRental(String(id)); await load(); };

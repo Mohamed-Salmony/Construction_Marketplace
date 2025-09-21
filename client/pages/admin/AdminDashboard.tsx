@@ -215,7 +215,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
       try { (context as any)?.hideLoading?.(); } catch {}
       setIsLoading(false);
     }
-  }, [isLoading, isAr, context]);
+  }, [isAr]); // Removed isLoading and context to prevent infinite loops
 
   // ✅ Load data once on mount
   React.useEffect(() => {
