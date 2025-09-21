@@ -1,6 +1,5 @@
 import { RouteContext } from "../components/Router";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
 import { Package } from "lucide-react";
 import { useTranslation } from "../hooks/useTranslation";
 import Header from "../components/Header";
@@ -78,7 +77,35 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {products.map((p) => (
-              <Card key={p.id} className="group hover:shadow transition-all relative">
+              <Card 
+                key={p.id} 
+                className="group hover:shadow-lg transition-all cursor-pointer hover:scale-105"
+                onClick={() => {
+                  try { window.localStorage.setItem('selected_product_id', String(p.id)); } catch {}
+                  try { 
+                    (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
+                      id: p.id,
+                      name: { ar: p.nameAr, en: p.nameEn },
+                      price: p.discountPrice || p.price,
+                      originalPrice: p.price,
+                      images: p.images?.map((img: any) => img.imageUrl) || [],
+                      description: { ar: p.descriptionAr, en: p.descriptionEn },
+                      brand: { ar: 'عام', en: 'Generic' },
+                      inStock: true,
+                      stockCount: p.stockQuantity || 99,
+                      rating: 4.5,
+                      reviewCount: 0,
+                      features: [],
+                      partNumber: '',
+                      warranty: { ar: 'سنة', en: '1 year' },
+                      specifications: {},
+                      compatibility: [],
+                      addonInstallation: null
+                    }); 
+                  } catch {}
+                  setCurrentPage && setCurrentPage('product-details');
+                }}
+              >
                 <CardHeader>
                   <div className="h-40 bg-muted rounded-lg mb-2 flex items-center justify-center overflow-hidden">
                     {p.images && p.images.length > 0 ? (
@@ -102,39 +129,6 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                         -{Math.round(100 - (Number(p.discountPrice)/Number(p.price))*100)}%
                       </span>
                     )}
-                  </div>
-                  <div className="pt-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        try { window.localStorage.setItem('selected_product_id', String(p.id)); } catch {}
-                        try { 
-                          (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
-                            id: p.id,
-                            name: { ar: p.nameAr, en: p.nameEn },
-                            price: p.discountPrice || p.price,
-                            originalPrice: p.price,
-                            images: p.images?.map((img: any) => img.imageUrl) || [],
-                            description: { ar: p.descriptionAr, en: p.descriptionEn },
-                            brand: { ar: 'عام', en: 'Generic' },
-                            inStock: true,
-                            stockCount: p.stockQuantity || 99,
-                            rating: 4.5,
-                            reviewCount: 0,
-                            features: [],
-                            partNumber: '',
-                            warranty: { ar: 'سنة', en: '1 year' },
-                            specifications: {},
-                            compatibility: [],
-                            addonInstallation: null
-
-                          }); 
-                        } catch {}
-                        setCurrentPage && setCurrentPage('product-details');
-                      }}
-                   >
-                      {locale==='ar' ? 'عرض المنتج' : 'View Product'}
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
