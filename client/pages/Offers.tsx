@@ -27,11 +27,43 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
         );
       }
       const r = await getProducts({ page: 1, pageSize: 500, sortBy: 'CreatedAt', sortDirection: 'desc' as any });
-      const items = ((r.data as any)?.items ?? (r.data as any)?.Items ?? []) as ProductDto[];
-      const discounted = items.filter(p => typeof p.discountPrice === 'number' && p.discountPrice! > 0 && p.discountPrice! < p.price && p.isApproved);
-      setProducts(discounted);
+      const { ok, data } = r;
+      if (ok && data) {
+        const items = Array.isArray((data as any).items) ? (data as any).items : (Array.isArray(data) ? data : []);
+        
+        // Debug: Log raw data structure
+        console.log('Raw data from API:', { 
+          dataType: typeof data, 
+          isArray: Array.isArray(data), 
+          itemsCount: items?.length || 0,
+          sampleItem: items?.[0] || null
+        });
+        
+        // Filter for items that have discount/offer prices
+        const offersOnly = items.filter((item: any) => {
+          const hasDiscount = item.discountPrice && Number(item.discountPrice) < Number(item.price);
+          return hasDiscount;
+        });
+        
+        // Debug: Log offers data
+        console.log('Offers data:', {
+          totalItems: items.length,
+          offersCount: offersOnly.length,
+          sampleOffer: offersOnly?.[0] ? {
+            id: offersOnly[0].id,
+            _id: offersOnly[0]._id,
+            nameAr: offersOnly[0].nameAr,
+            price: offersOnly[0].price,
+            discountPrice: offersOnly[0].discountPrice
+          } : null
+        });
+        
+        setProducts(offersOnly);
+      } else {
+        setError('حدث خطأ في تحميل العروض');
+      }
     } catch {
-      setError(locale==='ar' ? 'فشل تحميل العروض' : 'Failed to load offers');
+      setError('Failed to load offers');
     } finally {
       setLoading(false);
       if (firstLoadRef.current && typeof (context as any)?.hideLoading === 'function') {
@@ -76,12 +108,44 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((p) => (
+            {products.map((p, index) => {
+              const itemId = p.id || (p as any)._id || `offer-${index}`;
+              return (
               <Card 
-                key={p.id} 
+                key={itemId} 
                 className="group hover:shadow-lg transition-all cursor-pointer hover:scale-105"
                 onClick={async () => {
-                  try { window.localStorage.setItem('selected_product_id', String(p.id)); } catch {}
+                  // ✅ Check if product has valid ID before proceeding
+                  const productId = p.id || (p as any)._id;
+                  if (!productId || String(productId).trim() === '' || String(productId) === 'undefined' || String(productId) === 'null') {
+                    console.error('Product ID is missing or invalid:', p.id);
+                    console.log('Full product data:', p);
+                    
+                    // Fallback: use basic product data and navigate directly
+                    try {
+                      (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
+                        id: String(Math.random()), // temporary ID
+                        name: { ar: p.nameAr || '', en: p.nameEn || '' },
+                        price: p.discountPrice || p.price,
+                        originalPrice: p.price,
+                        description: { ar: p.descriptionAr || '', en: p.descriptionEn || '' },
+                        images: p.images?.map((img: any) => img.imageUrl).filter(Boolean) || [],
+                        brand: { ar: 'عام', en: 'Generic' },
+                        inStock: Number(p.stockQuantity || 0) > 0,
+                        stockCount: Number(p.stockQuantity || 0),
+                        rating: Number(p.averageRating || 0),
+                        reviewCount: Number(p.reviewCount || 0),
+                        compatibility: [],
+                        specifications: {},
+                        features: [],
+                        addonInstallation: null
+                      });
+                    } catch {}
+                    setCurrentPage && setCurrentPage('product-details');
+                    return;
+                  }
+
+                  try { window.localStorage.setItem('selected_product_id', String(productId)); } catch {}
                   
                   // Show loading state
                   if (typeof (context as any)?.showLoading === 'function') {
@@ -93,21 +157,12 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                   
                   try { 
                     // ✅ Fetch complete product details from API
-                    const productResponse = await getProductById(String(p.id));
+                    console.log('Fetching product details for ID:', productId);
+                    const productResponse = await getProductById(String(productId));
                     
                     if (productResponse.ok && productResponse.data) {
                       // Use full product data from API
                       const fullProduct = productResponse.data as any;
-                      
-                      // Debug: Log the product data to check what we're getting
-                      console.log('Full product data from API:', {
-                        id: fullProduct.id,
-                        specifications: fullProduct.specifications,
-                        compatibility: fullProduct.compatibility,
-                        compatibilityBackend: fullProduct.compatibilityBackend,
-                        addonInstallation: fullProduct.addonInstallation,
-                        allowCustomDimensions: fullProduct.allowCustomDimensions
-                      });
                       
                       // Transform the full product data
                       const imgs = Array.isArray(fullProduct.images) ? fullProduct.images : [];
@@ -178,7 +233,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                       const currentPrice = hasValidDiscount ? Number(disc) : basePrice;
                       
                       (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
-                        id: String(p.id),
+                        id: String(productId),
                         name: { ar: p.nameAr || '', en: p.nameEn || '' },
                         price: currentPrice,
                         originalPrice: basePrice,
@@ -200,7 +255,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                     console.error('Failed to fetch product details:', error);
                     // Fallback to basic product data
                     (context as any)?.setSelectedProduct && (context as any).setSelectedProduct({
-                      id: String(p.id),
+                      id: String(productId || 'temp-' + Math.random()),
                       name: { ar: p.nameAr || '', en: p.nameEn || '' },
                       price: p.discountPrice || p.price,
                       originalPrice: p.price,
@@ -242,7 +297,8 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
