@@ -185,7 +185,7 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
       }).catch(() => {/* no-op */});
     })();
     return () => { cancelled = true; };
-  }, []); // Remove dependencies to prevent reload loops
+  }, [context, locale]); // Include dependencies as indicated by ESLint
 
   // Helpers to derive constraints from target snapshot (project)
   const deriveProjectBaseTotal = (snap: any): number => {

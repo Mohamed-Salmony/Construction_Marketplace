@@ -27,7 +27,7 @@ export default function MyOrders({ user, setCurrentPage, goBack, showLoading, hi
       hideLoading?.();
       setLoading(false);
     }
-  }, []); // Remove dependencies to prevent reload loops
+  }, [hideLoading, locale, showLoading]); // Include dependencies as indicated by ESLint
 
   useEffect(() => { reload(); }, [reload]);
 

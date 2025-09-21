@@ -65,7 +65,7 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
       }
     })();
     return () => { mounted = false; };
-  }, []); // Remove dependency to prevent reload loops
+  }, [hideFirstOverlay]); // Include hideFirstOverlay as indicated by ESLint
   const reload = async () => {
     try {
       const { ok, data } = await getProducts({ page: 1, pageSize: 200 });

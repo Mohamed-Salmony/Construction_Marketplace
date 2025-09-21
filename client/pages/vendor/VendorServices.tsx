@@ -49,7 +49,7 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
       setLoading(false);
       if (firstLoadRef.current) { hideFirstOverlay(); firstLoadRef.current = false; }
     }
-  }, []); // Remove dependencies to prevent reload loops
+  }, [hideFirstOverlay, locale]); // Include dependencies as indicated by ESLint
 
   useEffect(() => { 
     let mounted = true;
@@ -58,7 +58,7 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
     };
     load();
     return () => { mounted = false; };
-  }, []);
+  }, [loadServices]);
 
 
   const labelForServiceType = (id: string) => {

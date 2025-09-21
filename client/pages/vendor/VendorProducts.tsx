@@ -100,7 +100,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
 
     load();
     return () => { cancelled = true; };
-  }, []); // Remove dependencies to prevent reload loops
+  }, [hideFirstOverlay, hideLoading, locale, showLoading]); // Include dependencies as indicated by ESLint
 
   // Load categories dynamically (public endpoint; no auth required)
   useEffect(() => {
@@ -118,7 +118,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       } catch {}
     })();
     return () => { cancelled = true; };
-  }, []); // Remove dependencies to prevent reload loops
+  }, [locale]); // Include locale dependency as indicated by ESLint
 
   // Filter products based on search and filters
   const filterProducts = useCallback(() => {
@@ -150,7 +150,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
   // Update filters when dependencies change
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm, selectedCategory, selectedStatus, selectedBrand]);
+  }, [filterProducts]);
 
   // Export current filtered products to CSV
   const handleExportCSV = () => {

@@ -45,7 +45,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
       }
     })();
     return () => { cancelled = true; };
-  }, []); // Remove dependencies to prevent reload loops
+  }, [context, locale]); // Include dependencies as indicated by ESLint
 
   return (
     <div className="min-h-screen bg-background" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
