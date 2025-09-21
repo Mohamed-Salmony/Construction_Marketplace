@@ -183,7 +183,7 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                       const brandEn = String(brandAttr?.valueEn || brandAttr?.valueAr || '').trim();
                       
                       const productToPass = {
-                        id: String(fullProduct.id),
+                        id: String(productId), // Use the same ID we used for API call
                         slug: undefined,
                         group: 'tools',
                         name: { ar: fullProduct.nameAr || '', en: fullProduct.nameEn || '' },
@@ -216,6 +216,9 @@ export default function Offers({ setCurrentPage, ...context }: Partial<RouteCont
                       // Debug: Log what we're passing to setSelectedProduct
                       console.log('Product data being passed to ProductDetails:', {
                         id: productToPass.id,
+                        originalApiId: productId,
+                        fullProductId: fullProduct.id,
+                        idForReviews: productToPass.id,
                         specificationsCount: Object.keys(productToPass.specifications || {}).length,
                         compatibilityCount: productToPass.compatibility?.length || 0,
                         compatibilityBackendCount: productToPass.compatibilityBackend?.length || 0,
