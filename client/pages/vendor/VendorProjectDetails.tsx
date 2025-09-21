@@ -86,6 +86,7 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
           const items = Array.isArray(p.items) ? p.items : (Array.isArray(p.Items) ? p.Items : []);
           const normalized = {
             ...p,
+            id: p.id ?? p._id,
             width,
             height,
             length,
@@ -122,7 +123,7 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
         if (!project) { setHasSubmitted(false); setMyProposal(null); return; }
         const { ok, data } = await getMyBids();
         const list = ok && Array.isArray(data) ? (data as any[]) : [];
-        const mine = list.find((b:any)=> String(b.projectId) === String(project.id));
+        const mine = list.find((b:any)=> String(b.projectId) === String(project.id ?? project._id));
         setHasSubmitted(!!mine);
         setMyProposal(mine || null);
         if (mine && !editingProposalId) setEditingProposalId(String(mine.id));
@@ -588,14 +589,19 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
                           (async () => {
                             try {
                               setSaving(true);
-                              const res = await createBid(String(project.id), { price: vP, days: vD, message: offerMessage });
+                              const pid = String(project.id ?? project._id ?? '');
+                              if (!pid) {
+                                Swal.fire({ icon: 'error', title: locale==='ar' ? 'تعذر تحديد المشروع' : 'Project not identified' });
+                                return;
+                              }
+                              const res = await createBid(pid, { price: vP, days: vD, message: offerMessage });
 
                               if (res.ok) {
                                 setHasSubmitted(true);
                                 try {
                                   const mb = await getMyBids();
                                   if (mb.ok && Array.isArray(mb.data)) {
-                                    setMyProposal((mb.data as any[]).find(b=> String(b.projectId)===String(project.id)) || null);
+                                    setMyProposal((mb.data as any[]).find(b=> String(b.projectId)===String(project.id ?? project._id)) || null);
                                   }
                                 } catch {}
                                 if (isEditing) setIsEditing(false);

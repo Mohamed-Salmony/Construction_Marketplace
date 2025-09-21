@@ -68,11 +68,28 @@ export default function ServicesSection() {
         )}
         {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((s) => (
+            {filtered.map((s) => {
+              const mapType = (t?: string) => {
+                const key = String(t || '').toLowerCase();
+                switch (key) {
+                  case 'plumber': return locale==='ar' ? 'سباك' : 'Plumber';
+                  case 'electrician': return locale==='ar' ? 'كهربائي' : 'Electrician';
+                  case 'carpenter': return locale==='ar' ? 'نجار' : 'Carpenter';
+                  case 'painter': return locale==='ar' ? 'دهان' : 'Painter';
+                  case 'gypsum':
+                  case 'gypsum_installer': return locale==='ar' ? 'جبس' : 'Gypsum Installer';
+                  case 'marble':
+                  case 'marble_installer': return locale==='ar' ? 'رخام' : 'Marble Installer';
+                  default: return locale==='ar' ? 'الخدمة' : 'Service';
+                }
+              };
+              return (
               <Card key={s.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-muted-foreground">#{s.id}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {s.isApproved !== false ? mapType((s as any).technicianType || (s as any).requiredSkills || s.type) : (locale==='ar' ? 'في انتظار الموافقة' : 'Pending approval')}
+                    </div>
                     <div className={`text-xs px-2 py-1 rounded ${s.status.toLowerCase()==='completed' ? 'bg-green-100 text-green-700' : s.status.toLowerCase()==='inprogress' || s.status.toLowerCase()==='open' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                       {locale==='ar' ? (s.status.toLowerCase()==='completed' ? 'مكتملة' : (s.status.toLowerCase()==='open' || s.status.toLowerCase()==='inprogress' ? 'قيد الانتظار' : s.status)) : s.status}
                     </div>
@@ -85,7 +102,8 @@ export default function ServicesSection() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
