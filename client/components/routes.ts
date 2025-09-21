@@ -69,6 +69,7 @@ import AdminAllProjects from '../pages/admin/AdminAllProjects';
 import AdminProjectDetails from '../pages/admin/AdminProjectDetails';
 import AdminRentals from '../pages/admin/AdminRentals';
 import AdminOffers from '../pages/admin/AdminOffers';
+import AdminServices from '../pages/admin/AdminServices';
 
 // Technician pages
 import TechnicianServices from '../pages/technician/TechnicianServices';
@@ -140,6 +141,7 @@ export const routes: Record<string, RouteConfig> = {
   'admin-project-details': { component: AdminProjectDetails, title: 'تفاصيل مشروع (أدمن)', icon: Shield, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-rentals': { component: AdminRentals, title: 'عقود التأجير (إدارة)', icon: FileText, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-offers': { component: AdminOffers, title: 'إدارة العروض', icon: Percent, requiresAuth: true, allowedRoles: ['admin'] },
+  'admin-services': { component: AdminServices, title: 'إدارة الخدمات', icon: Settings, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-technicians': { component: AdminTechnicians, title: 'إدارة الفنيين', icon: Users, requiresAuth: true, allowedRoles: ['admin'] },
   // Worker (technician) routes (require worker role)
   'technician-services': { component: TechnicianServices, title: 'الخدمات', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },

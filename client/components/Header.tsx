@@ -474,7 +474,7 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                     </PopoverContent>
                   </Popover>
                 )}
-                {user && (
+                {user && !isAdmin && (
                   <Popover open={chatOpen} onOpenChange={(o)=>{ setChatOpen(o); if (o) loadChats(); }}>
                     <PopoverTrigger asChild>
                       <Button

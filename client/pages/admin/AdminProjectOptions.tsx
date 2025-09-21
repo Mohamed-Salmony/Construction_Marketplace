@@ -400,7 +400,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                       ...s,
                       materials: [ ...(s.materials||[]), { id: id || `mat-${(s.materials||[]).length+1}`, ar: npDraftMaterial.ar, en: npDraftMaterial.en, pricePerM2: Number(npDraftMaterial.pricePerM2||0) || undefined } ]
                     })));
-                    setNpDraftMaterial({ id: '', ar: '', en: '', pricePerM2: 0 });
+                    setNpDraftMaterial({ id: '', ar: '', en: '', pricePerM2: undefined });
                   }}>{isAr?'إضافة خامة للنوع':'Add material to subtype'}</Button>
                 </div>
               </div>

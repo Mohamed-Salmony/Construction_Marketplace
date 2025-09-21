@@ -557,23 +557,6 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                   <Button 
                     className="w-full justify-start"
                     variant="outline"
-                    onClick={() => setCurrentPage && setCurrentPage('admin-vendors')}
-                  >
-                    <Store className="mr-2 h-4 w-4" />
-                    {t('manageVendors')}
-                  </Button>
-                  <Button 
-                    className="w-full justify-start"
-                    variant="outline"
-                    onClick={() => setCurrentPage && setCurrentPage('admin-technicians')}
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    {locale==='ar' ? 'إدارة الفنيين' : 'Manage Technicians'}
-                  </Button>
-                  <Button 
-                    className="w-full justify-start"
-                    variant="outline"
-                    onClick={() => setCurrentPage && setCurrentPage('admin-products')}
                   >
                     <Package className="mr-2 h-4 w-4" />
                     {t('manageProducts')}
@@ -633,6 +616,14 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                   >
                     <Percent className="mr-2 h-4 w-4" />
                     {locale==='ar' ? 'إدارة العروض' : 'Manage Offers'}
+                  </Button>
+                  <Button 
+                    className="w-full justify-start"
+                    variant="outline"
+                    onClick={() => setCurrentPage && setCurrentPage('admin-services')}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    {locale==='ar' ? 'إدارة الخدمات' : 'Manage Services'}
                   </Button>
                 </>
               )}
