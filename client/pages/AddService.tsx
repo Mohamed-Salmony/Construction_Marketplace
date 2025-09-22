@@ -12,6 +12,7 @@ import { getAdminTechnicianOptions } from "../lib/adminOptions";
 import { createService, updateService, listServiceTypes, type ServiceTypeItem } from "@/services/servicesCatalog";
 import { toastSuccess, toastError } from "../utils/alerts";
 import { getCommissionRates } from "@/services/commissions";
+import { getAdminOption } from "@/services/admin";
 
 interface AddServiceProps extends Partial<RouteContext> {}
 
@@ -34,12 +35,18 @@ const MIN_WAGE: Record<string, number> = {
   marble_installer: 350,
 };
 
+interface TechnicianSpecialty {
+  name: string;
+  dailyRate: number;
+}
+
 export default function AddService({ setCurrentPage, ...rest }: AddServiceProps) {
   const { t, locale } = useTranslation();
   const currency = locale === "ar" ? "ر.س" : "SAR";
 
   const [stype, setStype] = useState<string>("");
   const [techOptions, setTechOptions] = useState<ServiceTypeItem[]>([]);
+  const [techSpecialties, setTechSpecialties] = useState<TechnicianSpecialty[]>([]);
   const [dailyWage, setDailyWage] = useState<number>(0);
   const [days, setDays] = useState<number>(1);
   const [description, setDescription] = useState<string>("");
@@ -48,20 +55,34 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
   const [svcCommissionPct, setSvcCommissionPct] = useState<number>(0);
   const [ratesCurrency, setRatesCurrency] = useState<string>('SAR');
 
-  const minForSelected = useMemo(() => (stype ? (MIN_WAGE[stype] || 0) : 0), [stype]);
+  const minForSelected = useMemo(() => {
+    if (!stype) return 0;
+    
+    // First try to find from dynamic specialties
+    const found = techSpecialties.find(spec => 
+      spec.name.toLowerCase().includes(stype) || 
+      stype.toLowerCase().includes(spec.name.toLowerCase())
+    );
+    if (found && found.dailyRate > 0) {
+      return found.dailyRate;
+    }
+    
+    // Fallback to static MIN_WAGE
+    return MIN_WAGE[stype] || 0;
+  }, [stype, techSpecialties]);
 
   const skipNextTypeMinRef = useRef<boolean>(false);
   // When changing type, reset to min, but if we're initializing edit, keep existing if >= min
   useEffect(() => {
     if (!stype) return;
-    const min = MIN_WAGE[stype] || 0;
+    const min = minForSelected; // Use dynamic calculation instead of static
     if (skipNextTypeMinRef.current) {
       setDailyWage((prev) => (Number.isFinite(prev as any) ? Math.max(min, Number(prev)) : min));
       skipNextTypeMinRef.current = false;
     } else {
       setDailyWage(min);
     }
-  }, [stype]);
+  }, [stype, minForSelected]);
 
   // Load services (technicians) commission from backend so the provider sees platform cut
   useEffect(() => {
@@ -71,6 +92,29 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
         if (ok && (data as any)?.rates) {
           setSvcCommissionPct(Number((data as any).rates.servicesTechnicians || 0));
           setRatesCurrency(String((data as any).rates.currency || 'SAR'));
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Load technician specialties with rates
+  useEffect(() => {
+    (async () => {
+      try {
+        const { ok, data } = await getAdminOption('technician_specialties');
+        if (ok && data) {
+          const arr = JSON.parse(String((data as any).value || '[]'));
+          if (Array.isArray(arr)) {
+            const converted = arr.map((x: any) => {
+              if (typeof x === 'string') {
+                return { name: x, dailyRate: 0 } as TechnicianSpecialty;
+              } else if (x && typeof x === 'object' && x.name) {
+                return { name: String(x.name), dailyRate: Number(x.dailyRate) || 0 } as TechnicianSpecialty;
+              }
+              return null;
+            }).filter(Boolean) as TechnicianSpecialty[];
+            setTechSpecialties(converted);
+          }
         }
       } catch {}
     })();
@@ -253,7 +297,20 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
                   />
                   <span className="text-sm text-muted-foreground">{currency}</span>
                 </div>
-                {/* Removed minimum helper text under daily wage input as requested */}
+                {/* Commission preview */}
+                {svcCommissionPct > 0 && dailyWage > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                    <div className="text-blue-600">
+                      {locale==='ar' ? 'النسبة الحالية:' : 'Current rate:'} {svcCommissionPct}%
+                    </div>
+                    <div>
+                      {locale==='ar' ? 'عمولة المنصة:' : 'Platform commission:'} {Math.round((dailyWage || 0) * (svcCommissionPct / 100)).toLocaleString(locale==='ar'?'ar-EG':'en-US')} {ratesCurrency === 'SAR' ? (locale==='ar' ? 'ريال' : 'SAR') : ratesCurrency}
+                    </div>
+                    <div className="text-green-600 font-medium">
+                      {locale==='ar' ? 'الصافي لك:' : 'Net for you:'} {Math.max((dailyWage || 0) - Math.round((dailyWage || 0) * (svcCommissionPct / 100)), 0).toLocaleString(locale==='ar'?'ar-EG':'en-US')} {ratesCurrency === 'SAR' ? (locale==='ar' ? 'ريال' : 'SAR') : ratesCurrency}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm mb-1">{locale === 'ar' ? 'عدد الأيام (الدوام)' : 'Duration (days)'}</label>

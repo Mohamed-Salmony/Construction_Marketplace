@@ -57,6 +57,7 @@ export type AdminUpdateUserDto = {
   city?: string;
   country?: string;
   role?: 'Admin' | 'Merchant' | 'Technician' | 'Customer';
+  dailyRate?: number;
 };
 
 export async function updateAdminUser(userId: string, payload: AdminUpdateUserDto) {
@@ -88,6 +89,7 @@ export type AdminUserDetails = AdminListUser & {
   bio?: string | null;
   rating?: number | null;
   reviewCount?: number | null;
+  dailyRate?: number | null;
 };
 
 export async function getAdminUserById(userId: string) {

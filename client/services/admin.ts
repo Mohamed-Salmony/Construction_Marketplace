@@ -118,8 +118,8 @@ export async function getAdminOption(key: string) {
 }
 
 export async function setAdminOption(key: string, value: any) {
-  // value can be array/object; server expects JSON
-  return api.put(`/api/AdminOptions/${encodeURIComponent(key)}`, value, { auth: true });
+  // Send as number for commission values, server will handle conversion
+  return api.put(`/api/AdminOptions/${encodeURIComponent(key)}`, Number(value) || 0, { auth: true });
 }
 
 // Pending projects and approval actions

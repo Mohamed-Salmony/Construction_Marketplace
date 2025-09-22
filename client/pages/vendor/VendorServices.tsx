@@ -94,7 +94,7 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
               {locale === 'ar' ? 'لوحة التاجر' : 'Vendor Dashboard'}
             </Button>
             <Button onClick={() => safeSetCurrentPage('add-service')}>
-              {locale === 'ar' ? 'إضافة خدمة' : 'Add Service'}
+              {locale === 'ar' ? 'اطلب فني' : 'Request Technician'}
             </Button>
             <Button variant="secondary" onClick={() => safeSetCurrentPage('vendor-service-applicants')}>
               {locale === 'ar' ? 'عرض المتقدمين' : 'View Applicants'}

@@ -89,8 +89,28 @@ export async function remove(req, res) {
 export async function listByService(req, res) {
   const id = String(req.params.serviceId || '');
   if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid service id' });
-  const items = await Offer.find({ targetType: 'service', serviceId: id }).sort({ createdAt: -1 });
-  res.json(items);
+  const items = await Offer.find({ targetType: 'service', serviceId: id })
+    .populate('technicianId', 'name phoneNumber city country profession isVerified profilePicture dailyRate')
+    .sort({ createdAt: -1 });
+  
+  // Map to include technician data in response
+  const mapped = items.map(offer => {
+    const plainOffer = offer.toObject();
+    if (plainOffer.technicianId) {
+      const tech = plainOffer.technicianId;
+      plainOffer.technicianName = tech.name;
+      plainOffer.technicianPhone = tech.phoneNumber;
+      plainOffer.technicianCity = tech.city;
+      plainOffer.technicianCountry = tech.country;
+      plainOffer.technicianProfession = tech.profession;
+      plainOffer.technicianVerified = tech.isVerified;
+      plainOffer.technicianAvatar = tech.profilePicture;
+      plainOffer.technicianDailyRate = tech.dailyRate;
+    }
+    return plainOffer;
+  });
+  
+  res.json(mapped);
 }
 
 export async function listByProject(req, res) {

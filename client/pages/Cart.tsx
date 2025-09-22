@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Minus, Plus, Trash2, ShoppingBag, Truck, CreditCard, Shield } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, Truck, CreditCard, Shield, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
@@ -7,17 +7,19 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { RouteContext } from '../components/Router';
 import { useTranslation } from '../hooks/useTranslation';
-import { error as errorDialog } from '../utils/alerts';
+import { error as errorDialog, success as successDialog } from '../utils/alerts';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { validatePromoCode } from '../services/promoCodes';
 
 interface CartProps extends RouteContext {}
 
 export default function Cart({ setCurrentPage, cartItems, updateCartQty, removeFromCart, clearCart, user, setUser }: CartProps) {
   const { t, locale } = useTranslation();
   const [promoCode, setPromoCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discountAmount: number; discountType: string; discountValue: number } | null>(null);
+  const [applyingPromo, setApplyingPromo] = useState(false);
   // Fallbacks for SSG/SSR where context props may be undefined
   const items = cartItems ?? [];
   const go = setCurrentPage ?? (() => {});
@@ -30,21 +32,45 @@ export default function Cart({ setCurrentPage, cartItems, updateCartQty, removeF
   const removeItem = (id: string) => removeSafe(id);
 
   const applyPromoCode = async () => {
-    // Mock promo code validation
-    const validCodes = {
-      'WELCOME10': 10,
-      'SAVE20': 20,
-      'FIRST15': 15
-    };
+    if (!promoCode.trim()) return;
+    if (!user) {
+      await errorDialog(locale === 'ar' ? 'يجب تسجيل الدخول لاستخدام البرومو كود' : 'Please login to use promo code', locale === 'ar');
+      return;
+    }
 
-    if (validCodes[promoCode as keyof typeof validCodes]) {
-      setAppliedPromo({
-        code: promoCode,
-        discount: validCodes[promoCode as keyof typeof validCodes]
-      });
-      setPromoCode('');
-    } else {
-      await errorDialog(t('cartInvalidPromoCode'), locale === 'ar');
+    setApplyingPromo(true);
+    try {
+      const response = await validatePromoCode(promoCode.trim(), subtotal);
+      
+      if (response.ok && response.data && response.data.data) {
+        const promoData = response.data.data;
+        setAppliedPromo({
+          code: promoData.code,
+          discountAmount: promoData.discountAmount,
+          discountType: promoData.discountType,
+          discountValue: promoData.discountValue
+        });
+        setPromoCode('');
+        await successDialog(
+          locale === 'ar' 
+            ? `تم تطبيق البرومو كود ${promoData.code} بنجاح!`
+            : `Promo code ${promoData.code} applied successfully!`,
+          locale === 'ar'
+        );
+      } else {
+        await errorDialog(
+          response.data?.message || (locale === 'ar' ? 'البرومو كود غير صحيح' : 'Invalid promo code'),
+          locale === 'ar'
+        );
+      }
+    } catch (error) {
+      console.error('Promo code error:', error);
+      await errorDialog(
+        locale === 'ar' ? 'خطأ في تطبيق البرومو كود' : 'Error applying promo code',
+        locale === 'ar'
+      );
+    } finally {
+      setApplyingPromo(false);
     }
   };
 
@@ -61,7 +87,7 @@ export default function Cart({ setCurrentPage, cartItems, updateCartQty, removeF
     return sum;
   }, 0);
   
-  const promoDiscount = appliedPromo ? (subtotal * appliedPromo.discount / 100) : 0;
+  const promoDiscount = appliedPromo ? appliedPromo.discountAmount : 0;
   const shippingCost = subtotal >= 200 ? 0 : 25;
   const total = subtotal - promoDiscount + shippingCost;
 
@@ -266,18 +292,48 @@ export default function Cart({ setCurrentPage, cartItems, updateCartQty, removeF
                 {/* Promo Code */}
                 {!appliedPromo && (
                   <div className="space-y-2">
-                    <Label htmlFor="promo">{t('cartPromoCode')}</Label>
+                    <Label htmlFor="promo" className="flex items-center gap-2">
+                      <Tag className="h-4 w-4" />
+                      {t('cartPromoCode')}
+                    </Label>
                     <div className="flex gap-2">
                       <Input
                         id="promo"
                         placeholder={t('cartPromoPlaceholder')}
                         value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value)}
+                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                        disabled={applyingPromo}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            applyPromoCode();
+                          }
+                        }}
                       />
-                      <Button onClick={applyPromoCode} variant="outline">
-                        {t('cartApply')}
+                      <Button 
+                        onClick={applyPromoCode} 
+                        variant="outline"
+                        disabled={!promoCode.trim() || applyingPromo}
+                      >
+                        {applyingPromo ? (locale === 'ar' ? 'جاري التطبيق...' : 'Applying...') : t('cartApply')}
                       </Button>
                     </div>
+                    {user && (
+                      <p className="text-xs text-muted-foreground">
+                        {locale === 'ar' 
+                          ? 'أدخل رمز الخصم واضغط Enter أو زر التطبيق'
+                          : 'Enter discount code and press Enter or Apply button'
+                        }
+                      </p>
+                    )}
+                    {!user && (
+                      <p className="text-xs text-orange-600">
+                        {locale === 'ar' 
+                          ? 'يجب تسجيل الدخول أولاً لاستخدام رموز الخصم'
+                          : 'Please login first to use discount codes'
+                        }
+                      </p>
+                    )}
                   </div>
                 )}
                 

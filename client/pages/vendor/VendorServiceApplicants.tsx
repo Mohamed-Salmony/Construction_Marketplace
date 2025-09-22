@@ -195,6 +195,11 @@ export default function VendorServiceApplicants({ setCurrentPage, ...context }: 
                               <div className="text-xs text-muted-foreground text-left">
                                 <span className="font-medium text-foreground">{isAr ? 'السعر/المدة:' : 'Price/Duration:'} </span>
                                 {currency} {Number(r.price||0).toLocaleString(isAr?'ar-EG':'en-US')} • {isAr ? `${Number(r.days||0)} يوم` : `${Number(r.days||0)} days`}
+                                {anyR.technicianDailyRate && Number(anyR.technicianDailyRate) > 0 && (
+                                  <div className="text-[10px] text-blue-600 mt-1">
+                                    {isAr ? 'السعر اليومي:' : 'Daily Rate:'} {currency} {Number(anyR.technicianDailyRate).toLocaleString(isAr?'ar-EG':'en-US')}
+                                  </div>
+                                )}
                               </div>
                             </div>
 

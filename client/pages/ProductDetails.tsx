@@ -859,7 +859,7 @@ export default function ProductDetails({
               {/* Subtotal reflecting quantity and installation per unit */}
               <div className="flex items-center justify-between text-sm bg-muted/30 rounded-md px-3 py-2">
                 <span className="text-muted-foreground">
-                  {locale === 'ar' ? 'الإجمالي (يشمل التركيب إن وجد)' : 'Subtotal (incl. installation if selected)'}
+                  {locale === 'ar' ? 'الإجمالي' : 'Subtotal'}
                 </span>
                 <span className="font-semibold text-primary">
                   {subtotal} {currency}
@@ -951,7 +951,21 @@ export default function ProductDetails({
           <TabsContent value="description" className="mt-6">
             <Card>
               <CardContent className="p-6">
-                <p className="mb-6">{getText(product.description)}</p>
+                <p className="mb-6">{(() => {
+                  const desc = getText(product.description);
+                  // Remove unwanted phrases from description
+                  return desc
+                    .replace(/جودة عالية/gi, '')
+                    .replace(/أسعار منافسة/gi, '')
+                    .replace(/خدمة سريعة/gi, '')
+                    .replace(/Quality/gi, '')
+                    .replace(/Competitive/gi, '')
+                    .replace(/Service/gi, '')
+                    .replace(/نصائح تركيب/gi, '')
+                    .replace(/Installation Tips/gi, '')
+                    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                    .trim();
+                })()}</p>
 
                 <h3 className="font-medium mb-4">{t("features")}</h3>
                 <ul className="space-y-2">
@@ -963,23 +977,7 @@ export default function ProductDetails({
                   ))}
                 </ul>
 
-                {product.installationTips && (
-                  <>
-                    <h3 className="font-medium mb-4 mt-6">
-                      {locale === 'en' ? 'Installation Tips' : 'نصائح التركيب'}
-                    </h3>
-                    <ol className="space-y-2">
-                      {product.installationTips.map((tip: string, index: number) => (
-                        <li key={index} className="flex gap-2">
-                          <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground text-sm rounded-full flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </>
-                )}
+                {/* Installation tips removed as requested */}
               </CardContent>
             </Card>
           </TabsContent>
