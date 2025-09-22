@@ -291,14 +291,29 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
     setCurrentPage && setCurrentPage('projects');
   };
 
-  // Open or create a chat with the merchant for this project (customer side)
+  // Open or create a chat for this project (works for both customer and merchant)
   const openChatWithMerchant = async (merchantId: string, merchantName?: string) => {
     try {
       if (!project || !merchantId) return;
-      const pid = Number(project.id);
-      try { localStorage.setItem('project_chat_project_id', String(pid)); } catch {}
-      try { localStorage.setItem('project_chat_merchant_id', String(merchantId)); } catch {}
-      if (merchantName) { try { localStorage.setItem('project_chat_merchant_name', String(merchantName)); } catch {} }
+      const pid = String(project.id); // Keep as string for MongoDB ObjectId
+      
+      // Determine if current user is merchant or customer
+      const currentUserId = userId;
+      const isCurrentUserMerchant = String(currentUserId) === String(merchantId);
+      
+      try { localStorage.setItem('project_chat_project_id', pid); } catch {}
+      
+      if (isCurrentUserMerchant) {
+        // Current user is the merchant, so we're chatting with the customer
+        // Store the COUNTERPARTY (customer) id so the chat resolver can find the conversation
+        try { localStorage.setItem('project_chat_merchant_id', String(merchantId)); } catch {}
+        try { localStorage.setItem('project_chat_merchant_name', merchantName || ''); } catch {}
+      } else {
+        // Current user is customer, chatting with merchant
+        try { localStorage.setItem('project_chat_merchant_id', String(merchantId)); } catch {}
+        if (merchantName) { try { localStorage.setItem('project_chat_merchant_name', String(merchantName)); } catch {} }
+      }
+      
       // Try resolve existing conversation first
       try {
         const found = await getProjectConversationByKeys(pid, merchantId);
@@ -309,14 +324,20 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
           return;
         }
       } catch {}
-      // Create new conversation
-      const created = await createProjectConversation(pid, merchantId);
-      if ((created as any)?.ok && (created as any).data?.id) {
-        const cid = String((created as any).data.id);
-        try { localStorage.setItem('project_chat_conversation_id', cid); } catch {}
-        setCurrentPage && setCurrentPage('project-chat');
-        return;
+      
+      // Create new conversation (only if current user is customer)
+      if (!isCurrentUserMerchant) {
+        try {
+          const created = await createProjectConversation(pid, merchantId);
+          if ((created as any)?.ok && (created as any).data?.id) {
+            const cid = String((created as any).data.id);
+            try { localStorage.setItem('project_chat_conversation_id', cid); } catch {}
+            setCurrentPage && setCurrentPage('project-chat');
+            return;
+          }
+        } catch {}
       }
+      
       // Fallback: navigate to chat page without cid; page will try resolve by keys
       setCurrentPage && setCurrentPage('project-chat');
     } catch {}
@@ -367,70 +388,74 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
           </Card>
         )}
 
-        {!loading && project && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main details */}
-            <Card className="lg:col-span-2 overflow-hidden shadow-sm">
-              <div className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Package className="w-6 h-6 text-primary" />
-                    <h1 className="text-2xl font-bold">{locale==='ar' ? 'تفاصيل المشروع' : 'Project Details'}</h1>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-sm">{typeLabel}</Badge>
-                    {itemsCount > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {locale==='ar' ? `${itemsCount + 1} عناصر` : `${itemsCount + 1} items`}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="rounded-lg border p-4 bg-background shadow-sm">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <Calendar className="w-4 h-4" /> {locale==='ar' ? 'المدة (أيام)' : 'Duration (days)'}
-                    </div>
-                    <div className="mt-1 font-medium">{Number(project?.days) > 0 ? project.days : '-'}</div>
-                  </div>
-                </div>
+ {!loading && project && (
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+{/* Main details */}
+<Card className="lg:col-span-2 overflow-hidden shadow-sm">
+<div className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+<div className="flex items-center justify-between">
+<div className="flex items-center gap-3">
+<Package className="w-6 h-6 text-primary" />
+<div>
+<h1 className="text-2xl font-bold">{locale==='ar' ? 'تفاصيل المشروع' : 'Project Details'}</h1>
+{(project?.customerName || project?.userName || project?.user?.name) && (
+<p className="text-sm text-muted-foreground mt-1">
+{locale==='ar' ? 'صاحب المشروع: ' : 'Project Owner: '}
+<span className="font-medium text-foreground">
+{project?.customerName || project?.userName || project?.user?.name}
+</span>
+</p>
+)}
+</div>
+</div>
+<div className="flex items-center gap-2">
+<Badge variant="secondary" className="text-sm">{typeLabel}</Badge>
+{itemsCount > 0 && (
+<Badge variant="outline" className="text-xs">
+{locale==='ar' ? `${itemsCount + 1} عناصر` : `${itemsCount + 1} items`}
+</Badge>
+)}
+</div>
+</div>
 
-                {/* Quick summary chips */}
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {/* Category/type */}
-                  {typeLabel && (
-                    <Badge variant="outline" className="rounded-full text-xs">{typeLabel}</Badge>
-                  )}
-                  {/* Material */}
-                  {materialLabel && (
-                    <Badge variant="outline" className="rounded-full text-xs">{materialLabel}</Badge>
-                  )}
-                  {/* Dimensions */}
-                  <Badge variant="outline" className="rounded-full text-xs">
-                    {(project?.width||0)} × {(project?.height||0)} m
-                  </Badge>
-                  {/* Quantity */}
-                  <Badge variant="outline" className="rounded-full text-xs">
-                    {locale==='ar' ? `الكمية: ${project?.quantity ?? 0}` : `Quantity: ${project?.quantity ?? 0}`}
-                  </Badge>
-                  {/* Price per m² or Budget */}
-                  {Number(project?.pricePerMeter) > 0 ? (
-                    <Badge variant="outline" className="rounded-full text-xs">
-                      {locale==='ar' ? `سعر المتر: ${project.pricePerMeter}` : `Price per m²: ${project.pricePerMeter}`}
-                    </Badge>
-                  ) : (typeof project?.budgetMin !== 'undefined' || typeof project?.budgetMax !== 'undefined') ? (
-                    <Badge variant="outline" className="rounded-full text-xs">
-                      {locale==='ar'
-                        ? `الميزانية: ${project?.budgetMin ?? '-'} - ${project?.budgetMax ?? '-'}`
-                        : `Budget: ${project?.budgetMin ?? '-'} - ${project?.budgetMax ?? '-'}`}
-                    </Badge>
-                  ) : null}
-                  {/* Days */}
-                  {Number(project?.days) > 0 && (
-                    <Badge variant="outline" className="rounded-full text-xs">
-                      {locale==='ar' ? `الأيام: ${project.days}` : `Days: ${project.days}`}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+{/* Quick summary chips */}
+<div className="flex flex-wrap gap-2 mt-4">
+{/* Category/type */}
+{typeLabel && (
+<Badge variant="outline" className="rounded-full text-xs">{typeLabel}</Badge>
+)}
+{/* Material */}
+{materialLabel && (
+<Badge variant="outline" className="rounded-full text-xs">{materialLabel}</Badge>
+)}
+{/* Dimensions */}
+<Badge variant="outline" className="rounded-full text-xs">
+{(project?.width||0)} × {(project?.height||0)} m
+</Badge>
+{/* Quantity */}
+<Badge variant="outline" className="rounded-full text-xs">
+{locale==='ar' ? `الكمية: ${project?.quantity ?? 0}` : `Quantity: ${project?.quantity ?? 0}`}
+</Badge>
+{/* Price per m² or Budget */}
+{Number(project?.pricePerMeter) > 0 ? (
+<Badge variant="outline" className="rounded-full text-xs">
+{locale==='ar' ? `سعر المتر: ${project.pricePerMeter}` : `Price per m²: ${project.pricePerMeter}`}
+</Badge>
+) : (typeof project?.budgetMin !== 'undefined' || typeof project?.budgetMax !== 'undefined') ? (
+<Badge variant="outline" className="rounded-full text-xs">
+{locale==='ar'
+? `الميزانية: ${project?.budgetMin ?? '-'} - ${project?.budgetMax ?? '-'}`
+: `Budget: ${project?.budgetMin ?? '-'} - ${project?.budgetMax ?? '-'}`}
+</Badge>
+) : null}
+{/* Days */}
+{Number(project?.days) > 0 && (
+<Badge variant="outline" className="rounded-full text-xs">
+{locale==='ar' ? `الأيام: ${project.days}` : `Days: ${project.days}`}
+</Badge>
+)}
+</div>
+</div>
 
               <CardContent className="p-6 space-y-6">
                 {/* Info grid */}
@@ -471,7 +496,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                   {accessoriesNames.length>0 ? (
                     <div className="flex flex-wrap gap-2">
                       {accessoriesNames.map((name: string, idx: number) => (
-                        <Badge key={idx} variant="outline" className="rounded-full px-3 py-1 text-xs">
+                        <Badge key={`acc-${idx}-${name}`} variant="outline" className="rounded-full px-3 py-1 text-xs">
                           {name}
                         </Badge>
                       ))}
@@ -526,7 +551,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                           return [] as string[];
                         })();
                         return (
-                          <div key={it?.id || idx} className="rounded-lg border p-4 bg-background shadow-sm">
+                          <div key={it?.id || `item-${idx}`} className="rounded-lg border p-4 bg-background shadow-sm">
                             <div className="flex items-center justify-between">
                               <div className="font-semibold">{locale==='ar' ? `عنصر #${idx+2}` : `Item #${idx+2}`}</div>
                               {itTypeLabel && <Badge variant="outline">{itTypeLabel}</Badge>}
@@ -571,7 +596,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                               {itAccessoriesNames.length>0 ? (
                                 <div className="flex flex-wrap gap-2 mt-1">
                                   {itAccessoriesNames.map((name: string, i: number) => (
-                                    <Badge key={i} variant="outline" className="rounded-full px-3 py-1 text-xs">{name}</Badge>
+                                    <Badge key={`item-acc-${i}-${name}`} variant="outline" className="rounded-full px-3 py-1 text-xs">{name}</Badge>
                                   ))}
                                 </div>
                               ) : (
@@ -635,9 +660,20 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-sm">
+                      <div className="text-sm mb-3">
                         {(project?.customerName || project?.userName || project?.user?.name) || (locale==='ar' ? 'غير معروف' : 'Unknown')}
                       </div>
+                      {project?.customerId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => openChatWithMerchant(String(project.customerId), project?.customerName || project?.userName || project?.user?.name)}
+                        >
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          {locale==='ar' ? 'مراسلة العميل' : 'Message Customer'}
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -660,13 +696,13 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                             <>
                               <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">{locale==='ar' ? 'السعر المقدم' : 'Submitted Price'}</span>
-                                <span className="font-semibold">{currency} {formatMoney(Number(myProposal.price||0))}</span>
+                                <span className="font-semibold">{currency} {formatMoney(Number(myProposal?.price||0))}</span>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">{locale==='ar' ? 'الأيام' : 'Days'}</span>
-                                <span className="font-semibold">{Number(myProposal.days||0)}</span>
+                                <span className="font-semibold">{Number(myProposal?.days||0)}</span>
                               </div>
-                              {!!myProposal.message && (
+                              {!!myProposal?.message && (
                                 <div className="text-muted-foreground whitespace-pre-wrap">{myProposal.message}</div>
                               )}
                             </>
@@ -815,60 +851,102 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                     {proposals.length === 0 ? (
                       <div className="text-sm text-muted-foreground">{locale==='ar' ? 'لا توجد عروض حتى الآن.' : 'No proposals yet.'}</div>
                     ) : (
-                      <div className="space-y-3">
-                        {proposals.map((pp:any)=> (
-                          <div key={pp.id} className="border rounded-md p-3">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm font-medium">{locale==='ar' ? 'السعر' : 'Price'}: {currency} {Number(pp.price||0).toLocaleString(locale==='ar'?'ar-EG':'en-US')}</div>
-                              <Badge variant={pp.status==='accepted'? 'secondary' : pp.status==='rejected'? 'destructive' : 'outline'} className="text-xs capitalize">
-                                {locale==='ar' ? (pp.status==='pending'?'معلق': pp.status==='accepted'?'مقبول':'مرفوض') : pp.status}
-                              </Badge>
-                            </div>
-                            {/* Chat action */}
-                            <div className="mt-2 flex items-center justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="inline-flex items-center gap-2"
-                                onClick={() => openChatWithMerchant(String(pp.merchantId || ''), String(pp.merchantName || ''))}
-                              >
-                                <MessageCircle className="w-4 h-4" /> {locale==='ar' ? 'مراسلة التاجر' : 'Chat with merchant'}
-                              </Button>
-                            </div>
-                            <div className="text-sm text-muted-foreground">{locale==='ar' ? 'المدة' : 'Days'}: {Number(pp.days||0)}</div>
-                            {pp.message && <div className="mt-1 text-xs bg-muted/20 rounded p-2">{pp.message}</div>}
-                            {pp.status === 'pending' && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <Button size="sm" className="flex-1" onClick={async () => {
-                                  try {
-                                    const r = await acceptBid(String(pp.id));
-                                    if (r.ok && project) {
-                                      const rd = await getProjectBids(String(project.id));
-                                      if (rd.ok && Array.isArray(rd.data)) setProposals(rd.data as BidDto[]);
-                                    }
-                                  } catch {}
-                                }}>
-                                  <Check className="w-4 h-4 ml-1" /> {locale==='ar' ? 'قبول' : 'Accept'}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white border border-red-600"
-                                  onClick={async () => {
-                                    try {
-                                      const r = await rejectBid(String(pp.id));
-                                      if (r.ok && project) {
-                                        const rd = await getProjectBids(String(project.id));
-                                        if (rd.ok && Array.isArray(rd.data)) setProposals(rd.data as BidDto[]);
-                                      }
-                                    } catch {}
-                                  }}
-                                >
-                                  <X className="w-4 h-4 ml-1" /> {locale==='ar' ? 'رفض' : 'Reject'}
-                                </Button>
+                      <div className="space-y-4">
+                        {proposals.map((pp:any, idx: number)=> (
+                          <Card key={pp.id || `proposal-${idx}`} className="hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-semibold text-base">
+                                      {pp.merchantName || (locale==='ar' ? 'تاجر' : 'Merchant')}
+                                    </h4>
+                                    <Badge variant={pp.status==='accepted'? 'secondary' : pp.status==='rejected'? 'destructive' : 'outline'} className="text-xs">
+                                      {locale==='ar' ? (pp.status==='pending'?'معلق': pp.status==='accepted'?'مقبول':'مرفوض') : pp.status}
+                                    </Badge>
+                                  </div>
+                                  {pp.createdAt && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {locale==='ar' ? 'تاريخ التقديم: ' : 'Submitted: '}
+                                      {new Date(pp.createdAt).toLocaleDateString(locale==='ar'?'ar-EG':'en-US')}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                            )}
-                          </div>
+                              
+                              <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div className="text-center p-3 bg-primary/5 rounded-lg">
+                                  <div className="text-xs text-muted-foreground mb-1">{locale==='ar' ? 'السعر المعروض' : 'Offered Price'}</div>
+                                  <div className="text-lg font-bold text-primary">
+                                    {currency} {Number(pp.price||0).toLocaleString(locale==='ar'?'ar-EG':'en-US')}
+                                  </div>
+                                </div>
+                                <div className="text-center p-3 bg-muted/30 rounded-lg">
+                                  <div className="text-xs text-muted-foreground mb-1">{locale==='ar' ? 'مدة التنفيذ' : 'Duration'}</div>
+                                  <div className="text-lg font-bold">
+                                    {Number(pp.days||0)} {locale==='ar' ? 'يوم' : 'days'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {pp.message && (
+                                <div className="mb-3">
+                                  <div className="text-xs text-muted-foreground mb-1">{locale==='ar' ? 'رسالة التاجر:' : 'Merchant message:'}</div>
+                                  <div className="text-sm bg-muted/20 rounded-lg p-3 border-l-4 border-primary/20">
+                                    {pp.message}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between pt-2 border-t">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="inline-flex items-center gap-2"
+                                  onClick={() => openChatWithMerchant(String(pp.merchantId || ''), String(pp.merchantName || ''))}
+                                >
+                                  <MessageCircle className="w-4 h-4" /> 
+                                  {locale==='ar' ? 'مراسلة التاجر' : 'Chat with merchant'}
+                                </Button>
+                                
+                                {pp.status === 'pending' && (
+                                  <div className="flex items-center gap-2">
+                                    <Button 
+                                      size="sm" 
+                                      className="bg-green-600 hover:bg-green-700"
+                                      onClick={async () => {
+                                        try {
+                                          const r = await acceptBid(String(pp.id));
+                                          if (r.ok && project) {
+                                            const rd = await getProjectBids(String(project.id));
+                                            if (rd.ok && Array.isArray(rd.data)) setProposals(rd.data as BidDto[]);
+                                          }
+                                        } catch {}
+                                      }}
+                                    >
+                                      <Check className="w-4 h-4 ml-1" /> {locale==='ar' ? 'قبول' : 'Accept'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="bg-red-600 hover:bg-red-700"
+                                      onClick={async () => {
+                                        try {
+                                          const r = await rejectBid(String(pp.id));
+                                          if (r.ok && project) {
+                                            const rd = await getProjectBids(String(project.id));
+                                            if (rd.ok && Array.isArray(rd.data)) setProposals(rd.data as BidDto[]);
+                                          }
+                                        } catch {}
+                                      }}
+                                    >
+                                      <X className="w-4 h-4 ml-1" /> {locale==='ar' ? 'رفض' : 'Reject'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
                         ))}
                       </div>
                     )}

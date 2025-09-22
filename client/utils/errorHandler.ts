@@ -15,6 +15,7 @@ class GlobalErrorHandler {
   private static instance: GlobalErrorHandler;
   private errorQueue: ErrorInfo[] = [];
   private maxErrors = 50; // Keep last 50 errors
+  private originalConsoleError: ((...args: any[]) => void) | null = null;
 
   private constructor() {
     this.setupGlobalErrorHandlers();
@@ -59,23 +60,29 @@ class GlobalErrorHandler {
       });
 
       // Handle console errors
-      const originalConsoleError = console.error;
+      this.originalConsoleError = console.error;
       console.error = (...args: any[]) => {
+        // Prevent infinite recursion by checking if this is already a logged error
         const message = args.map(arg => 
           typeof arg === 'string' ? arg : JSON.stringify(arg, null, 2)
         ).join(' ');
 
-        this.logError({
-          message: `Console Error: ${message}`,
-          component: 'Console',
-          action: 'console.error',
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          url: window.location.href
-        });
+        // Don't log if it's already from our error handler to prevent recursion
+        if (!message.includes('🚨 Application Error') && !message.includes('Console Error:')) {
+          this.logError({
+            message: `Console Error: ${message}`,
+            component: 'Console',
+            action: 'console.error',
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: window.location.href
+          });
+        }
 
         // Still call the original console.error
-        originalConsoleError.apply(console, args);
+        if (this.originalConsoleError) {
+          this.originalConsoleError.apply(console, args);
+        }
       };
     }
   }
@@ -89,16 +96,15 @@ class GlobalErrorHandler {
       this.errorQueue = this.errorQueue.slice(-this.maxErrors);
     }
 
-    // Log to console for development
-    if (process.env.NODE_ENV === 'development') {
-      console.group('🚨 Application Error');
-      console.error('Message:', error.message);
-      console.error('Component:', error.component);
-      console.error('Action:', error.action);
-      console.error('Stack:', error.stack);
-      console.error('URL:', error.url);
-      console.error('Timestamp:', error.timestamp);
-      console.groupEnd();
+    // Log to console for development using original console.error to prevent recursion
+    if (process.env.NODE_ENV === 'development' && this.originalConsoleError) {
+      this.originalConsoleError('🚨 Application Error:');
+      this.originalConsoleError('Message:', error.message);
+      this.originalConsoleError('Component:', error.component);
+      this.originalConsoleError('Action:', error.action);
+      this.originalConsoleError('Stack:', error.stack);
+      this.originalConsoleError('URL:', error.url);
+      this.originalConsoleError('Timestamp:', error.timestamp);
     }
 
     // Store in localStorage for debugging
@@ -110,7 +116,9 @@ class GlobalErrorHandler {
       const recentErrors = storedErrors.slice(-20);
       localStorage.setItem('app_errors', JSON.stringify(recentErrors));
     } catch (e) {
-      console.warn('Could not save error to localStorage:', e);
+      if (this.originalConsoleError) {
+        this.originalConsoleError('Could not save error to localStorage:', e);
+      }
     }
   }
 
@@ -123,7 +131,9 @@ class GlobalErrorHandler {
     try {
       localStorage.removeItem('app_errors');
     } catch (e) {
-      console.warn('Could not clear errors from localStorage:', e);
+      if (this.originalConsoleError) {
+        this.originalConsoleError('Could not clear errors from localStorage:', e);
+      }
     }
   }
 
@@ -172,14 +182,18 @@ class GlobalErrorHandler {
       try {
         // Try to use toast if available, otherwise use alert
         if (typeof window !== 'undefined') {
-          // Simple user notification
-          console.error(`خطأ في ${context}: ${message}`);
+          // Simple user notification using original console.error to prevent recursion
+          if (this.originalConsoleError) {
+            this.originalConsoleError(`خطأ في ${context}: ${message}`);
+          }
           
           // You can integrate with your preferred toast library here
           // For now using console.error as it's always available
         }
       } catch (e) {
-        console.warn('Could not show error notification:', e);
+        if (this.originalConsoleError) {
+          this.originalConsoleError('Could not show error notification:', e);
+        }
       }
     }
   }
