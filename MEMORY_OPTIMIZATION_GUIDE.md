@@ -200,14 +200,14 @@ setInterval(() => {
 - Backend API URL غير متطابق مع service name الفعلي
 
 **الحل المُطبق:**
-1. ✅ تصحيح NEXT_PUBLIC_API_BASE_URL إلى https://construction-marketplace-backend.onrender.com
+1. ✅ تصحيح NEXT_PUBLIC_API_BASE_URL إلى https://construction-marketplace.onrender.com
 2. ✅ إضافة ALLOWED_ORIGINS في Backend env vars
 3. ✅ تفعيل ALLOW_ALL_ORIGINS=true لتجنب مشاكل CORS
 4. ✅ تحديث startCommand لاستخدام server.js المحسن
 5. ✅ تحديث buildCommand لاستخدام NODE_OPTIONS المحسنة
 
-**URLs الصحيحة:**
-- Backend: https://construction-marketplace-backend.onrender.com
+**URLs الصحيحة (محدثة):**
+- Backend: https://construction-marketplace.onrender.com
 - Frontend: https://construction-marketplace-1.onrender.com
 
 ### ❌ مشاكل البناء السابقة (تم حلها):

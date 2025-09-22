@@ -24,6 +24,11 @@ const RUNTIME_BASE = (() => {
       if (host === 'localhost' || host === '127.0.0.1') {
         return 'http://localhost:4000';
       }
+      // In production, always use the env variable
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[API Base] Using:', NORMALIZED_BASE);
+        return NORMALIZED_BASE;
+      }
     }
   } catch {}
   return NORMALIZED_BASE;
@@ -90,16 +95,17 @@ export async function apiFetch<T>(path: string, options?: {
 
   const url = (() => {
     if (path.startsWith('http')) return path;
-    // If in the browser and calling /api, prefer same-origin so Next rewrites can proxy to backend
-    if (typeof window !== 'undefined' && path.startsWith('/api')) {
-      return path;
+    
+    // Always use backend URL in production (not same-origin)
+    const base = RUNTIME_BASE;
+    const fullUrl = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+    
+    // Log API calls in production for debugging
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      console.log('[API Debug]', options?.method || 'GET', fullUrl);
     }
-    const hasApiOnBase = /\/api\/?$/.test(RUNTIME_BASE);
-    const startsWithApi = path.startsWith('/api');
-    const base = hasApiOnBase && startsWithApi
-      ? RUNTIME_BASE.replace(/\/api\/?$/, '')
-      : RUNTIME_BASE;
-    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+    
+    return fullUrl;
   })();
   const isForm = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   const headers: Record<string, string> = {
@@ -126,44 +132,70 @@ export async function apiFetch<T>(path: string, options?: {
     }
   }
 
+  const method = options?.method || 'GET';
+
   try {
-    // Determine if the request is cross-origin (e.g., different port or domain)
-    const isCrossOrigin = (() => {
-      try {
-        if (typeof window === 'undefined') return false;
-        return new URL(url).origin !== window.location.origin;
-      } catch {
-        return false;
-      }
-    })();
-
-    const res = await fetch(url, {
-      method: options?.method || 'GET',
-      headers,
-      body: options?.body ? (isForm ? options.body : JSON.stringify(options.body)) : undefined,
-      signal: options?.signal,
-      cache: options?.cache,
-
-      // Include cookies when authenticated or for cross-origin (different port/domain) requests
-      credentials: useCredentials || isCrossOrigin ? 'include' : 'same-origin',
+    // Add timeout for requests (30 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(url, { 
+      method, 
+      body: isForm ? options?.body : JSON.stringify(options?.body), 
+      headers, 
+      signal: options?.signal || controller.signal,
+      credentials: useCredentials ? 'include' : undefined, 
+      cache: options?.cache 
     });
 
-    const status = res.status;
-    const ok = res.ok;
-    let data: any = null;
+    clearTimeout(timeoutId);
+
+    // Log response for debugging in production
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      console.log('[API Response]', response.status, url);
+      if (!response.ok) {
+        console.error('[API Error]', response.status, response.statusText, url);
+      }
+    }
+
+    let data: T | null = null;
     try {
-      data = await res.json();
-    } catch {
-      data = null;
+      // Only attempt JSON parsing if response body has content
+      data = await response.json();
+    } catch (jsonErr) {
+      if (response.bodyUsed || !response.body) {
+        // No body expected or already consumed
+      } else {
+        console.warn(`Failed to parse JSON from ${url}:`, jsonErr);
+      }
     }
 
-    if (!ok) {
-      return { data: null, ok: false, status, error: data };
+    return {
+      data,
+      ok: response.ok,
+      status: response.status,
+      error: !response.ok ? { status: response.status, message: response.statusText || 'Request failed' } : undefined,
+    };
+  } catch (error: any) {
+    // Enhanced error logging for production debugging
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      console.error('[API Network Error]', error.message, url);
     }
-
-    return { data: data as T, ok: true, status };
-  } catch (error) {
-    return { data: null, ok: false, status: 0, error };
+    
+    // Log error to error handler
+    handleApiError(error, `API: ${method} ${url}`);
+    
+    // Return proper API error response format
+    return {
+      data: null,
+      ok: false,
+      status: error.name === 'AbortError' ? 408 : 0,
+      error: {
+        status: error.name === 'AbortError' ? 408 : 0,
+        message: error.message || 'Network error',
+        name: error.name
+      }
+    };
   }
 }
 

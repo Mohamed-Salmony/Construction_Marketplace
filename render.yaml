@@ -1,7 +1,7 @@
 services:
   # Backend Service
   - type: web
-    name: construction-marketplace-backend
+    name: construction-marketplace
     env: node
     rootDir: server
     plan: free
@@ -12,7 +12,7 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: ALLOWED_ORIGINS
-        value: https://construction-marketplace-1.onrender.com,https://construction-marketplace-frontend.onrender.com
+        value: https://construction-marketplace-1.onrender.com
       - key: ALLOW_ALL_ORIGINS
         value: true
       # Define your environment variables in the Render dashboard or add them here (avoid committing secrets):
