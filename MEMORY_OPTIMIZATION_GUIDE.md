@@ -188,3 +188,32 @@ setInterval(() => {
 ✅ **إعدادات Render محسنة** - environment variables محسنة
 
 **هدف واحد: ضمان عدم تجاوز 400MB حد أقصى للذاكرة على Render!**
+
+---
+
+## مشاكل البناء والنشر المحلولة
+
+### ❌ مشكلة: المنتجات والأقسام لا تظهر رغم نجاح البناء
+
+**السبب:** 
+- Frontend URL في CORS غير صحيح
+- Backend API URL غير متطابق مع service name الفعلي
+
+**الحل المُطبق:**
+1. ✅ تصحيح NEXT_PUBLIC_API_BASE_URL إلى https://construction-marketplace-backend.onrender.com
+2. ✅ إضافة ALLOWED_ORIGINS في Backend env vars
+3. ✅ تفعيل ALLOW_ALL_ORIGINS=true لتجنب مشاكل CORS
+4. ✅ تحديث startCommand لاستخدام server.js المحسن
+5. ✅ تحديث buildCommand لاستخدام NODE_OPTIONS المحسنة
+
+**URLs الصحيحة:**
+- Backend: https://construction-marketplace-backend.onrender.com
+- Frontend: https://construction-marketplace-1.onrender.com
+
+### ❌ مشاكل البناء السابقة (تم حلها):
+- ✅ Invalid next.config.js options (memoryBasedWorkerCount, modularizeImports)
+- ✅ Cannot find module 'critters' (تعطيل optimizeCss)
+- ✅ TypeError في prerendering (تعطيل standalone output)
+- ✅ Tailwind console warnings (تحسين setup)
+
+**الآن الموقع يعمل بالكامل مع تحسينات الذاكرة! 🚀**

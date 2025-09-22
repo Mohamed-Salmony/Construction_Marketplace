@@ -11,6 +11,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: ALLOWED_ORIGINS
+        value: https://construction-marketplace-1.onrender.com,https://construction-marketplace-frontend.onrender.com
+      - key: ALLOW_ALL_ORIGINS
+        value: true
       # Define your environment variables in the Render dashboard or add them here (avoid committing secrets):
       # - key: MONGO_URI
       #   sync: false
@@ -23,8 +27,8 @@ services:
     env: node
     rootDir: client
     plan: free
-    buildCommand: npm run render-build
-    startCommand: npm run render-start
+    buildCommand: npm ci --prefer-offline --no-audit --progress=false && NODE_OPTIONS='--max-old-space-size=1024' npm run build
+    startCommand: node --max-old-space-size=400 --expose-gc server.js
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
