@@ -29,6 +29,7 @@ import React from 'react';
 import { toastSuccess, toastError } from '../../utils/alerts';
 import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser, approveService as approveServiceAdmin, rejectService as rejectServiceAdmin } from '@/services/admin';
 import { getAdminPendingServices } from '@/services/services';
+import { getPromoCodes } from '@/services/promoCodes';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { getProductById } from '../../services/products';
@@ -60,11 +61,12 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   const [growthPct, setGrowthPct] = React.useState<{ customers: number; merchants: number; technicians: number }>({ customers: 0, merchants: 0, technicians: 0 });
   const [sales, setSales] = React.useState<{ daily: number; weekly: number; monthly: number; yearly: number; currency: string }>({ daily: 0, weekly: 0, monthly: 0, yearly: 0, currency: 'SAR' });
   const [finance, setFinance] = React.useState<{ monthlyRevenue: number; platformCommission: number; pendingVendorPayouts: number; currency: string }>({ monthlyRevenue: 0, platformCommission: 0, pendingVendorPayouts: 0, currency: 'SAR' });
-  const [commissions, setCommissions] = React.useState<{ products: number; projectsMerchants: number; servicesTechnicians: number }>({ products: 0, projectsMerchants: 0, servicesTechnicians: 0 });
-  const [commDraft, setCommDraft] = React.useState<{ products: string; projectsMerchants: string; servicesTechnicians: string }>({ products: '', projectsMerchants: '', servicesTechnicians: '' });
+  const [commissions, setCommissions] = React.useState<{ products: number; projectsMerchants: number; servicesTechnicians: number; rentalsMerchants: number }>({ products: 0, projectsMerchants: 0, servicesTechnicians: 0, rentalsMerchants: 0 });
+  const [commDraft, setCommDraft] = React.useState<{ products: string; projectsMerchants: string; servicesTechnicians: string; rentalsMerchants: string }>({ products: '', projectsMerchants: '', servicesTechnicians: '', rentalsMerchants: '' });
   const [quickActions, setQuickActions] = React.useState<Array<{ page: string; labelAr: string; labelEn: string; icon?: string; enabled?: boolean }>>([]);
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [promoStats, setPromoStats] = React.useState({ total: 0, active: 0, expired: 0, totalUsages: 0 });
 
   // Simple loading function
   const loadAll = React.useCallback(async () => {
@@ -83,7 +85,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
         }, 600);
       } catch {}
 
-      const [mer, srv, prod, usersAll, usersActiveVendors, usersTech, overview, c1, c2, c3, qact] = await Promise.all([
+      const [mer, srv, prod, usersAll, usersActiveVendors, usersTech, overview, c1, c2, c3, c4, promos, qact] = await Promise.all([
         getPendingMerchants(),
         getAdminPendingServices(),
         getPendingProducts(),
@@ -94,6 +96,8 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
         getAdminOption('commission_products'),
         getAdminOption('commission_projects_merchants'),
         getAdminOption('commission_services_technicians'),
+        getAdminOption('commission_rentals_merchants'),
+        getPromoCodes({ limit: 1 }), // Just get stats
         getAdminOption('quick_actions'),
       ]);
 
@@ -110,14 +114,32 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
 
       // Load commission settings from AdminOptions
       const parseNum = (resp: any) => {
-        try { return Number(JSON.parse(String(resp?.data?.value ?? '0')) || 0); } catch { return 0; }
+        try { 
+          if (!resp || !resp.ok || !resp.data) return 0;
+          const value = resp.data.value;
+          if (value === null || value === undefined) return 0;
+          return Number(value) || 0;
+        } catch { 
+          return 0; 
+        }
       };
 
       const productsC = parseNum(c1);
       const projectsMerchantsC = parseNum(c2);
       const servicesTechC = parseNum(c3);
-      setCommissions({ products: productsC, projectsMerchants: projectsMerchantsC, servicesTechnicians: servicesTechC });
-      setCommDraft({ products: String(productsC), projectsMerchants: String(projectsMerchantsC), servicesTechnicians: String(servicesTechC) });
+      const rentalsMerchantsC = parseNum(c4);
+      setCommissions({ products: productsC, projectsMerchants: projectsMerchantsC, servicesTechnicians: servicesTechC, rentalsMerchants: rentalsMerchantsC });
+      setCommDraft({ 
+        products: String(productsC || 0), 
+        projectsMerchants: String(projectsMerchantsC || 0), 
+        servicesTechnicians: String(servicesTechC || 0), 
+        rentalsMerchants: String(rentalsMerchantsC || 0) 
+      });
+
+      // Load promo codes stats
+      if (promos.ok && promos.data) {
+        setPromoStats(promos.data.stats || { total: 0, active: 0, expired: 0, totalUsages: 0 });
+      }
 
       if (srv.ok && srv.data && Array.isArray((srv.data as any).items)) {
         // Normalize id for Mongo/ObjectId or numeric backends
@@ -367,7 +389,11 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {statsData.map((stat) => (
-            <Card key={stat.title}>
+            <Card 
+              key={stat.title} 
+              className={stat.title === t('technicians') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
+              onClick={stat.title === t('technicians') ? () => setCurrentPage && setCurrentPage('admin-technicians') : undefined}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
                 <stat.icon className="h-4 w-4 text-muted-foreground" />
@@ -560,6 +586,14 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                   <Button 
                     className="w-full justify-start"
                     variant="outline"
+                    onClick={() => setCurrentPage && setCurrentPage('admin-technicians')}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    {locale==='ar' ? 'إدارة الفنيين والأسعار' : 'Manage Technicians & Rates'}
+                  </Button>
+                  <Button 
+                    className="w-full justify-start"
+                    variant="outline"
                   >
                     <Package className="mr-2 h-4 w-4" />
                     {t('manageProducts')}
@@ -735,8 +769,49 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
               </Card>
             </div>
 
+            {/* Promo Codes Management */}
+            <div className="mb-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Percent className="h-5 w-5" />
+                    {locale==='ar' ? 'إدارة رموز الخصم' : 'Promo Codes Management'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="text-2xl font-bold text-primary">{promoStats.total}</div>
+                      <div className="text-sm text-muted-foreground">{locale==='ar' ? 'إجمالي الرموز' : 'Total Codes'}</div>
+                    </div>
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">{promoStats.active}</div>
+                      <div className="text-sm text-muted-foreground">{locale==='ar' ? 'نشط' : 'Active'}</div>
+                    </div>
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">{promoStats.totalUsages}</div>
+                      <div className="text-sm text-muted-foreground">{locale==='ar' ? 'مرات الاستخدام' : 'Total Uses'}</div>
+                    </div>
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{promoStats.expired}</div>
+                      <div className="text-sm text-muted-foreground">{locale==='ar' ? 'منتهي الصلاحية' : 'Expired'}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => setCurrentPage && setCurrentPage('admin-promo-codes')}
+                      className="flex-1"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {locale==='ar' ? 'إدارة رموز الخصم' : 'Manage Promo Codes'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Commission Settings */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Products (Sales/Rentals) Commission */}
               <Card>
                 <CardHeader>
@@ -750,19 +825,31 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                       type="number"
                       min={0}
                       max={100}
-                      value={commDraft.products}
-                      onChange={(e) => setCommDraft(s=>({ ...s, products: e.target.value }))}
+                      value={commDraft.products || 0}
+                      onChange={(e) => setCommDraft(s=>({ ...s, products: e.target.value || '0' }))}
                     />
                     <Button
                       onClick={async ()=>{
                         setSavingKey('products');
-                        try { await setAdminOption('commission_products', Number(commDraft.products||0)); setCommissions(c=>({ ...c, products: Number(commDraft.products||0) })); }
+                        try { 
+                          const value = Number(commDraft.products) || 0;
+                          const result = await setAdminOption('commission_products', value); 
+                          if (result.ok) {
+                            setCommissions(c=>({ ...c, products: value }));
+                            toastSuccess(locale==='ar' ? 'تم حفظ عمولة المنتجات بنجاح' : 'Product commission saved successfully', locale==='ar');
+                          } else {
+                            toastError(locale==='ar' ? 'فشل في حفظ عمولة المنتجات' : 'Failed to save product commission', locale==='ar');
+                          }
+                        } catch (error) {
+                          console.error('Error saving product commission:', error);
+                          toastError(locale==='ar' ? 'خطأ في حفظ عمولة المنتجات' : 'Error saving product commission', locale==='ar');
+                        }
                         finally { setSavingKey(null); }
                       }}
                       disabled={savingKey==='products'}
                     >{locale==='ar'? 'حفظ' : 'Save'}</Button>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.products}%</div>
+                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.products || 0}%</div>
                 </CardContent>
               </Card>
 
@@ -779,19 +866,31 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                       type="number"
                       min={0}
                       max={100}
-                      value={commDraft.projectsMerchants}
-                      onChange={(e) => setCommDraft(s=>({ ...s, projectsMerchants: e.target.value }))}
+                      value={commDraft.projectsMerchants || 0}
+                      onChange={(e) => setCommDraft(s=>({ ...s, projectsMerchants: e.target.value || '0' }))}
                     />
                     <Button
                       onClick={async ()=>{
                         setSavingKey('projectsMerchants');
-                        try { await setAdminOption('commission_projects_merchants', Number(commDraft.projectsMerchants||0)); setCommissions(c=>({ ...c, projectsMerchants: Number(commDraft.projectsMerchants||0) })); }
+                        try { 
+                          const value = Number(commDraft.projectsMerchants) || 0;
+                          const result = await setAdminOption('commission_projects_merchants', value); 
+                          if (result.ok) {
+                            setCommissions(c=>({ ...c, projectsMerchants: value }));
+                            toastSuccess(locale==='ar' ? 'تم حفظ عمولة المشاريع بنجاح' : 'Project commission saved successfully', locale==='ar');
+                          } else {
+                            toastError(locale==='ar' ? 'فشل في حفظ عمولة المشاريع' : 'Failed to save project commission', locale==='ar');
+                          }
+                        } catch (error) {
+                          console.error('Error saving project commission:', error);
+                          toastError(locale==='ar' ? 'خطأ في حفظ عمولة المشاريع' : 'Error saving project commission', locale==='ar');
+                        }
                         finally { setSavingKey(null); }
                       }}
                       disabled={savingKey==='projectsMerchants'}
                     >{locale==='ar'? 'حفظ' : 'Save'}</Button>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.projectsMerchants}%</div>
+                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.projectsMerchants || 0}%</div>
                 </CardContent>
               </Card>
 
@@ -808,19 +907,72 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                       type="number"
                       min={0}
                       max={100}
-                      value={commDraft.servicesTechnicians}
-                      onChange={(e) => setCommDraft(s=>({ ...s, servicesTechnicians: e.target.value }))}
+                      value={commDraft.servicesTechnicians || 0}
+                      onChange={(e) => setCommDraft(s=>({ ...s, servicesTechnicians: e.target.value || '0' }))}
                     />
                     <Button
                       onClick={async ()=>{
                         setSavingKey('servicesTechnicians');
-                        try { await setAdminOption('commission_services_technicians', Number(commDraft.servicesTechnicians||0)); setCommissions(c=>({ ...c, servicesTechnicians: Number(commDraft.servicesTechnicians||0) })); }
+                        try { 
+                          const value = Number(commDraft.servicesTechnicians) || 0;
+                          const result = await setAdminOption('commission_services_technicians', value); 
+                          if (result.ok) {
+                            setCommissions(c=>({ ...c, servicesTechnicians: value }));
+                            toastSuccess(locale==='ar' ? 'تم حفظ عمولة الخدمات بنجاح' : 'Service commission saved successfully', locale==='ar');
+                          } else {
+                            toastError(locale==='ar' ? 'فشل في حفظ عمولة الخدمات' : 'Failed to save service commission', locale==='ar');
+                          }
+                        } catch (error) {
+                          console.error('Error saving service commission:', error);
+                          toastError(locale==='ar' ? 'خطأ في حفظ عمولة الخدمات' : 'Error saving service commission', locale==='ar');
+                        }
                         finally { setSavingKey(null); }
                       }}
                       disabled={savingKey==='servicesTechnicians'}
                     >{locale==='ar'? 'حفظ' : 'Save'}</Button>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.servicesTechnicians}%</div>
+                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.servicesTechnicians || 0}%</div>
+                </CardContent>
+              </Card>
+
+              {/* Rentals commission from merchants */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>{locale==='ar' ? 'نسبة خصم من التجار (المعدات)' : 'Rental Commission (Merchants)'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground mb-2">{locale==='ar' ? 'النسبة المئوية %' : 'Percentage %'}</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="border rounded px-3 py-2 w-24"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={commDraft.rentalsMerchants || 0}
+                      onChange={(e) => setCommDraft(s=>({ ...s, rentalsMerchants: e.target.value || '0' }))}
+                    />
+                    <Button
+                      onClick={async ()=>{
+                        setSavingKey('rentalsMerchants');
+                        try { 
+                          const value = Number(commDraft.rentalsMerchants) || 0;
+                          const result = await setAdminOption('commission_rentals_merchants', value); 
+                          if (result.ok) {
+                            setCommissions(c=>({ ...c, rentalsMerchants: value }));
+                            toastSuccess(locale==='ar' ? 'تم حفظ عمولة التأجير بنجاح' : 'Rental commission saved successfully', locale==='ar');
+                          } else {
+                            toastError(locale==='ar' ? 'فشل في حفظ عمولة التأجير' : 'Failed to save rental commission', locale==='ar');
+                          }
+                        } catch (error) {
+                          console.error('Error saving rental commission:', error);
+                          toastError(locale==='ar' ? 'خطأ في حفظ عمولة التأجير' : 'Error saving rental commission', locale==='ar');
+                        }
+                        finally { setSavingKey(null); }
+                      }}
+                      disabled={savingKey==='rentalsMerchants'}
+                    >{locale==='ar'? 'حفظ' : 'Save'}</Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">{locale==='ar'? 'القيمة الحالية: ' : 'Current: '}{commissions.rentalsMerchants || 0}%</div>
                 </CardContent>
               </Card>
             </div>
@@ -828,6 +980,7 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
         </Tabs>
 
     {/* Product Details Dialog */
+    /* Hide IDs, show clear labels */
     /* Hide IDs, show clear labels */}
     <Dialog open={productDialogOpen} onOpenChange={(o)=> { if (!o) { setProductDialogOpen(false); setProductDialogData(null); } }}>
       {productDialogOpen && (

@@ -6,6 +6,7 @@ export type CommissionRates = {
     products: number;
     projectsMerchants: number;
     servicesTechnicians: number;
+    rentalsMerchants: number;
     currency: string;
   };
 };

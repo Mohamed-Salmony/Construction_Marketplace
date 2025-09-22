@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema({
   registryStart: String,
   registryEnd: String,
   profession: String, // e.g., electrician, plumber
+  dailyRate: { type: Number, default: 0 }, // Daily rate for technicians in SAR
 }, { timestamps: true });
 
 export const User = mongoose.models.User || mongoose.model('User', userSchema);

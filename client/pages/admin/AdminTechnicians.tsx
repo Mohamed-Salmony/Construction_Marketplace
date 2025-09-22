@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
-import { Users, Search, Filter, Eye, CheckCircle, Ban, ArrowRight } from 'lucide-react';
+import { Users, Search, Filter, Eye, CheckCircle, Ban, ArrowRight, Pencil } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getUsers as adminGetUsers } from '@/services/admin';
 import { approveTechnician, suspendTechnician } from '@/services/admin';
@@ -61,6 +61,13 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
   const [viewUser, setViewUser] = useState<AdminUserDetails | null>(null);
+  
+  // Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editUser, setEditUser] = useState<AdminUserDetails | null>(null);
+  const [editDailyRate, setEditDailyRate] = useState<string>('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -113,6 +120,51 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
       const r = await suspendTechnician(u.id);
       if (r.ok) await load();
     } catch { }
+  };
+
+  const openEdit = async (userId: string) => {
+    try {
+      setEditLoading(true);
+      setEditError(null);
+      const r = await getAdminUserById(userId);
+      if (r.ok && r.data && (r.data as any).item) {
+        const user = (r.data as any).item as AdminUserDetails;
+        setEditUser(user);
+        setEditDailyRate(String(user.dailyRate || 0));
+        setEditOpen(true);
+      } else {
+        setEditError(isAr ? 'فشل في تحميل بيانات المستخدم' : 'Failed to load user data');
+      }
+    } catch (error) {
+      setEditError(isAr ? 'خطأ في تحميل البيانات' : 'Error loading data');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editUser) return;
+    try {
+      setEditLoading(true);
+      const { updateAdminUser } = await import('@/services/adminUsers');
+      const result = await updateAdminUser(editUser.id, {
+        dailyRate: Number(editDailyRate) || 0
+      });
+      
+      if (result.ok) {
+        setEditOpen(false);
+        // Update view if it's open for the same user
+        if (viewUser && viewUser.id === editUser.id) {
+          await openView(editUser.id);
+        }
+      } else {
+        alert(isAr ? 'فشل في حفظ التغييرات' : 'Failed to save changes');
+      }
+    } catch (error) {
+      alert(isAr ? 'خطأ في الحفظ' : 'Error saving');
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   return (
@@ -179,6 +231,7 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={() => openView(u.id)}><Eye className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="outline" onClick={() => openEdit(u.id)}><Pencil className="h-4 w-4" /></Button>
                     {u.status === 'active' ? (
                       <Button size="sm" variant="outline" onClick={() => suspend(u)}><Ban className="h-4 w-4" /></Button>
                     ) : (
@@ -286,6 +339,10 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
                       <div>{viewUser.address || '—'}</div>
                     </div>
                     <div>
+                      <Label className="text-muted-foreground">{isAr ? 'السعر اليومي' : 'Daily Rate'}</Label>
+                      <div>{viewUser.dailyRate ? `${viewUser.dailyRate} ${isAr ? 'ريال' : 'SAR'}` : '—'}</div>
+                    </div>
+                    <div>
                       <Label className="text-muted-foreground">IBAN</Label>
                       <div dir="ltr">{viewUser.iban || '—'}</div>
                     </div>
@@ -293,6 +350,45 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
                 </div>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{isAr ? 'تعديل بيانات الفني' : 'Edit Technician'}</DialogTitle>
+            </DialogHeader>
+            {editLoading && (<div className="text-sm text-muted-foreground">{isAr ? 'جارٍ التحميل...' : 'Loading...'}</div>)}
+            {editError && (<div className="text-sm text-red-600">{editError}</div>)}
+            {editUser && (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-muted-foreground">{isAr ? 'الاسم' : 'Name'}</Label>
+                  <div className="font-medium">{editUser.name}</div>
+                </div>
+                <div>
+                  <Label htmlFor="dailyRate">{isAr ? 'السعر اليومي (ريال سعودي)' : 'Daily Rate (SAR)'}</Label>
+                  <Input
+                    id="dailyRate"
+                    type="number"
+                    value={editDailyRate}
+                    onChange={(e) => setEditDailyRate(e.target.value)}
+                    placeholder={isAr ? 'أدخل السعر اليومي' : 'Enter daily rate'}
+                    min="0"
+                    step="1"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editLoading}>
+                    {isAr ? 'إلغاء' : 'Cancel'}
+                  </Button>
+                  <Button onClick={saveEdit} disabled={editLoading}>
+                    {editLoading ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
