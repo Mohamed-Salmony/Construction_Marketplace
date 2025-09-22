@@ -24,7 +24,7 @@ services:
     rootDir: client
     plan: free
     buildCommand: npm run render-build
-    startCommand: node server.js
+    startCommand: npm run render-start
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
@@ -35,5 +35,9 @@ services:
         value: https://construction-marketplace.onrender.com
       - key: NEXT_TELEMETRY_DISABLED
         value: 1
-      - key: DEBUG
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=400 --expose-gc
+      - key: MEMORY_PRESSURE_CHECK
         value: 1
+      - key: FORCE_COLOR
+        value: 0

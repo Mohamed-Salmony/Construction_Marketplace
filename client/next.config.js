@@ -25,6 +25,11 @@ const nextConfig = {
         hostname: 'construction-marketplace-backend.onrender.com',
       },
     ],
+    // Memory optimization for images
+    formats: ['image/webp'],
+    minimumCacheTTL: 60 * 60 * 24, // 24 hours
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
 
   reactStrictMode: false,
@@ -32,16 +37,28 @@ const nextConfig = {
   poweredByHeader: false,
   generateEtags: false,
   
-  // Performance optimizations
+  // Memory and performance optimizations for Render's 512MB limit
   experimental: {
-    // Keep experimental features minimal for Render compatibility
+    // Reduce memory usage
+    memoryBasedWorkerCount: true,
+    // Optimize CSS loading
+    optimizeCss: true,
+    // Reduce bundle size
+    modularizeImports: {
+      'lucide-react': {
+        transform: 'lucide-react/dist/esm/icons/{{member}}',
+      },
+    },
   },
+  
   // Ensure certain ESM-only packages are transpiled for SSR compatibility
   transpilePackages: ['lucide-react', '@radix-ui/react-icons'],
   
   // Compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
+    // Remove unused CSS
+    styledComponents: false,
   },
   
   // Skip TypeScript checking during build for faster production builds
@@ -53,6 +70,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: process.env.NODE_ENV === 'production',
   },
+
+  // Optimize output for production
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   
   // Bundle analyzer and optimization - simplified to avoid build issues
   webpack: (config, { dev, isServer }) => {
@@ -61,6 +81,35 @@ const nextConfig = {
       ...config.resolve.alias,
       '@': require('path').resolve(__dirname),
     };
+
+    // Production optimizations for memory reduction
+    if (!dev && !isServer) {
+      // Reduce chunk size for better memory management
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        minSize: 10000,
+        maxSize: 200000, // Smaller chunks to reduce memory pressure
+        cacheGroups: {
+          default: {
+            minChunks: 1,
+            priority: -20,
+            reuseExistingChunk: true,
+          },
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+            priority: -10,
+            maxSize: 150000, // Keep vendor chunks smaller
+          },
+        },
+      };
+
+      // Memory optimization flags
+      config.optimization.minimize = true;
+      config.optimization.usedExports = true;
+      config.optimization.sideEffects = false;
+    }
     
     return config;
   },

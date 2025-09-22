@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "serve": "node server.js",
-    "render-build": "npm ci && next build",
+    "serve": "node --max-old-space-size=400 --expose-gc server.js",
+    "render-build": "npm ci --prefer-offline --no-audit --progress=false && next build",
+    "render-start": "node --max-old-space-size=400 --expose-gc server.js",
     "lint": "next lint"
   },
   "dependencies": {
