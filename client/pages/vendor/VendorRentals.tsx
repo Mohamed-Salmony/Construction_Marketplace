@@ -18,6 +18,7 @@ import { getMyProducts } from '@/services/products';
 import { listMyRentals, createRental, type CreateRentalInput, updateRental, deleteRental, listRentalMessages, replyRentalMessage, getRentalById } from '@/services/rentals';
 import { api } from '@/lib/api';
 import { getCommissionRates } from '@/services/commissions';
+import { getRootRentalCategories, type RentalCategoryDto } from '@/services/rentalCategories';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 
 // This page mirrors VendorProducts but for rentals. It reuses ProductForm and ProductItem for speed.
@@ -50,6 +51,9 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
   const [editUsage, setEditUsage] = useState('');
   const [editMachine, setEditMachine] = useState('');
   const [editProductId, setEditProductId] = useState<string>('');
+  // Rental categories
+  const [rentalCategories, setRentalCategories] = useState<RentalCategoryDto[]>([]);
+  const [selectedRentalCategory, setSelectedRentalCategory] = useState('');
   // Messages dialog
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgTarget, setMsgTarget] = useState<any|null>(null);
@@ -91,25 +95,35 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
     let cancelled = false;
     (async () => {
       try {
-        const [rents, prods] = await Promise.all([listMyRentals(), getMyProducts()]);
+        const [rents, prods, rentalCats] = await Promise.all([
+          listMyRentals(), 
+          getMyProducts(),
+          getRootRentalCategories()
+        ]);
         if (!cancelled) {
           setRentals(Array.isArray(rents.data) ? (rents.data as any[]) : []);
           setMyProducts(Array.isArray(prods.data) ? (prods.data as any[]) : []);
+          setRentalCategories(Array.isArray(rentalCats.data) ? (rentalCats.data as RentalCategoryDto[]) : []);
         }
       } catch {
-        if (!cancelled) { setRentals([]); toastError(locale==='ar'?'فشل تحميل التأجير':'Failed to load rentals', locale==='ar'); }
+        if (!cancelled) { 
+          setRentals([]); 
+          setRentalCategories([]);
+          toastError(locale==='ar'?'فشل تحميل التأجير':'Failed to load rentals', locale==='ar'); 
+        }
       } finally { if (!cancelled) { try { hideFirstOverlay(); } catch {} } }
     })();
     return () => { cancelled = true; };
   }, [hideFirstOverlay, locale]); // Include dependencies as indicated by ESLint
 
-  // Load commission rates for rentals (uses products commission rate)
+  // Load commission rates for rentals (now uses separate rentals commission rate)
   useEffect(() => {
     (async () => {
       try {
         const { ok, data } = await getCommissionRates();
         if (ok && (data as any)?.rates) {
-          setCommissionPct(Number((data as any).rates.products || 0));
+          // Use rentals commission rate if available, fallback to products rate
+          setCommissionPct(Number((data as any).rates.rentalsMerchants || (data as any).rates.products || 0));
           setRatesCurrency(String((data as any).rates.currency || 'SAR'));
         }
       } catch {}
@@ -126,7 +140,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
       );
     }
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter((r: any) => r.category === selectedCategory);
+      filtered = filtered.filter((r: any) => r.rentalCategoryId === selectedCategory);
     }
     if (selectedStatus !== 'all') {
       filtered = filtered.filter((r: any) => r.status === selectedStatus);
@@ -136,7 +150,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
 
   const resetForm = () => {
     setMachineName(''); setProductId(''); setCustomerId(''); setDailyRate(''); setSecurityDeposit('');
-    setCurrency('SAR'); setRequiresDelivery(false); setDeliveryAddress(''); setDeliveryFee(''); setRequiresPickup(false); setPickupFee(''); setSpecialInstructions(''); setUsageNotes(''); setImages([]);
+    setCurrency('SAR'); setSelectedRentalCategory(''); setRequiresDelivery(false); setDeliveryAddress(''); setDeliveryFee(''); setRequiresPickup(false); setPickupFee(''); setSpecialInstructions(''); setUsageNotes(''); setImages([]);
   };
 
   // Read hint from URL/localStorage to auto-open messages for a rental
@@ -373,6 +387,8 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
         dailyRate: Number(dailyRate),
         currency,
         securityDeposit: Number(securityDeposit),
+        // Include rental category
+        rentalCategoryId: selectedRentalCategory || undefined,
         // Delivery/Pickup removed
         requiresDelivery: false,
         requiresPickup: false,
@@ -473,6 +489,23 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                       </div>
                     )}
                   </div>
+                  {/* Rental Category Selection */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>{locale==='ar'? 'فئة التأجير' : 'Rental Category'}</Label>
+                    <Select value={selectedRentalCategory} onValueChange={setSelectedRentalCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={locale==='ar' ? 'اختر فئة التأجير' : 'Select rental category'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">{locale==='ar' ? 'بدون فئة' : 'No category'}</SelectItem>
+                        {rentalCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {locale==='ar' ? (category.nameAr || category.nameEn) : (category.nameEn || category.nameAr)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {/* Customer ID (optional; auto-filled) */}
                   <div className="space-y-2 hidden">
                     <Label>{locale==='ar'? 'معرّف العميل' : 'Customer ID'}</Label>
@@ -529,6 +562,20 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                   <div className="space-y-2">
                     <Label>{locale==='ar'? 'سعر اليوم' : 'Daily rate'}</Label>
                     <Input type="number" inputMode="decimal" value={dailyRate} onChange={(e)=> setDailyRate(e.target.value)} placeholder="0.00" />
+                    {/* Commission preview for rentals */}
+                    {commissionPct > 0 && Number(dailyRate || 0) > 0 && (
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="text-blue-600">
+                          {locale==='ar' ? 'النسبة الحالية:' : 'Current rate:'} {commissionPct}%
+                        </div>
+                        <div>
+                          {locale==='ar' ? 'عمولة المنصة لليوم:' : 'Platform commission per day:'} {Math.round(Number(dailyRate || 0) * (commissionPct / 100)).toLocaleString(locale==='ar'?'ar-EG':'en-US')} {ratesCurrency === 'SAR' ? (locale==='ar' ? 'ريال' : 'SAR') : ratesCurrency}
+                        </div>
+                        <div className="text-green-600 font-medium">
+                          {locale==='ar' ? 'الصافي لك لليوم:' : 'Net for you per day:'} {Math.max(Number(dailyRate || 0) - Math.round(Number(dailyRate || 0) * (commissionPct / 100)), 0).toLocaleString(locale==='ar'?'ar-EG':'en-US')} {ratesCurrency === 'SAR' ? (locale==='ar' ? 'ريال' : 'SAR') : ratesCurrency}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>{locale==='ar'? 'تأمين (إجباري)' : 'Security deposit (required)'}</Label>
@@ -581,7 +628,11 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{locale === 'en' ? 'All Categories' : 'جميع الفئات'}</SelectItem>
-                    {/* Categories are free-form for now */}
+                    {rentalCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {locale==='ar' ? (category.nameAr || category.nameEn) : (category.nameEn || category.nameAr)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 

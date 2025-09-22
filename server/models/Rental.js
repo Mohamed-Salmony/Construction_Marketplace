@@ -4,6 +4,7 @@ const rentalSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
   productName: { type: String },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  rentalCategoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'RentalCategory', required: false },
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   rentalDays: { type: Number, default: 0 },

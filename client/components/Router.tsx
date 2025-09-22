@@ -8,7 +8,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { getProfile } from "@/services/auth";
 import { toastInfo, toastError } from "../utils/alerts";
 import { getWishlist as apiGetWishlist, addToWishlist as apiAddToWishlist, removeFromWishlist as apiRemoveFromWishlist, toggleWishlist as apiToggleWishlist } from "@/services/wishlist";
-import { getProductById } from "@/services/products";
+import { getProductById, cleanLocalStorageFromNonExistentProducts } from "@/services/products";
 import LoadingOverlay from "./LoadingOverlay";
 import AdminNavigationGuard, { AdminGuardStatus } from "./AdminNavigationGuard";
 
@@ -303,7 +303,7 @@ export default function Router() {
               const pid = normalizeProductIdForApi(ci.id);
               if (pid === null) return ci;
               const pidStr = String(pid);
-              if (notFoundProductsRef.current.has(pidStr)) return ci;
+              if (notFoundProductsRef.current.has(pidStr)) return null; // Return null for not found products
               // Only fetch if it's a valid Mongo ObjectId (24 hex) or strictly numeric id
               const isValidOid = /^[a-fA-F0-9]{24}$/.test(pidStr);
               const isNumeric = /^\d+$/.test(pidStr);
@@ -311,21 +311,28 @@ export default function Router() {
               const p = await getProductById(pid as any);
               if (!p.ok && p.status === 404) {
                 notFoundProductsRef.current.add(pidStr);
+                // Silently remove not found products from cart
+                return null; // Return null to filter out this item
               }
               if (p.ok && p.data) {
                 const imgs = Array.isArray((p.data as any).images) ? (p.data as any).images : [];
                 const image = imgs.find((im:any)=> im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl || (p as any).data?.imageUrl;
-                const name = (p as any).data?.nameAr || (p as any).data?.nameEn || ci.name;
-                const price = Number((p as any).data?.price ?? ci.price ?? 0);
+                const name = (p as any).data?.nameAr || (p.data as any).nameEn || ci.name;
+                const price = Number((p.data as any)?.price ?? ci.price ?? 0);
                 return { ...ci, image: ci.image || image, name: ci.name || name, price } as CartItem;
               }
-            } catch {}
+            } catch (error) {
+              console.error('Error enriching cart item:', error);
+            }
             return ci;
           }));
+          
+          // Filter out null items (not found products)
+          const validItems = enriched.filter(item => item !== null) as CartItem[];
           // Generate composite IDs to avoid merging when backend returns same base id for different lines
           const withCompositeIds = (() => {
             const counts = new Map<string, number>();
-            return enriched.map((it) => {
+            return validItems.map((it) => {
               const base = normalizeBaseId(it.id);
               const varSig = `${String((it as any).name || '')}|${String((it as any).partNumber || '')}|${String((it as any).price ?? '')}`;
               const compositeBase = `${base}|v:${varSig}`;
@@ -336,6 +343,19 @@ export default function Router() {
             });
           })();
           setCartItems(withCompositeIds);
+          
+          // Update localStorage with cleaned cart (remove not found products)
+          try {
+            localStorage.setItem('cart', JSON.stringify(withCompositeIds.map(item => ({
+              id: normalizeBaseId(item.id),
+              name: item.name,
+              price: item.price,
+              image: item.image,
+              quantity: item.quantity
+            }))));
+          } catch (error) {
+            console.error('Failed to update localStorage cart:', error);
+          }
         }
       } catch {}
     })();
@@ -365,13 +385,18 @@ export default function Router() {
                     const p = await getProductById(pidNorm as any);
                     if (!p.ok && p.status === 404) {
                       notFoundProductsRef.current.add(pidStr);
+                      // Silently remove not found products from wishlist
+                      return null; // Return null to filter out this item
                     }
                     if (p.ok && p.data) {
                       const imgs = Array.isArray((p.data as any).images) ? (p.data as any).images : [];
                       image = imgs.find((im:any)=> im?.isPrimary)?.imageUrl || imgs[0]?.imageUrl || (p as any).data?.imageUrl;
                       price = Number((p.data as any).price ?? 0);
-                      if (!name) name = (p as any).data?.nameAr || (p as any).data?.nameEn || undefined;
+                      if (!name) name = (p.data as any)?.nameAr || (p.data as any)?.nameEn || undefined;
                     }
+                  } else {
+                    // If we know this product doesn't exist, filter it out
+                    return null;
                   }
                 }
               }
@@ -393,7 +418,10 @@ export default function Router() {
               partNumber: undefined,
             } as WishlistItem;
           }));
-          setWishlistItems(enriched);
+          
+          // Filter out null items (not found products)
+          const validWishlistItems = enriched.filter(item => item !== null) as WishlistItem[];
+          setWishlistItems(validWishlistItems);
         } else setWishlistItems([]);
       } catch { setWishlistItems([]); }
     })();
@@ -568,6 +596,11 @@ export default function Router() {
 
   const { locale } = useTranslation();
   const dir = locale === "ar" ? "rtl" : "ltr";
+
+  // Clean localStorage from non-existent products on app start
+  useEffect(() => {
+    cleanLocalStorageFromNonExistentProducts();
+  }, []);
 
   // Scroll to top on page change (ensure start at top, not footer)
   useEffect(() => {

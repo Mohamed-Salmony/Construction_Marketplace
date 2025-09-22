@@ -121,7 +121,7 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
     },
     {
       icon: "Plus",
-      label: { ar: "إضافة خدمة", en: "Add Service" },
+      label: { ar: "اطلب فني", en: "Request Technician" },
       route: "add-service",
     },
     {
@@ -545,7 +545,7 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
                 onClick={() => setCurrentPage && setCurrentPage("add-service")}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                {locale === 'ar' ? 'إضافة خدمة' : 'Add Service'}
+                {locale === 'ar' ? 'اطلب فني' : 'Request Technician'}
               </Button>
               {/* Rentals */}
               <Button

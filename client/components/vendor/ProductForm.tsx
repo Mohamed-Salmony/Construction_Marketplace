@@ -214,10 +214,13 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
               const v = e.target.value.replace(/[^0-9]/g, '');
               setFormData({ ...formData, price: v });
             }} required />
-            <div className="mt-1 text-xs text-muted-foreground">
-              <div>عمولتنا {commissionPct}%: {commissionAmount.toLocaleString('ar-EG')} {currency === 'SAR' ? 'ريال' : currency}</div>
-              <div>الصافي بعد الخصم: {netAmount.toLocaleString('ar-EG')} {currency === 'SAR' ? 'ريال' : currency}</div>
-            </div>
+            {commissionPct > 0 && pricePreview > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                <div className="text-blue-600">النسبة الحالية: {commissionPct}%</div>
+                <div>عمولة المنصة: {commissionAmount.toLocaleString('ar-EG')} {currency === 'SAR' ? 'ريال' : currency}</div>
+                <div className="text-green-600 font-medium">الصافي لك: {netAmount.toLocaleString('ar-EG')} {currency === 'SAR' ? 'ريال' : currency}</div>
+              </div>
+            )}
           </div>
           <div>
             <Label htmlFor="originalPrice">السعر الأصلي (اختياري)</Label>

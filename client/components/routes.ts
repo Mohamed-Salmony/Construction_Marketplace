@@ -61,6 +61,7 @@ import AdminProducts from '../pages/admin/AdminProducts';
 import AdminReports from '../pages/admin/AdminReports';
 import AdminSections from '../pages/admin/AdminSections';
 import AdminProductOptions from '../pages/admin/AdminProductOptions';
+import AdminRentalOptions from '../pages/admin/AdminRentalOptions';
 import AdminTechnicianOptions from '../pages/admin/AdminTechnicianOptions';
 import AdminTechnicians from '../pages/admin/AdminTechnicians';
 import AdminProjectOptions from '../pages/admin/AdminProjectOptions';
@@ -70,6 +71,7 @@ import AdminProjectDetails from '../pages/admin/AdminProjectDetails';
 import AdminRentals from '../pages/admin/AdminRentals';
 import AdminOffers from '../pages/admin/AdminOffers';
 import AdminServices from '../pages/admin/AdminServices';
+import AdminPromoCodes from '../pages/admin/AdminPromoCodes';
 
 // Technician pages
 import TechnicianServices from '../pages/technician/TechnicianServices';
@@ -133,6 +135,7 @@ export const routes: Record<string, RouteConfig> = {
   'admin-reports': { component: AdminReports, title: 'Reports & Analytics', icon: BarChart3, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-sections': { component: AdminSections, title: 'الأقسام', icon: Package, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-sections-products': { component: AdminProductOptions, title: 'خيارات المنتجات', icon: Package, requiresAuth: true, allowedRoles: ['admin'] },
+  'admin-sections-rentals': { component: AdminRentalOptions, title: 'أقسام التأجير', icon: Tag, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-sections-technicians': { component: AdminTechnicianOptions, title: 'خيارات العمال', icon: Users, requiresAuth: true, allowedRoles: ['admin'] },
   // Admin project management
   'admin-project-options': { component: AdminProjectOptions, title: 'خيارات مشاريع (كتالوج)', icon: Settings, requiresAuth: true, allowedRoles: ['admin'] },
@@ -143,6 +146,7 @@ export const routes: Record<string, RouteConfig> = {
   'admin-offers': { component: AdminOffers, title: 'إدارة العروض', icon: Percent, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-services': { component: AdminServices, title: 'إدارة الخدمات', icon: Settings, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-technicians': { component: AdminTechnicians, title: 'إدارة الفنيين', icon: Users, requiresAuth: true, allowedRoles: ['admin'] },
+  'admin-promo-codes': { component: AdminPromoCodes, title: 'إدارة رموز الخصم', icon: Tag, requiresAuth: true, allowedRoles: ['admin'] },
   // Worker (technician) routes (require worker role)
   'technician-services': { component: TechnicianServices, title: 'الخدمات', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-service-details': { component: TechnicianServiceDetails, title: 'تفاصيل خدمة', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },

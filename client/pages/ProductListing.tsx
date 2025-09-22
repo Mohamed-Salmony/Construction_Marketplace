@@ -594,7 +594,6 @@ export default function ProductListing({
                 }}
               >
                 <ShoppingCart className="h-3 w-3 ml-1" />
-                {t("add")}
               </Button>
             )}
           </div>

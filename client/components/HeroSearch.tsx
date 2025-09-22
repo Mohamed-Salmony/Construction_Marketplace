@@ -22,6 +22,7 @@ export default function HeroSearch({ setSearchFilters, setCurrentPage }: Partial
           src="https://images.unsplash.com/photo-1562492855-1c6e20372f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWNoYW5pYyUyMHdvcmtpbmclMjBnYXJhZ2UlMjBhdXRvbW90aXZlfGVufDF8fHx8MTc1NDA2Mzg3Mnww&ixlib=rb-4.1.0&q=80&w=1080"
           alt={t("workshopBackground")}
           className="w-full h-full object-cover opacity-20"
+          priority={true}
         />
       </div>
 

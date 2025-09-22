@@ -50,11 +50,11 @@ export async function protect(req, res, next) {
 }
 
 export function requireRoles(...roles) {
-  // Technician = Worker alias rule
+  // Technician = Worker alias rule + case-insensitive comparison
   const norm = (r) => {
     if (!r) return r;
-    const x = String(r);
-    if (x.toLowerCase() === 'technician') return 'Worker';
+    const x = String(r).toLowerCase(); // Make it case-insensitive
+    if (x === 'technician') return 'worker';
     return x;
   };
   const required = roles.map(norm);
@@ -63,9 +63,13 @@ export function requireRoles(...roles) {
     const userRoles = [];
     if (Array.isArray(req.user.roles)) userRoles.push(...req.user.roles);
     if (req.user.role) userRoles.push(req.user.role);
+    
     const normalizedUser = userRoles.map(norm);
     const allowed = normalizedUser.some((ur) => required.includes(ur));
-    if (!allowed) return res.status(403).json({ success: false, message: 'Forbidden' });
+    
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
     next();
   };
 }

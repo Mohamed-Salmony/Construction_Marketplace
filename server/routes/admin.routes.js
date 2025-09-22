@@ -398,6 +398,7 @@ router.get('/users/:id', ...adminOnly, async (req, res) => {
       })) : [],
       rating: null,
       reviewCount: null,
+      dailyRate: typeof u.dailyRate === 'number' ? u.dailyRate : 0,
     };
     return res.json({ success: true, item });
   } catch (err) {

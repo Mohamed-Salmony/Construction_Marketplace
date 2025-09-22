@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
 import { Progress } from '../../components/ui/progress';
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, Users, Package, ArrowRight } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, Users, Package, ArrowRight, Tag, Plus, Percent } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getAdminAnalyticsOverview, getAdminOption, setAdminOption } from '@/services/admin';
+import { getPromoCodes } from '@/services/promoCodes';
+import { toastSuccess, toastError } from '../../utils/alerts';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 
 export default function AdminReports({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -20,19 +22,16 @@ export default function AdminReports({ setCurrentPage, ...context }: Partial<Rou
   const [growthPct, setGrowthPct] = React.useState<{ customers: number; merchants: number; technicians: number }>({ customers: 0, merchants: 0, technicians: 0 });
   const [finance, setFinance] = React.useState<{ monthlyRevenue: number; platformCommission: number; pendingVendorPayouts: number; currency: string }>({ monthlyRevenue: 0, platformCommission: 0, pendingVendorPayouts: 0, currency: 'SAR' });
   const [inventory, setInventory] = React.useState<{ totalInStockItems: number; lowStockAlerts: number }>({ totalInStockItems: 0, lowStockAlerts: 0 });
-  const [commissions, setCommissions] = React.useState<{ products: number; projectsMerchants: number; servicesTechnicians: number; currency: string; rates?: { products: number; projectsMerchants: number; servicesTechnicians: number } }>({ products: 0, projectsMerchants: 0, servicesTechnicians: 0, currency: 'SAR' });
   const [counts, setCounts] = React.useState<{ ordersMonth: number; rentalsMonth: number; projectsAccepted: number; servicesAccepted: number }>({ ordersMonth: 0, rentalsMonth: 0, projectsAccepted: 0, servicesAccepted: 0 });
-  const [commDraft, setCommDraft] = React.useState<{ products: string; projectsMerchants: string; servicesTechnicians: string }>({ products: '', projectsMerchants: '', servicesTechnicians: '' });
-  const [savingKey, setSavingKey] = React.useState<string | null>(null);
+  const [promoStats, setPromoStats] = React.useState({ total: 0, active: 0, expired: 0, totalUsages: 0 });
+
 
   React.useEffect(() => {
     (async () => {
       try {
-        const [overview, c1, c2, c3] = await Promise.all([
+        const [overview, promos] = await Promise.all([
           getAdminAnalyticsOverview(),
-          getAdminOption('commission_products'),
-          getAdminOption('commission_projects_merchants'),
-          getAdminOption('commission_services_technicians'),
+          getPromoCodes({ limit: 1 }), // Just get stats
         ]);
         if (overview.ok && overview.data) {
           const ov: any = overview.data;
@@ -71,17 +70,6 @@ export default function AdminReports({ setCurrentPage, ...context }: Partial<Rou
             totalInStockItems: Number(ov?.inventory?.totalInStockItems || 0),
             lowStockAlerts: Number(ov?.inventory?.lowStockAlerts || 0),
           });
-          setCommissions({
-            products: Number(ov?.commissions?.products || 0),
-            projectsMerchants: Number(ov?.commissions?.projectsMerchants || 0),
-            servicesTechnicians: Number(ov?.commissions?.servicesTechnicians || 0),
-            currency: String(ov?.commissions?.currency || 'SAR'),
-            rates: {
-              products: Number(ov?.commissions?.rates?.products || 0),
-              projectsMerchants: Number(ov?.commissions?.rates?.projectsMerchants || 0),
-              servicesTechnicians: Number(ov?.commissions?.rates?.servicesTechnicians || 0),
-            }
-          });
           setCounts({
             ordersMonth: Number(ov?.counts?.ordersMonth || 0),
             rentalsMonth: Number(ov?.counts?.rentalsMonth || 0),
@@ -89,21 +77,11 @@ export default function AdminReports({ setCurrentPage, ...context }: Partial<Rou
             servicesAccepted: Number(ov?.counts?.servicesAccepted || 0),
           });
         }
-        const parseNum = (resp: any) => {
-          try {
-            const raw = JSON.parse(String(resp?.data?.value ?? '0'));
-            const n = typeof raw === 'number' ? raw : Number(raw ?? 0);
-            return Number.isFinite(n) ? n : 0;
-          } catch {
-            return 0;
-          }
-        };
-        const p = parseNum(c1); const pm = parseNum(c2); const st = parseNum(c3);
-        setCommDraft({
-          products: String(Number.isFinite(p) ? p : 0),
-          projectsMerchants: String(Number.isFinite(pm) ? pm : 0),
-          servicesTechnicians: String(Number.isFinite(st) ? st : 0)
-        });
+
+        // Load promo codes stats
+        if (promos.ok && promos.data) {
+          setPromoStats(promos.data.stats || { total: 0, active: 0, expired: 0, totalUsages: 0 });
+        }
       } catch (e) {
         console.error('Failed to load reports data', e);
       } finally { hideFirstOverlay(); }
@@ -246,76 +224,51 @@ export default function AdminReports({ setCurrentPage, ...context }: Partial<Rou
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-          <Card>
-            <CardHeader><CardTitle>{locale==='ar'?'خصم المنتجات (بيع/تأجير)':'Products Commission (Sales/Rentals)'}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">{locale==='ar'?'القيمة الشهرية':'Monthly amount'}</div>
-              <div className="text-xl font-bold mb-2">{nf(commissions.products, commissions.currency)}</div>
-              <div className="flex items-center gap-2">
-                <input className="border rounded px-3 py-2 w-24" type="number" min={0} max={100} value={commDraft.products} onChange={(e)=>setCommDraft(s=>({...s,products:e.target.value}))} />
-                <Button
-                  disabled={savingKey==='cp'}
-                  onClick={async ()=>{
-                    setSavingKey('cp');
-                    try{
-                      const v = Number(commDraft.products);
-                      const safe = Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0;
-                      await setAdminOption('commission_products', safe);
-                      setCommDraft(s=>({...s, products: String(safe)}));
-                    } finally{ setSavingKey(null);} }
-                  }
-                > {locale==='ar'?'حفظ':'Save'} </Button>
+        {/* Promo Codes Management */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Percent className="h-5 w-5" />
+              {locale==='ar' ? 'إدارة رموز الخصم' : 'Promo Codes Management'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="text-center p-4 border rounded-lg">
+                <Tag className="h-8 w-8 mx-auto mb-2 text-primary" />
+                <div className="text-2xl font-bold text-primary">{promoStats.total}</div>
+                <div className="text-sm text-muted-foreground">{locale==='ar' ? 'إجمالي الرموز' : 'Total Codes'}</div>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{locale==='ar'?'النسبة:':'Rate:'} {commissions.rates?.products ?? 0}%</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>{locale==='ar'?'خصم التجار (المشاريع)':'Merchants Commission (Projects)'}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">{locale==='ar'?'القيمة الشهرية':'Monthly amount'}</div>
-              <div className="text-xl font-bold mb-2">{nf(commissions.projectsMerchants, commissions.currency)}</div>
-              <div className="flex items-center gap-2">
-                <input className="border rounded px-3 py-2 w-24" type="number" min={0} max={100} value={commDraft.projectsMerchants} onChange={(e)=>setCommDraft(s=>({...s,projectsMerchants:e.target.value}))} />
-                <Button
-                  disabled={savingKey==='cm'}
-                  onClick={async ()=>{
-                    setSavingKey('cm');
-                    try{
-                      const v = Number(commDraft.projectsMerchants);
-                      const safe = Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0;
-                      await setAdminOption('commission_projects_merchants', safe);
-                      setCommDraft(s=>({...s, projectsMerchants: String(safe)}));
-                    } finally{ setSavingKey(null);} }
-                  }
-                >{locale==='ar'?'حفظ':'Save'}</Button>
+              <div className="text-center p-4 border rounded-lg">
+                <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                <div className="text-2xl font-bold text-green-600">{promoStats.active}</div>
+                <div className="text-sm text-muted-foreground">{locale==='ar' ? 'نشط' : 'Active'}</div>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{locale==='ar'?'النسبة:':'Rate:'} {commissions.rates?.projectsMerchants ?? 0}%</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>{locale==='ar'?'خصم الفنيين (الخدمات)':'Technicians Commission (Services)'}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">{locale==='ar'?'القيمة الشهرية':'Monthly amount'}</div>
-              <div className="text-xl font-bold mb-2">{nf(commissions.servicesTechnicians, commissions.currency)}</div>
-              <div className="flex items-center gap-2">
-                <input className="border rounded px-3 py-2 w-24" type="number" min={0} max={100} value={commDraft.servicesTechnicians} onChange={(e)=>setCommDraft(s=>({...s,servicesTechnicians:e.target.value}))} />
-                <Button
-                  disabled={savingKey==='cs'}
-                  onClick={async ()=>{
-                    setSavingKey('cs');
-                    try{
-                      const v = Number(commDraft.servicesTechnicians);
-                      const safe = Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0;
-                      await setAdminOption('commission_services_technicians', safe);
-                      setCommDraft(s=>({...s, servicesTechnicians: String(safe)}));
-                    } finally{ setSavingKey(null);} }
-                  }
-                >{locale==='ar'?'حفظ':'Save'}</Button>
+              <div className="text-center p-4 border rounded-lg">
+                <Users className="h-8 w-8 mx-auto mb-2 text-orange-600" />
+                <div className="text-2xl font-bold text-orange-600">{promoStats.totalUsages}</div>
+                <div className="text-sm text-muted-foreground">{locale==='ar' ? 'مرات الاستخدام' : 'Total Uses'}</div>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{locale==='ar'?'النسبة:':'Rate:'} {commissions.rates?.servicesTechnicians ?? 0}%</div>
-            </CardContent>
-          </Card>
+              <div className="text-center p-4 border rounded-lg">
+                <Package className="h-8 w-8 mx-auto mb-2 text-red-600" />
+                <div className="text-2xl font-bold text-red-600">{promoStats.expired}</div>
+                <div className="text-sm text-muted-foreground">{locale==='ar' ? 'منتهي الصلاحية' : 'Expired'}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setCurrentPage && setCurrentPage('admin-promo-codes')}
+                className="flex-1"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {locale==='ar' ? 'إدارة رموز الخصم' : 'Manage Promo Codes'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+
         </div>
       </div>
     </div>

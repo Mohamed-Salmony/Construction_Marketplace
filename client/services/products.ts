@@ -88,13 +88,116 @@ export async function getFeaturedProducts() {
   return primary;
 }
 
-export async function getProductById(id: string | number) {
-  const primary = await api.get<ProductDto>(`/api/Products/${String(id)}`);
-  if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
-    const alt = await api.get<ProductDto>(`/api/products/${encodeURIComponent(String(id))}`);
-    return alt;
+// Global cache for products that don't exist to avoid repeated API calls
+const notFoundProductCache = new Set<string>();
+
+// Pre-populate with known non-existent product IDs to prevent API calls
+notFoundProductCache.add('68d04de1765b673763063328');
+
+// Also cache successful products for better performance
+const productCache = new Map<string, {data: any, timestamp: number}>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Utility function to clean localStorage from non-existent products
+export function cleanLocalStorageFromNonExistentProducts() {
+  try {
+    // Clean cart
+    const cartData = localStorage.getItem('cart');
+    if (cartData) {
+      const cart = JSON.parse(cartData);
+      if (Array.isArray(cart)) {
+        const cleanedCart = cart.filter((item: any) => {
+          const productId = item.id ? String(item.id).split('|')[0] : null;
+          return productId && !notFoundProductCache.has(productId);
+        });
+        
+        if (cleanedCart.length !== cart.length) {
+          console.log(`Cleaned ${cart.length - cleanedCart.length} invalid products from cart localStorage`);
+          localStorage.setItem('cart', JSON.stringify(cleanedCart));
+        }
+      }
+    }
+    
+    // Clean wishlist if stored locally
+    const wishlistData = localStorage.getItem('wishlist');
+    if (wishlistData) {
+      const wishlist = JSON.parse(wishlistData);
+      if (Array.isArray(wishlist)) {
+        const cleanedWishlist = wishlist.filter((item: any) => {
+          const productId = item.id ? String(item.id).split('|')[0] : null;
+          return productId && !notFoundProductCache.has(productId);
+        });
+        
+        if (cleanedWishlist.length !== wishlist.length) {
+          console.log(`Cleaned ${wishlist.length - cleanedWishlist.length} invalid products from wishlist localStorage`);
+          localStorage.setItem('wishlist', JSON.stringify(cleanedWishlist));
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error cleaning localStorage:', error);
   }
-  return primary;
+}
+
+export async function getProductById(id: string | number) {
+  const idStr = String(id);
+  
+  // If we already know this product doesn't exist, return 404 immediately (no API call)
+  if (notFoundProductCache.has(idStr)) {
+    // Silent return to avoid console spam
+    return { ok: false, status: 404, data: null, error: 'Product not found (cached)' };
+  }
+  
+  // Check if we have a cached successful result
+  const cached = productCache.get(idStr);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    console.log(`Product ${idStr} loaded from cache`);
+    return { ok: true, status: 200, data: cached.data };
+  }
+  
+  try {
+    // Making API call for product...
+    const primary = await api.get<ProductDto>(`/api/Products/${idStr}`);
+    
+    // If product not found, add to not-found cache permanently
+    if (!primary.ok && primary.status === 404) {
+      // Product not found, adding to cache silently
+      notFoundProductCache.add(idStr);
+      return primary;
+    }
+    
+    // If successful, cache the result
+    if (primary.ok && primary.data) {
+      productCache.set(idStr, { data: primary.data, timestamp: Date.now() });
+      // Product loaded successfully and cached
+      return primary;
+    }
+    
+    // Only try alternative route for other errors (405, 500, etc.)
+    if (!primary.ok && primary.status !== 404) {
+      // Primary route failed, trying alternative...
+      const alt = await api.get<ProductDto>(`/api/products/${encodeURIComponent(idStr)}`);
+      
+      // If alternative route also returns 404, cache it
+      if (!alt.ok && alt.status === 404) {
+        // Alternative route also returned 404, caching as not found
+        notFoundProductCache.add(idStr);
+      } else if (alt.ok && alt.data) {
+        // Cache successful alternative result
+        productCache.set(idStr, { data: alt.data, timestamp: Date.now() });
+        // Product loaded from alternative route and cached
+      }
+      
+      return alt;
+    }
+    
+    return primary;
+  } catch (error) {
+    console.error(`Failed to fetch product ${idStr}:`, error);
+    // Cache network errors as not found to prevent repeated failures
+    notFoundProductCache.add(idStr);
+    return { ok: false, status: 404, data: null, error: error };
+  }
 }
 
 export async function getProductBySlug(slug: string) {
