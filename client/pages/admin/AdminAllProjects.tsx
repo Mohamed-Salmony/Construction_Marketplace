@@ -9,19 +9,18 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { getProjects, deleteProject, type ProjectDto } from '@/services/projects';
+import { api } from '@/lib/api';
 import { Eye, RefreshCw } from 'lucide-react';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 import { toastError, toastSuccess, confirmDialog } from '../../utils/alerts';
 
 const STATUS_OPTIONS = [
-  { id: 'all', ar: 'الكل', en: 'All' },
-  { id: 'Draft', ar: 'مسودة', en: 'Draft' },
+  { id: 'all', ar: 'كل المعتمدة', en: 'All Approved' },
   { id: 'Published', ar: 'منشور', en: 'Published' },
   { id: 'InBidding', ar: 'مفتوح للمناقصات', en: 'In Bidding' },
   { id: 'BidSelected', ar: 'تم اختيار عرض', en: 'Bid Selected' },
   { id: 'InProgress', ar: 'قيد التنفيذ', en: 'In Progress' },
   { id: 'Completed', ar: 'مكتمل', en: 'Completed' },
-  { id: 'Cancelled', ar: 'ملغي', en: 'Cancelled' },
 ];
 
 function normalizeStatus(raw: any): string {
@@ -64,15 +63,24 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
     try {
       setLoading(true);
       setError(null);
-      const r = await getProjects({ page: 1, pageSize: 200, query });
+      // Get all approved/published projects (excluding drafts and pending)
+      const r = await getProjects({ page: 1, pageSize: 500, query });
       if (r.ok && r.data) {
         const list = (r.data as any).items as ProjectDto[];
-        setItems(Array.isArray(list) ? list : []);
+        // Filter to show only approved/active projects
+        const approvedProjects = (Array.isArray(list) ? list : []).filter((p: any) => {
+          const st = normalizeStatus(p.status ?? p.Status);
+          // Show Published, InBidding, BidSelected, InProgress, and Completed projects
+          return ['Published', 'InBidding', 'BidSelected', 'InProgress', 'Completed'].includes(st);
+        });
+        
+        setItems(approvedProjects);
       } else {
         setItems([]);
         setError(isAr ? 'تعذر جلب المشاريع' : 'Failed to fetch projects');
       }
-    } catch {
+    } catch (error) {
+      console.error('Error fetching projects:', error);
       setItems([]);
       setError(isAr ? 'تعذر الاتصال بالخادم' : 'Failed to contact server');
     } finally {
@@ -113,8 +121,8 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{isAr ? 'كل المشاريع' : 'All Projects'}</h1>
-            <p className="text-muted-foreground">{isAr ? 'استعرض كل المشاريع وقم بالتصفية حسب الحالة' : 'Browse all projects and filter by status'}</p>
+            <h1 className="text-2xl font-bold">{isAr ? 'كل المشاريع المعتمدة' : 'All Approved Projects'}</h1>
+            <p className="text-muted-foreground">{isAr ? 'استعرض جميع المشاريع المعتمدة والمتوافق عليها وقم بالتصفية حسب الحالة' : 'Browse all approved and active projects and filter by status'}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => void load()}>
             <RefreshCw className="w-4 h-4 mr-1" /> {isAr ? 'تحديث' : 'Refresh'}
@@ -176,40 +184,42 @@ export default function AdminAllProjects({ setCurrentPage, ...context }: Partial
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground truncate max-w-[80vw]">{p.description || ''}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          ID: {p.id} • {isAr ? 'عدد العروض:' : 'Bids:'} {(p as any).bidCount ?? 0} • {isAr ? 'المشاهدات:' : 'Views:'} {(p as any).views ?? (p as any).viewCount ?? 0}
+                        <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                          <div>
+                            {(p as any).customerName || (p as any).ownerName || (p as any).customer?.name ? (
+                              <span className="text-green-600 font-medium">{isAr ? 'صاحب المشروع: ' : 'Owner: '}{(p as any).customerName || (p as any).ownerName || (p as any).customer?.name} • </span>
+                            ) : (
+                              <span className="text-gray-500">{isAr ? 'صاحب المشروع: غير محدد • ' : 'Owner: Not specified • '}</span>
+                            )}
+                            {isAr ? 'العروض: ' : 'Bids: '}{(p as any).bidCount ?? (p as any).bids?.length ?? 0} • {isAr ? 'المشاهدات: ' : 'Views: '}{(p as any).views ?? (p as any).viewCount ?? 0}
+                            {(p as any).createdAt && (
+                              <span> • {isAr ? 'التاريخ: ' : 'Date: '}{new Date((p as any).createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}</span>
+                            )}
+                          </div>
+                          {(p as any).bidCount > 0 || ((p as any).bids && (p as any).bids.length > 0) ? (
+                            <div className="mt-1">
+                              <span className="text-blue-600 font-medium">{isAr ? 'يوجد عروض مقدمة من التجار' : 'Has bidding merchants'}</span>
+                              <span className="text-gray-500 ml-2">({isAr ? 'انقر لعرض التفاصيل' : 'Click to view details'})</span>
+                            </div>
+                          ) : (
+                            <div className="mt-1">
+                              <span className="text-gray-500">{isAr ? 'لا توجد عروض حتى الآن' : 'No bids yet'}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            // Confirm deletion
-                            const ok = await confirmDialog(
-                              isAr ? 'هل أنت متأكد من حذف هذا المشروع؟ لا يمكن التراجع.' : 'Delete this project? This cannot be undone.',
-                              isAr ? 'حذف' : 'Delete',
-                              isAr ? 'إلغاء' : 'Cancel',
-                              isAr
-                            );
-                            if (!ok) return;
-                            try {
-                              const r = await deleteProject(p.id ?? p._id);
-                              if (r.ok) {
-                                toastSuccess(isAr ? 'تم حذف المشروع' : 'Project deleted', isAr);
-                                void load();
-                              } else {
-                                const errorMsg = (r as any).error?.message || (r as any).error || 'Failed to delete project';
-                                toastError(isAr ? `فشل حذف المشروع: ${errorMsg}` : `Failed to delete project: ${errorMsg}`, isAr);
-                              }
-                            } catch (error: any) {
-                              const errorMsg = error?.message || 'Failed to delete project';
-                              toastError(isAr ? `فشل حذف المشروع: ${errorMsg}` : `Failed to delete project: ${errorMsg}`, isAr);
-                            }
+                            try { window.localStorage.setItem('admin_selected_project_id', String(p.id ?? p._id)); } catch {}
+                            setCurrentPage && setCurrentPage('admin-project-details');
                           }}
                         >
-                          {isAr ? 'حذف' : 'Delete'}
+                          <Eye className="w-4 h-4 mr-1" />
+                          {isAr ? 'عرض' : 'View'}
                         </Button>
                       </div>
                     </div>

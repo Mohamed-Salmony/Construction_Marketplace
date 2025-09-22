@@ -137,7 +137,7 @@ export const routes: Record<string, RouteConfig> = {
   // Admin project management
   'admin-project-options': { component: AdminProjectOptions, title: 'خيارات مشاريع (كتالوج)', icon: Settings, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-pending-projects': { component: AdminPendingProjects, title: 'مشاريع قيد الاعتماد', icon: Shield, requiresAuth: true, allowedRoles: ['admin'] },
-  'admin-all-projects': { component: AdminAllProjects, title: 'كل المشاريع', icon: Shield, requiresAuth: true, allowedRoles: ['admin'] },
+  'admin-all-projects': { component: AdminAllProjects, title: 'كل المشاريع المعتمدة', icon: Shield, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-project-details': { component: AdminProjectDetails, title: 'تفاصيل مشروع (أدمن)', icon: Shield, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-rentals': { component: AdminRentals, title: 'عقود التأجير (إدارة)', icon: FileText, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-offers': { component: AdminOffers, title: 'إدارة العروض', icon: Percent, requiresAuth: true, allowedRoles: ['admin'] },

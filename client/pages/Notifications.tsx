@@ -7,6 +7,10 @@ import { Bell } from "lucide-react";
 import { useTranslation } from "../hooks/useTranslation";
 import { listMyNotifications, markNotificationRead } from "@/services/notifications";
 import { getConversation } from "@/services/chat";
+import { getAdminPendingNotifications } from "@/services/adminNotifications";
+import { getVendorNotifications } from "@/services/vendorNotifications";
+import { getTechnicianNotifications } from "@/services/technicianNotifications";
+import { getCustomerNotifications, markCustomerNotificationRead } from "@/services/customerNotifications";
 
 export default function NotificationsPage(context: Partial<RouteContext>) {
   const { locale } = useTranslation();
@@ -15,19 +19,43 @@ export default function NotificationsPage(context: Partial<RouteContext>) {
 
   const load = async () => {
     try {
-      const r = await listMyNotifications();
-      if (r.ok && r.data && (r.data as any).success) {
-        const list = ((r.data as any).data || []) as any[];
-        // Exclude any message-related notification types from the list
-        const filtered = list.filter((n:any)=> {
-          const tp = String(n.type || '').toLowerCase();
-          return tp && !tp.includes('message');
-        });
-        setItems(filtered);
+      const user = (context as any)?.user;
+      const role = (user?.role || '').toString().toLowerCase();
+      const isAdmin = role === 'admin';
+      const isVendor = role === 'vendor' || role === 'merchant';
+      const isWorker = role === 'worker' || role === 'technician';
+      const isCustomerRole = !isVendor && !isAdmin && !isWorker && !!user; // treat any other logged-in role as customer
+
+      let notifications: any[] = [];
+
+      if (isAdmin) {
+        // For admin, show pending items that need approval
+        notifications = await getAdminPendingNotifications();
+      } else if (isVendor) {
+        // For vendors, show business-related notifications
+        notifications = await getVendorNotifications();
+      } else if (isWorker) {
+        // For technicians, show job-related notifications
+        notifications = await getTechnicianNotifications();
+      } else if (isCustomerRole) {
+        // For customers, show order and project related notifications
+        notifications = await getCustomerNotifications();
       } else {
-        setItems([]);
+        // Fallback for other users - use legacy system
+        const r = await listMyNotifications();
+        if (r.ok && r.data && (r.data as any).success) {
+          const list = ((r.data as any).data || []) as any[];
+          // Exclude any message-related notification types from the list
+          notifications = list.filter((n:any)=> {
+            const tp = String(n.type || '').toLowerCase();
+            return tp && !tp.includes('message');
+          });
+        }
       }
-    } catch {
+
+      setItems(notifications || []);
+    } catch (error) {
+      console.log('Error loading notifications:', error);
       setItems([]);
     }
   };
@@ -36,9 +64,41 @@ export default function NotificationsPage(context: Partial<RouteContext>) {
 
   const openFromNotification = async (n: any) => {
     try {
-      // mark read first
-      if (n && n._id) { try { await markNotificationRead(String(n._id)); } catch {} }
-      // chat message -> navigate to chat using conversationId
+      const user = (context as any)?.user;
+      const role = (user?.role || '').toString().toLowerCase();
+      const isAdmin = role === 'admin';
+      const isVendor = role === 'vendor' || role === 'merchant';
+      const isWorker = role === 'worker' || role === 'technician';
+      const isCustomerRole = !isVendor && !isAdmin && !isWorker && !!user;
+
+      // Mark notification as read based on user type
+      if (n && n.id) {
+        try {
+          if (isCustomerRole) {
+            await markCustomerNotificationRead(String(n.id));
+          } else if (n._id) {
+            await markNotificationRead(String(n._id));
+          }
+        } catch {}
+      }
+
+      // Handle navigation based on notification page property
+      if (n.page) {
+        // Store any additional data for the target page
+        if (n.data) {
+          const prefix = isCustomerRole ? 'customer' : isVendor ? 'vendor' : isWorker ? 'technician' : 'user';
+          Object.keys(n.data).forEach(key => {
+            try {
+              localStorage.setItem(`${prefix}_${key}`, String(n.data[key]));
+            } catch {}
+          });
+        }
+        
+        setCurrentPage && setCurrentPage(n.page);
+        return;
+      }
+
+      // Handle legacy chat message navigation
       if (n?.type === 'chat.message' && n?.data?.conversationId) {
         const cid = String(n.data.conversationId);
         try { window.localStorage.setItem('chat_conversation_id', cid); } catch {}
@@ -51,7 +111,6 @@ export default function NotificationsPage(context: Partial<RouteContext>) {
             const sid = String((c.data as any).serviceRequestId || '');
             try { if (sid) window.localStorage.setItem('chat_service_id', sid); } catch {}
             // decide target page based on current user role
-            const role = String((context as any)?.user?.role || '').toLowerCase();
             if (role === 'vendor') {
               try { if (techId) window.localStorage.setItem('chat_technician_id', techId); } catch {}
               setCurrentPage && setCurrentPage('vendor-chat');
@@ -88,12 +147,19 @@ export default function NotificationsPage(context: Partial<RouteContext>) {
               items.map((n:any) => (
                 <div
                   key={String(n._id || n.id)}
-                  className={`p-3 border rounded-md bg-white cursor-pointer hover:bg-muted/30 ${n.read ? '' : 'border-primary/40'}`}
+                  className={`p-3 border rounded-md bg-white cursor-pointer hover:bg-muted/30 ${n.isRead ? '' : 'border-primary/40 bg-blue-50/50'}`}
                   onClick={() => void openFromNotification(n)}
                 >
-                  <div className="text-sm font-medium">{n.title || (locale==='ar'?'تنبيه':'Notification')}</div>
-                  <div className="text-sm text-muted-foreground break-words">{n.message}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString(locale==='ar'?'ar-EG':'en-US')}</div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{n.title || (locale==='ar'?'تنبيه':'Notification')}</div>
+                      <div className="text-sm text-muted-foreground break-words mt-1">{n.message}</div>
+                      <div className="text-[10px] text-muted-foreground mt-2">{new Date(n.createdAt).toLocaleString(locale==='ar'?'ar-EG':'en-US')}</div>
+                    </div>
+                    {!n.isRead && (
+                      <div className="w-2 h-2 bg-primary rounded-full ml-2 mt-1 flex-shrink-0"></div>
+                    )}
+                  </div>
                 </div>
               ))
             )}

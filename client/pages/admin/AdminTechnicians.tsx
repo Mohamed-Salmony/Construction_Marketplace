@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { Label } from '../../components/ui/label';
 import { Users, Search, Filter, Eye, CheckCircle, Ban, ArrowRight } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
+import UserAvatar from '../../components/UserAvatar';
 import { getUsers as adminGetUsers } from '@/services/admin';
 import { approveTechnician, suspendTechnician } from '@/services/admin';
 import { getAdminUserById, type AdminUserDetails } from '@/services/adminUsers';
@@ -24,6 +25,7 @@ interface Row {
   country?: string;
   createdAt?: string;
   status: 'active' | 'pending' | 'suspended';
+  profilePicture?: string;
 }
 
 export default function AdminTechnicians({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -74,7 +76,8 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
           city: u.city,
           country: u.country,
           createdAt: u.createdAt,
-          status: (u.isActive ? 'active' : (!u.isVerified ? 'pending' : 'suspended')) as Row['status']
+          status: (u.isActive ? 'active' : (!u.isVerified ? 'pending' : 'suspended')) as Row['status'],
+          profilePicture: u.profilePicture || ''
         })) as Row[];
         setRows(list);
       } else setRows([]);
@@ -162,7 +165,12 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
               {filtered.map(u => (
                 <div key={u.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center"><Users className="h-6 w-6 text-primary" /></div>
+                    <UserAvatar 
+                      src={u.profilePicture} 
+                      name={u.name} 
+                      size="lg"
+                      className="shrink-0"
+                    />
                     <div className="space-y-1 w-full min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{u.name}</h3>

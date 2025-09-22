@@ -53,8 +53,8 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
   }, []);
 
   const load = React.useCallback(async () => {
-    if (!projectId) {
-      setError(isAr ? 'معرّف المشروع غير صالح' : 'Invalid project id');
+    if (!projectId || projectId === 'undefined' || projectId === 'null') {
+      setError(isAr ? 'لم يتم تحديد المشروع. يرجى العودة لقائمة المشاريع واختيار مشروع.' : 'No project selected. Please go back to projects list and select a project.');
       setLoading(false);
       return;
     }
@@ -76,7 +76,8 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
       } else {
         setError(isAr ? 'تعذر تحميل تفاصيل المشروع' : 'Failed to load project details');
       }
-    } catch {
+    } catch (error) {
+      console.error('Error loading project:', error);
       setError(isAr ? 'تعذر الاتصال بالخادم' : 'Failed to contact server');
     } finally {
       setLoading(false);
@@ -122,14 +123,31 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-sm text-muted-foreground">ID: {project.id ?? project._id ?? '-'}</div>
+              <CardContent className="space-y-3">
                 <div className="text-sm">{project.description || ''}</div>
-                <div className="text-sm text-muted-foreground">
-                  {isAr ? 'العميل' : 'Customer'}: {project.customerName || project.customerId || '-'}
+                
+                {/* Owner/Customer Information */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="text-sm font-medium text-green-800 mb-1">
+                    {isAr ? 'صاحب المشروع' : 'Project Owner'}
+                  </div>
+                  <div className="text-sm text-green-700">
+                    {project.customerName || project.customer?.name || project.ownerName || (isAr ? 'غير محدد' : 'Not specified')}
+                  </div>
+                  {(project.customerEmail || project.customer?.email) && (
+                    <div className="text-xs text-green-600 mt-1">
+                      {project.customerEmail || project.customer?.email}
+                    </div>
+                  )}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {isAr ? 'العروض' : 'Bids'}: {project.bidCount ?? 0} • {isAr ? 'المشاهدات' : 'Views'}: {project.viewCount ?? 0}
+
+                {/* Project Stats */}
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  <span>{isAr ? 'العروض المقدمة: ' : 'Bids: '}<span className="font-medium">{project.bidCount ?? bids.length ?? 0}</span></span>
+                  <span>{isAr ? 'المشاهدات: ' : 'Views: '}<span className="font-medium">{project.viewCount ?? project.views ?? 0}</span></span>
+                  {project.createdAt && (
+                    <span>{isAr ? 'تاريخ الإنشاء: ' : 'Created: '}<span className="font-medium">{new Date(project.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}</span></span>
+                  )}
                 </div>
                 <Separator />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -154,23 +172,65 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
                   <div className="p-4 text-sm text-muted-foreground">{isAr ? 'لا توجد عروض حتى الآن.' : 'No bids yet.'}</div>
                 ) : (
                   <div className="divide-y">
-                    {bids.map((b) => (
-                      <div key={b.id} className="p-4 flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate max-w-[60vw]">{b.merchantName || b.merchantEmail || b.merchantId}</div>
-                          <div className="text-sm text-muted-foreground truncate max-w-[80vw]">{b.merchantEmail || ''}</div>
-                          <div className="text-xs text-muted-foreground mt-1">{isAr ? 'المبلغ' : 'Amount'}: {b.amount} • {isAr ? 'الأيام' : 'Days'}: {b.estimatedDays}</div>
-                          {b.proposal && (
-                            <div className="text-sm mt-1">{b.proposal}</div>
-                          )}
-                        </div>
-                        <div className="shrink-0">
-                          <Badge variant={statusBadgeVariant(String(b.status))}>
-                            {(() => {
-                              const st = String(b.status);
-                              return isAr ? (st==='Submitted' ? 'مُقدّم' : st==='UnderReview' ? 'قيد المراجعة' : st==='Accepted' ? 'مقبول' : st==='Rejected' ? 'مرفوض' : st==='Withdrawn' ? 'مسحوب' : st) : st;
-                            })()}
-                          </Badge>
+                    {bids.map((b, index) => (
+                      <div key={index} className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            {/* Merchant Info */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                              <div className="text-sm font-medium text-blue-800 mb-1">
+                                {isAr ? 'التاجر المقدم للعرض' : 'Bidding Merchant'}
+                              </div>
+                              <div className="text-sm text-blue-700">
+                                {b.merchantName || b.merchant?.name || b.vendorName || (isAr ? 'تاجر غير محدد' : 'Unknown Merchant')}
+                              </div>
+                              {(b.merchantEmail || b.merchant?.email) && (
+                                <div className="text-xs text-blue-600 mt-1">
+                                  {b.merchantEmail || b.merchant?.email}
+                                </div>
+                              )}
+                              {(b.merchantPhone || b.merchant?.phone) && (
+                                <div className="text-xs text-blue-600">
+                                  {b.merchantPhone || b.merchant?.phone}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Bid Details */}
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap gap-4 text-sm">
+                                <span className="font-medium text-green-600">
+                                  {isAr ? 'المبلغ المقترح: ' : 'Proposed Amount: '}
+                                  {new Intl.NumberFormat().format(b.amount || 0)} {b.currency || 'ر.س'}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {isAr ? 'مدة التنفيذ: ' : 'Duration: '}{b.estimatedDays || b.days || '-'} {isAr ? 'يوم' : 'days'}
+                                </span>
+                              </div>
+                              
+                              {b.proposal && (
+                                <div className="bg-gray-50 p-3 rounded-md">
+                                  <div className="text-xs font-medium text-gray-600 mb-1">{isAr ? 'تفاصيل العرض:' : 'Proposal Details:'}</div>
+                                  <div className="text-sm text-gray-700">{b.proposal}</div>
+                                </div>
+                              )}
+                              
+                              {b.submittedAt && (
+                                <div className="text-xs text-muted-foreground">
+                                  {isAr ? 'تاريخ التقديم: ' : 'Submitted: '}{new Date(b.submittedAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="shrink-0">
+                            <Badge variant={statusBadgeVariant(String(b.status))}>
+                              {(() => {
+                                const st = String(b.status);
+                                return isAr ? (st==='Submitted' ? 'مُقدّم' : st==='UnderReview' ? 'قيد المراجعة' : st==='Accepted' ? 'مقبول' : st==='Rejected' ? 'مرفوض' : st==='Withdrawn' ? 'مسحوب' : st) : st;
+                              })()}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                     ))}

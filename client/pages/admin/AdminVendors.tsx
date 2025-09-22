@@ -11,6 +11,7 @@ import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Store, Search, Filter, Plus, Edit, Trash2, MapPin, Mail, Phone, ArrowRight, CheckCircle, Ban, Eye } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
+import UserAvatar from '../../components/UserAvatar';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 import { getPendingMerchants, getUsers as adminGetUsers, approveMerchant, suspendMerchant } from '@/services/admin';
 import { successAlert, warningAlert } from '../../utils/alerts';
@@ -79,6 +80,7 @@ type VendorRow = {
   phone: string;
   status: 'active' | 'pending' | 'suspended';
   joinDate?: string;
+  profilePicture?: string;
 };
 
 export default function AdminVendors({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -104,7 +106,8 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
           name: u.name || '',
           email: u.email || '',
           phone: u.phoneNumber || '',
-          status: u.isActive ? 'active' : (u.isVerified ? 'active' : 'pending')
+          status: u.isActive ? 'active' : (u.isVerified ? 'active' : 'pending'),
+          profilePicture: u.profilePicture || ''
         } as VendorRow));
         setRows(list);
       } else setRows([]);
@@ -224,7 +227,12 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
               {filtered.map(r => (
                 <div key={r.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center"><Store className="h-6 w-6 text-primary" /></div>
+                    <UserAvatar 
+                      src={r.profilePicture} 
+                      name={r.name} 
+                      size="lg"
+                      className="shrink-0"
+                    />
                     <div className="space-y-1 w-full min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{r.name}</h3>

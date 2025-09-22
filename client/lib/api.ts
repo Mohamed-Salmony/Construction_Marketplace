@@ -1,3 +1,5 @@
+import { handleApiError } from '../utils/errorHandler';
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 // Default to the public backend URL if env is not provided (use HTTPS to avoid mixed content)
