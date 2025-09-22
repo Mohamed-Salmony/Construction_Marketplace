@@ -10,6 +10,7 @@ import { toastInfo, toastError } from "../utils/alerts";
 import { getWishlist as apiGetWishlist, addToWishlist as apiAddToWishlist, removeFromWishlist as apiRemoveFromWishlist, toggleWishlist as apiToggleWishlist } from "@/services/wishlist";
 import { getProductById, cleanLocalStorageFromNonExistentProducts } from "@/services/products";
 import LoadingOverlay from "./LoadingOverlay";
+import AdminNavigationGuard, { AdminGuardStatus } from "./AdminNavigationGuard";
 
 export type UserRole = "customer" | "vendor" | "worker" | "admin";
 
@@ -820,8 +821,15 @@ export default function Router() {
 
   return (
     <div className="min-h-screen bg-background" dir={dir} suppressHydrationWarning>
-      <CurrentPageComponent {...context} />
-      <LoadingOverlay open={loadingOpen} message={loadingMsg} subMessage={loadingSub} />
+      <AdminNavigationGuard
+        user={user}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+      >
+        <CurrentPageComponent {...context} />
+        <LoadingOverlay open={loadingOpen} message={loadingMsg} subMessage={loadingSub} />
+        <AdminGuardStatus user={user} currentPage={currentPage} />
+      </AdminNavigationGuard>
     </div>
   );
 }

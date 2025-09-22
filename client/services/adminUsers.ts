@@ -13,6 +13,7 @@ export type AdminListUser = {
   companyName?: string | null;
   city?: string | null;
   country?: string | null;
+  profilePicture?: string | null;
 };
 
 export type AdminUsersResponse = { success: boolean; items: AdminListUser[] };

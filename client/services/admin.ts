@@ -38,6 +38,7 @@ export type AdminUser = {
   companyName?: string;
   city?: string;
   country?: string;
+  profilePicture?: string;
 };
 
 // Pending products for admin approval

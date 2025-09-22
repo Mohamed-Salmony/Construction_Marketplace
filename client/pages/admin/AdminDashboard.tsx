@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useTranslation } from '../../hooks/useTranslation';
+import UserAvatar from '../../components/UserAvatar';
 // useStableCallback removed to avoid build issues
 import React from 'react';
 import { toastSuccess, toastError } from '../../utils/alerts';
@@ -447,11 +448,18 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
               {/* Pending merchants */}
               {pendingMerchants.map((m) => (
                 <div key={m.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">{m.name} ({m.email})</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant="secondary">{t('vendor')}</Badge>
-                      <Badge variant="secondary">{m.companyName || 'N/A'}</Badge>
+                  <div className="flex items-center gap-3">
+                    <UserAvatar 
+                      src={(m as any).profilePicture} 
+                      name={m.name} 
+                      size="md"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">{m.name} ({m.email})</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge variant="secondary">{t('vendor')}</Badge>
+                        <Badge variant="secondary">{m.companyName || 'N/A'}</Badge>
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -500,13 +508,20 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
               {/* Pending technicians */}
               {pendingTechnicians.map((u) => (
                 <div key={u.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">{u.name || '—'} ({u.email})</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant="secondary">{locale==='ar' ? 'عامل' : 'Technician'}</Badge>
-                      {u.city && <Badge variant="secondary">{u.city}</Badge>}
-                      {u.country && <Badge variant="secondary">{u.country}</Badge>}
-                      {u.createdAt && (<span className="text-xs text-muted-foreground">{locale==='ar'?'مسجّل':'Joined'}: {new Date(u.createdAt).toLocaleDateString(locale==='ar'?'ar-EG':'en-US')}</span>)}
+                  <div className="flex items-center gap-3">
+                    <UserAvatar 
+                      src={u.profilePicture} 
+                      name={u.name} 
+                      size="md"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">{u.name || '—'} ({u.email})</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge variant="secondary">{locale==='ar' ? 'عامل' : 'Technician'}</Badge>
+                        {u.city && <Badge variant="secondary">{u.city}</Badge>}
+                        {u.country && <Badge variant="secondary">{u.country}</Badge>}
+                        {u.createdAt && (<span className="text-xs text-muted-foreground">{locale==='ar'?'مسجّل':'Joined'}: {new Date(u.createdAt).toLocaleDateString(locale==='ar'?'ar-EG':'en-US')}</span>)}
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -586,14 +601,24 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                   <Button 
                     className="w-full justify-start"
                     variant="outline"
-                    onClick={() => setCurrentPage && setCurrentPage('admin-technicians')}
+                    onClick={() => setCurrentPage && setCurrentPage('admin-vendors')}
                   >
-                    <Users className="mr-2 h-4 w-4" />
-                    {locale==='ar' ? 'إدارة الفنيين والأسعار' : 'Manage Technicians & Rates'}
+                    <Store className="mr-2 h-4 w-4" />
+                    {locale==='ar' ? 'إدارة البائعين' : 'Manage Vendors'}
                   </Button>
                   <Button 
                     className="w-full justify-start"
                     variant="outline"
+                    onClick={() => setCurrentPage && setCurrentPage('admin-technicians')}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    {locale==='ar' ? 'إدارة الفنيين' : 'Manage Technicians'}
+
+                  </Button>
+                  <Button 
+                    className="w-full justify-start"
+                    variant="outline"
+                    onClick={() => setCurrentPage && setCurrentPage('admin-products')}
                   >
                     <Package className="mr-2 h-4 w-4" />
                     {t('manageProducts')}
@@ -1056,9 +1081,18 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
           <DialogHeader>
             <DialogTitle>{locale==='ar' ? 'تفاصيل التاجر (قيد الاعتماد)' : 'Merchant Details (Pending)'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 text-sm">
-            <div className="font-medium text-base">{merchantDialogData.name}</div>
-            <div className="text-muted-foreground">{merchantDialogData.email}</div>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center gap-4">
+              <UserAvatar 
+                src={merchantDialogData.profilePicture} 
+                name={merchantDialogData.name} 
+                size="xl"
+              />
+              <div>
+                <div className="font-medium text-base">{merchantDialogData.name}</div>
+                <div className="text-muted-foreground">{merchantDialogData.email}</div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {merchantDialogData.companyName && (<Badge variant="secondary">{locale==='ar'?'الشركة: ':'Company: '}{merchantDialogData.companyName}</Badge>)}
               {merchantDialogData.city && (<Badge variant="secondary">{merchantDialogData.city}</Badge>)}
@@ -1082,9 +1116,18 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
           <DialogHeader>
             <DialogTitle>{locale==='ar' ? 'تفاصيل العامل (قيد الاعتماد)' : 'Technician Details (Pending)'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 text-sm">
-            <div className="font-medium text-base">{techDialogData.name || (locale==='ar'?'عامل':'Technician')}</div>
-            <div className="text-muted-foreground">{techDialogData.email}</div>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center gap-4">
+              <UserAvatar 
+                src={techDialogData.profilePicture} 
+                name={techDialogData.name} 
+                size="xl"
+              />
+              <div>
+                <div className="font-medium text-base">{techDialogData.name || (locale==='ar'?'عامل':'Technician')}</div>
+                <div className="text-muted-foreground">{techDialogData.email}</div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {techDialogData.city && (<Badge variant="secondary">{techDialogData.city}</Badge>)}
               {techDialogData.country && (<Badge variant="secondary">{techDialogData.country}</Badge>)}

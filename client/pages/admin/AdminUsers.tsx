@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useTranslation } from '../../hooks/useTranslation';
+import UserAvatar from '../../components/UserAvatar';
 import { useEffect, useState, useCallback } from 'react';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 
@@ -50,6 +51,7 @@ export type UserRow = {
   orders?: number;
   totalSpent?: string;
   joinDate?: string;
+  profilePicture?: string;
 };
 
 export default function AdminUsers({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -126,6 +128,7 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
           orders: 0,
           totalSpent: '—',
           joinDate: u.createdAt || '',
+          profilePicture: u.profilePicture || '',
         } as UserRow;
       });
       setUsers(rows);
@@ -309,9 +312,11 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
             {selectedUser && (
               <div className="space-y-4">
                 <div className="flex items-center space-x-4 space-x-reverse">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Users className="h-8 w-8 text-primary" />
-                  </div>
+                  <UserAvatar 
+                    src={selectedUser.profilePicture} 
+                    name={selectedUser.name} 
+                    size="xl"
+                  />
                   <div>
                     <h3 className="font-medium">{selectedUser.name}</h3>
                     <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
@@ -375,9 +380,12 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
               {filteredUsers.map((user) => (
                 <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                      <Users className="h-6 w-6 text-primary" />
-                    </div>
+                    <UserAvatar 
+                      src={user.profilePicture} 
+                      name={user.name} 
+                      size="lg"
+                      className="shrink-0"
+                    />
                     <div className="space-y-1 w-full min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{user.name}</h3>

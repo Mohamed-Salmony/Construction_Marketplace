@@ -13,6 +13,11 @@ import { getVendorMessageCount, getRecentVendorMessages, getCustomerMessageCount
 import { getVendorProjectMessageCount, getVendorProjectRecentMessages, getCustomerProjectMessageCount, getCustomerProjectRecentMessages } from '@/services/projectChat';
 import { listMyNotifications, markNotificationRead, markAllNotificationsRead } from '@/services/notifications';
 import { getConversation } from '@/services/chat';
+import { getAdminPendingNotifications, getAdminPendingCount } from '@/services/adminNotifications';
+import { getVendorNotifications, getVendorNotificationCount } from '@/services/vendorNotifications';
+import { getTechnicianNotifications, getTechnicianNotificationCount } from '@/services/technicianNotifications';
+import { getCustomerNotifications, getCustomerNotificationCount } from '@/services/customerNotifications';
+import { useAdminGuard } from './AdminNavigationGuard';
 
 interface HeaderProps extends Partial<RouteContext> {
   currentPage?: string;
@@ -108,27 +113,26 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
           }
         } catch { /* fall back below */ }
 
-        // Fallback by role (legacy counts)
-        if (role === 'vendor') {
-          const [rentalsCnt, projectCnt] = await Promise.all([
-            getVendorMessageCount(),
-            getVendorProjectMessageCount(),
-          ]);
-          const c1 = rentalsCnt.ok ? Number((rentalsCnt.data as any)?.count || 0) : 0;
-          const c2 = projectCnt.ok ? Number((projectCnt.data as any)?.count || 0) : 0;
-          setVendorMsgCount(c1 + c2);
-        } else if (role === 'customer' || isCustomerRole) {
-          const [rentalsCnt, projectCnt] = await Promise.all([
-            getCustomerMessageCount(),
-            getCustomerProjectMessageCount(),
-          ]);
-          const c1 = rentalsCnt.ok ? Number((rentalsCnt.data as any)?.count || 0) : 0;
-          const c2 = projectCnt.ok ? Number((projectCnt.data as any)?.count || 0) : 0;
-          setVendorMsgCount(c1 + c2);
+        // Fallback by role (using new notification systems)
+        if (role === 'admin') {
+          // For admin, get count of pending items that need approval
+          const count = await getAdminPendingCount();
+          setVendorMsgCount(count);
+        } else if (role === 'vendor' || role === 'merchant') {
+          // For vendors, get count of business notifications (bids, orders, payments, etc.)
+          const count = await getVendorNotificationCount();
+          setVendorMsgCount(count);
         } else if (role === 'worker' || role === 'technician') {
-          // If unread endpoint failed above, set 0 for workers as we cannot infer
-          setVendorMsgCount(0);
-        } else { setVendorMsgCount(0); }
+          // For technicians, get count of job-related notifications
+          const count = await getTechnicianNotificationCount();
+          setVendorMsgCount(count);
+        } else if (role === 'customer' || isCustomerRole) {
+          // For customers, get count of order and project related notifications
+          const count = await getCustomerNotificationCount();
+          setVendorMsgCount(count);
+        } else { 
+          setVendorMsgCount(0); 
+        }
       } catch { /* ignore */ }
     }
     fetchCount();
@@ -173,11 +177,14 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   const [mobileOpen, setMobileOpen] = useState(false);
   const role = (user?.role || '').toString().toLowerCase();
   const isAdmin = role === 'admin';
-  const isVendor = role === 'vendor';
+  const isVendor = role === 'vendor' || role === 'merchant';
   const isWorker = role === 'worker' || role === 'technician';
   const isCustomerRole = !isVendor && !isAdmin && !isWorker && !!user; // treat any other logged-in role as customer
   // Restrict header content on admin pages: only greeting, logout, language, and notifications
   const isRestricted = isAdmin && current.startsWith('admin-');
+
+  // تفعيل حماية الأدمن
+  const { isAdminProtected, isInAdminArea } = useAdminGuard(user, current, setCurrentPage || (() => {}));
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [vendorMsgCount, setVendorMsgCount] = useState<number>(0);
@@ -189,29 +196,51 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   const lastChatTsRef = useRef<number>(0);
   const loadNotifications = async () => {
     try {
-      // Use notifications API and exclude any message-related items
-      const resp = await listMyNotifications();
-      if (resp.ok && (resp.data as any)?.success) {
-        const list = (((resp.data as any).data) || []) as any[];
-        const filtered = list
-          .filter((n:any)=> {
-            const tp = String(n.type || '').toLowerCase();
-            return tp && !tp.includes('message');
-          })
-          .map((n:any)=> ({
-            type: n.type,
-            title: n.title,
-            message: n.message,
-            createdAt: n.createdAt,
-            data: n.data,
-            _id: n._id || n.id,
-            read: !!n.read,
-          }))
-          .sort((a:any,b:any)=> new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 10);
-        setNotifications(filtered);
+      if (isAdmin) {
+        // For admin, show pending items that need approval
+        const adminNotifications = await getAdminPendingNotifications();
+        setNotifications(adminNotifications || []);
+      } else if (isVendor) {
+        // For vendors, show business-related notifications
+        const vendorNotifications = await getVendorNotifications();
+        setNotifications(vendorNotifications || []);
+      } else if (isWorker) {
+        // For technicians, show job-related notifications
+        const technicianNotifications = await getTechnicianNotifications();
+        setNotifications(technicianNotifications || []);
+      } else if (isCustomerRole) {
+        // For customers, show order and project related notifications
+        const customerNotifications = await getCustomerNotifications();
+        setNotifications(customerNotifications || []);
       } else {
-        setNotifications([]);
+        // Fallback for other users - use legacy system
+        try {
+          const resp = await listMyNotifications();
+          if (resp.ok && (resp.data as any)?.success) {
+            const list = (((resp.data as any).data) || []) as any[];
+            const filtered = list
+              .filter((n:any)=> {
+                const tp = String(n.type || '').toLowerCase();
+                return tp && !tp.includes('message');
+              })
+              .map((n:any)=> ({
+                type: n.type,
+                title: n.title,
+                message: n.message,
+                createdAt: n.createdAt,
+                data: n.data,
+                _id: n._id || n.id,
+                read: !!n.read,
+              }))
+              .sort((a:any,b:any)=> new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              .slice(0, 10);
+            setNotifications(filtered);
+          } else {
+            setNotifications([]);
+          }
+        } catch {
+          setNotifications([]);
+        }
       }
     } catch { setNotifications([]); }
   };
@@ -349,6 +378,78 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                               setNotifOpen(false);
                               // Clear the badge count once a notification item is opened
                               setVendorMsgCount(0);
+                              
+                              // Handle admin notifications - navigate to appropriate page
+                              if (isAdmin && n.page) {
+                                if (setCurrentPage) setCurrentPage(n.page);
+                                else {
+                                  const url = new URL(window.location.href);
+                                  url.searchParams.set('page', n.page);
+                                  window.location.href = url.toString();
+                                }
+                                return;
+                              }
+
+                              // Handle vendor notifications - navigate to appropriate page
+                              if ((isVendor || role === 'merchant') && n.page) {
+                                // Store any additional data for the target page
+                                if (n.data) {
+                                  Object.keys(n.data).forEach(key => {
+                                    try {
+                                      localStorage.setItem(`vendor_${key}`, String(n.data[key]));
+                                    } catch {}
+                                  });
+                                }
+                                
+                                if (setCurrentPage) setCurrentPage(n.page);
+                                else {
+                                  const url = new URL(window.location.href);
+                                  url.searchParams.set('page', n.page);
+                                  window.location.href = url.toString();
+                                }
+                                return;
+                              }
+
+                              // Handle technician notifications - navigate to appropriate page
+                              if ((isWorker || role === 'technician') && n.page) {
+                                // Store any additional data for the target page
+                                if (n.data) {
+                                  Object.keys(n.data).forEach(key => {
+                                    try {
+                                      localStorage.setItem(`technician_${key}`, String(n.data[key]));
+                                    } catch {}
+                                  });
+                                }
+                                
+                                if (setCurrentPage) setCurrentPage(n.page);
+                                else {
+                                  const url = new URL(window.location.href);
+                                  url.searchParams.set('page', n.page);
+                                  window.location.href = url.toString();
+                                }
+                                return;
+                              }
+
+                              // Handle customer notifications - navigate to appropriate page
+                              if (isCustomerRole && n.page) {
+                                // Store any additional data for the target page
+                                if (n.data) {
+                                  Object.keys(n.data).forEach(key => {
+                                    try {
+                                      localStorage.setItem(`customer_${key}`, String(n.data[key]));
+                                    } catch {}
+                                  });
+                                }
+                                
+                                if (setCurrentPage) setCurrentPage(n.page);
+                                else {
+                                  const url = new URL(window.location.href);
+                                  url.searchParams.set('page', n.page);
+                                  window.location.href = url.toString();
+                                }
+                                return;
+                              }
+                              
                               // Handle chat.message first using conversationId to open existing chat
                               if (n.type === 'chat.message' && n.conversationId) {
                                 (async () => {
@@ -488,7 +589,36 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                       <div className="p-3 border-t">
                         <Button
                           className="w-full"
-                          onClick={() => { setNotifOpen(false); if (setCurrentPage) setCurrentPage('notifications'); else { if (typeof window!=='undefined'){ try { const url=new URL(window.location.href); url.searchParams.set('page','notifications'); window.location.href=url.toString(); } catch {} } } }}
+                          onClick={() => {
+                            setNotifOpen(false);
+                            
+                            // Different pages for different user types
+                            let targetPage = 'notifications'; // default for customers and technicians
+                            if (isAdmin) {
+                              targetPage = 'admin-dashboard';
+                            } else if (isVendor || role === 'merchant') {
+                              targetPage = 'vendor-dashboard';
+                            } else if (isWorker || role === 'technician') {
+                              targetPage = 'notifications'; // technicians go to notifications page
+                            }
+                            
+                            if (setCurrentPage) {
+                              setCurrentPage(targetPage);
+                            } else {
+                              // Fallback navigation
+                              if (typeof window !== 'undefined') {
+                                try {
+                                  const url = new URL(window.location.href);
+                                  url.searchParams.set('page', targetPage);
+                                  window.location.href = url.toString();
+                                } catch (e) {
+                                  console.error('Navigation error:', e);
+                                  // Direct navigation as last resort
+                                  window.location.href = `/${locale}?page=${targetPage}`;
+                                }
+                              }
+                            }
+                          }}
                         >
                           {locale==='ar' ? 'عرض المزيد' : 'Show more'}
                         </Button>
@@ -496,7 +626,7 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                     </PopoverContent>
                   </Popover>
                 )}
-                {user && (
+                {user && !isAdmin && (
                   <Popover open={chatOpen} onOpenChange={(o)=>{ setChatOpen(o); if (o) loadChats(); }}>
                     <PopoverTrigger asChild>
                       <Button
