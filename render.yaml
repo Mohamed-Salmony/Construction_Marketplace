@@ -41,3 +41,7 @@ services:
         value: 1
       - key: FORCE_COLOR
         value: 0
+      - key: DISABLE_PRERENDERING
+        value: 1
+      - key: SKIP_ENV_VALIDATION
+        value: 1

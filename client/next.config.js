@@ -39,16 +39,8 @@ const nextConfig = {
   
   // Memory and performance optimizations for Render's 512MB limit
   experimental: {
-    // Reduce memory usage
-    memoryBasedWorkerCount: true,
-    // Optimize CSS loading
-    optimizeCss: true,
-    // Reduce bundle size
-    modularizeImports: {
-      'lucide-react': {
-        transform: 'lucide-react/dist/esm/icons/{{member}}',
-      },
-    },
+    // Note: optimizeCss disabled due to critters issues in production
+    // optimizeCss: true,
   },
   
   // Ensure certain ESM-only packages are transpiled for SSR compatibility
@@ -71,10 +63,10 @@ const nextConfig = {
     ignoreDuringBuilds: process.env.NODE_ENV === 'production',
   },
 
-  // Optimize output for production
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // Note: standalone output disabled due to prerendering issues on Render
+  // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   
-  // Bundle analyzer and optimization - simplified to avoid build issues
+  // Simplified webpack config to avoid build issues on Render
   webpack: (config, { dev, isServer }) => {
     // Fix path resolution for production builds
     config.resolve.alias = {
@@ -82,33 +74,15 @@ const nextConfig = {
       '@': require('path').resolve(__dirname),
     };
 
-    // Production optimizations for memory reduction
+    // Simplified production optimizations
     if (!dev && !isServer) {
-      // Reduce chunk size for better memory management
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        minSize: 10000,
-        maxSize: 200000, // Smaller chunks to reduce memory pressure
-        cacheGroups: {
-          default: {
-            minChunks: 1,
-            priority: -20,
-            reuseExistingChunk: true,
-          },
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-            priority: -10,
-            maxSize: 150000, // Keep vendor chunks smaller
-          },
-        },
+      // Basic chunk optimization without complex settings
+      config.optimization = {
+        ...config.optimization,
+        minimize: true,
+        usedExports: true,
+        sideEffects: false,
       };
-
-      // Memory optimization flags
-      config.optimization.minimize = true;
-      config.optimization.usedExports = true;
-      config.optimization.sideEffects = false;
     }
     
     return config;
