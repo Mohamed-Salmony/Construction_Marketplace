@@ -15,6 +15,9 @@ function mapUser(u) {
     companyName: u.companyName || null,
     city: u.city || null,
     country: u.country || null,
+    // Add business fields for merchant cards
+    storeName: u.storeName || u.businessName || u.shopName || null,
+    registryNumber: u.registryNumber || u.commercialRegistryNumber || u.crNumber || null,
   };
 }
 
@@ -124,6 +127,9 @@ export async function adminGetUserById(req, res) {
     taxNumber: u.taxNumber || u.vatNumber || u.taxId || u.tax_id || null,
     profession: u.profession || null,
     iban: u.iban || u.IBAN || u.ibanNumber || null,
+    // Business information for merchants
+    storeName: u.storeName || u.businessName || u.shopName || null,
+    registryNumber: u.registryNumber || u.commercialRegistryNumber || u.crNumber || null,
     registryStart: u.registryStart || u.registryStartDate || u.commercialRegisterStart || null,
     registryEnd: u.registryEnd || u.registryEndDate || u.commercialRegisterEnd || null,
     address: u.address || null,

@@ -1,4 +1,6 @@
 import { api } from '@/lib/api';
+// @ts-ignore - Import optimized cache for memory management
+const { getApiCacheManager } = require('@/lib/optimizedCache');
 
 export type SearchFilterDto = {
   page?: number;
@@ -70,21 +72,65 @@ export async function getProducts(filter: SearchFilterDto = {}) {
   if (filter.sortBy) params.set('SortBy', filter.sortBy);
   if (filter.sortDirection) params.set('SortDescending', String(filter.sortDirection === 'desc'));
   const qs = params.toString();
-  const primary = await api.get<PagedResultDto<ProductDto>>(`/api/Products${qs ? `?${qs}` : ''}`);
+  const url = `/api/Products${qs ? `?${qs}` : ''}`;
+  
+  // Check cache first
+  const cacheManager = getApiCacheManager();
+  const cached = cacheManager.getApiResponse(url);
+  if (cached) {
+    return { ok: true, status: 200, data: cached };
+  }
+  
+  const primary = await api.get<PagedResultDto<ProductDto>>(url);
   if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
-    const alt = await api.get<PagedResultDto<ProductDto>>(`/api/products${qs ? `?${qs}` : ''}`);
+    const altUrl = `/api/products${qs ? `?${qs}` : ''}`;
+    const alt = await api.get<PagedResultDto<ProductDto>>(altUrl);
+    
+    // Cache successful response
+    if (alt.ok && alt.data) {
+      cacheManager.cacheApiResponse(altUrl, alt.data, 2 * 60 * 1000); // 2 minutes for product lists
+    }
+    
     return alt;
   }
+  
+  // Cache successful response
+  if (primary.ok && primary.data) {
+    cacheManager.cacheApiResponse(url, primary.data, 2 * 60 * 1000); // 2 minutes for product lists
+  }
+  
   return primary;
 }
 
 // Featured products for homepage
 export async function getFeaturedProducts() {
-  const primary = await api.get(`/api/Products/featured`);
+  const url = '/api/Products/featured';
+  
+  // Check cache first
+  const cacheManager = getApiCacheManager();
+  const cached = cacheManager.getApiResponse(url);
+  if (cached) {
+    return { ok: true, status: 200, data: cached };
+  }
+  
+  const primary = await api.get(url);
   if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
-    const alt = await api.get(`/api/products/featured`);
+    const altUrl = '/api/products/featured';
+    const alt = await api.get(altUrl);
+    
+    // Cache successful response
+    if (alt.ok && alt.data) {
+      cacheManager.cacheApiResponse(altUrl, alt.data, 10 * 60 * 1000); // 10 minutes for featured
+    }
+    
     return alt;
   }
+  
+  // Cache successful response
+  if (primary.ok && primary.data) {
+    cacheManager.cacheApiResponse(url, primary.data, 10 * 60 * 1000); // 10 minutes for featured
+  }
+  
   return primary;
 }
 
@@ -142,50 +188,55 @@ export function cleanLocalStorageFromNonExistentProducts() {
 export async function getProductById(id: string | number) {
   const idStr = String(id);
   
+  // Initialize cache manager
+  const cacheManager = getApiCacheManager();
+  
   // If we already know this product doesn't exist, return 404 immediately (no API call)
   if (notFoundProductCache.has(idStr)) {
-    // Silent return to avoid console spam
     return { ok: false, status: 404, data: null, error: 'Product not found (cached)' };
   }
   
-  // Check if we have a cached successful result
-  const cached = productCache.get(idStr);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log(`Product ${idStr} loaded from cache`);
-    return { ok: true, status: 200, data: cached.data };
+  // Check optimized cache first
+  const cachedProduct = cacheManager.getProduct(idStr);
+  if (cachedProduct) {
+    return { ok: true, status: 200, data: cachedProduct };
+  }
+  
+  // Check legacy cache for backward compatibility
+  const legacyCached = productCache.get(idStr);
+  if (legacyCached && (Date.now() - legacyCached.timestamp) < CACHE_DURATION) {
+    // Migrate to new cache and return
+    cacheManager.cacheProduct(idStr, legacyCached.data);
+    return { ok: true, status: 200, data: legacyCached.data };
   }
   
   try {
-    // Making API call for product...
     const primary = await api.get<ProductDto>(`/api/Products/${idStr}`);
     
     // If product not found, add to not-found cache permanently
     if (!primary.ok && primary.status === 404) {
-      // Product not found, adding to cache silently
       notFoundProductCache.add(idStr);
       return primary;
     }
     
-    // If successful, cache the result
+    // If successful, cache the result in both systems
     if (primary.ok && primary.data) {
+      cacheManager.cacheProduct(idStr, primary.data);
       productCache.set(idStr, { data: primary.data, timestamp: Date.now() });
-      // Product loaded successfully and cached
       return primary;
     }
     
     // Only try alternative route for other errors (405, 500, etc.)
     if (!primary.ok && primary.status !== 404) {
-      // Primary route failed, trying alternative...
       const alt = await api.get<ProductDto>(`/api/products/${encodeURIComponent(idStr)}`);
       
       // If alternative route also returns 404, cache it
       if (!alt.ok && alt.status === 404) {
-        // Alternative route also returned 404, caching as not found
         notFoundProductCache.add(idStr);
       } else if (alt.ok && alt.data) {
         // Cache successful alternative result
+        cacheManager.cacheProduct(idStr, alt.data);
         productCache.set(idStr, { data: alt.data, timestamp: Date.now() });
-        // Product loaded from alternative route and cached
       }
       
       return alt;
@@ -235,19 +286,63 @@ export type CategoryDto = {
 };
 
 export async function getRootCategories() {
-  const primary = await api.get<CategoryDto[]>(`/api/Categories`);
+  const url = '/api/Categories';
+  
+  // Check cache first
+  const cacheManager = getApiCacheManager();
+  const cached = cacheManager.getCategories();
+  if (cached) {
+    return { ok: true, status: 200, data: cached };
+  }
+  
+  const primary = await api.get<CategoryDto[]>(url);
   if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
     const alt = await api.get<CategoryDto[]>(`/api/categories`);
+    
+    // Cache successful response
+    if (alt.ok && alt.data) {
+      cacheManager.cacheCategories(alt.data);
+    }
+    
     return alt;
   }
+  
+  // Cache successful response
+  if (primary.ok && primary.data) {
+    cacheManager.cacheCategories(primary.data);
+  }
+  
   return primary;
 }
+
 export async function getAllCategories() {
-  const primary = await api.get<CategoryDto[]>(`/api/Categories/all`);
+  const url = '/api/Categories/all';
+  
+  // Check cache first
+  const cacheManager = getApiCacheManager();
+  const cached = cacheManager.getApiResponse(url);
+  if (cached) {
+    return { ok: true, status: 200, data: cached };
+  }
+  
+  const primary = await api.get<CategoryDto[]>(url);
   if (!primary.ok && (primary.status === 404 || primary.status === 405)) {
-    const alt = await api.get<CategoryDto[]>(`/api/categories/all`);
+    const altUrl = '/api/categories/all';
+    const alt = await api.get<CategoryDto[]>(altUrl);
+    
+    // Cache successful response
+    if (alt.ok && alt.data) {
+      cacheManager.cacheApiResponse(altUrl, alt.data, 30 * 60 * 1000); // 30 minutes
+    }
+    
     return alt;
   }
+  
+  // Cache successful response
+  if (primary.ok && primary.data) {
+    cacheManager.cacheApiResponse(url, primary.data, 30 * 60 * 1000); // 30 minutes
+  }
+  
   return primary;
 }
 

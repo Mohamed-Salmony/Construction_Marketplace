@@ -142,6 +142,10 @@ export async function register(dto: RegisterDto) {
       documentFile: 'DocumentFile',
       imageFile: 'ImageFile',
       licenseImage: 'LicenseImage',
+      // New vendor file fields
+      commercialRegistryFile: 'commercialRegistryFile',
+      licenseFile: 'licenseFile',
+      additionalDocumentFile: 'additionalDocumentFile',
       name: 'Name',
     };
     return m[k] || k;

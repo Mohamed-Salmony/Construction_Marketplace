@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema({
   // Vendor/Technician fields
   iban: String,
   taxNumber: String,
+  registryNumber: String, // رقم السجل التجاري
+  storeName: String, // اسم المتجر
+  commercialRegistryUrl: String, // السجل التجاري
+  licenseUrl: String, // الرخصة  
+  additionalDocumentUrl: String, // مستند إضافي
   registryStart: String,
   registryEnd: String,
   profession: String, // e.g., electrician, plumber

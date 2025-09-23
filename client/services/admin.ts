@@ -112,6 +112,14 @@ export async function getUsers(params?: { role?: string; status?: string }) {
   return api.get<{ success: boolean; items: AdminUser[] }>(path, { auth: true });
 }
 
+// Get full user details by ID (for viewing complete profile in admin panel)
+export async function getUserById(userId: string) {
+  return api.get<{ success: boolean; item: AdminUser & any }>(
+    `/api/Admin/users/${userId}`,
+    { auth: true }
+  );
+}
+
 // Project catalogs (types, materials, price rules, currency)
 export async function getAdminOption(key: string) {
   return api.get<{ key: string; value: string }>(`/api/AdminOptions/${encodeURIComponent(key)}`, { auth: true });
