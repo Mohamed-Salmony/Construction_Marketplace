@@ -134,16 +134,27 @@ export async function apiFetch<T>(path: string, options?: {
 
   const method = options?.method || 'GET';
 
+  // Add timeout for requests (60 seconds for registration, 30 for others)
+  const isRegistration = path.includes('/register') || path.includes('/Auth/register');
+  const timeoutMs = isRegistration ? 60000 : 30000;
+  
+  const controller = new AbortController();
+  let timeoutId: NodeJS.Timeout | undefined;
+  
   try {
-    // Add timeout for requests (30 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    timeoutId = setTimeout(() => {
+      console.warn(`[api] Request timeout after ${timeoutMs}ms for ${path}`);
+      controller.abort();
+    }, timeoutMs);
+    
+    // Use provided signal if available, otherwise use our controller
+    const finalSignal = options?.signal || controller.signal;
     
     const response = await fetch(url, { 
       method, 
       body: isForm ? options?.body : JSON.stringify(options?.body), 
       headers, 
-      signal: options?.signal || controller.signal,
+      signal: finalSignal,
       credentials: useCredentials ? 'include' : undefined, 
       cache: options?.cache 
     });
@@ -177,13 +188,20 @@ export async function apiFetch<T>(path: string, options?: {
       error: !response.ok ? { status: response.status, message: response.statusText || 'Request failed' } : undefined,
     };
   } catch (error: any) {
+    // Make sure to clear timeout in error case too
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    
     // Enhanced error logging for production debugging
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
       console.error('[API Network Error]', error.message, url);
     }
     
-    // Log error to error handler
-    handleApiError(error, `API: ${method} ${url}`);
+    // Only log to error handler if it's not a timeout abort
+    if (error.name !== 'AbortError' || !error.message.includes('timeout')) {
+      handleApiError(error, `API: ${method} ${url}`);
+    }
     
     // Return proper API error response format
     return {
@@ -192,7 +210,9 @@ export async function apiFetch<T>(path: string, options?: {
       status: error.name === 'AbortError' ? 408 : 0,
       error: {
         status: error.name === 'AbortError' ? 408 : 0,
-        message: error.message || 'Network error',
+        message: error.name === 'AbortError' && error.message.includes('timeout') 
+          ? `Request timeout after ${timeoutMs || 30000}ms` 
+          : error.message || 'Network error',
         name: error.name
       }
     };

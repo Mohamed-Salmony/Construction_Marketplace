@@ -163,6 +163,9 @@ export default function Login({ setCurrentPage, setUser, returnTo, setReturnTo, 
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-form-type="other"
                         className={cn('h-12 rounded-xl text-base', isAr ? 'pr-11 text-right' : 'pl-11')}
                       />
                       <Mail className={cn('absolute top-1/2 -translate-y-1/2 size-4 text-muted-foreground', isAr ? 'right-3' : 'left-3')} />
@@ -177,6 +180,9 @@ export default function Login({ setCurrentPage, setUser, returnTo, setReturnTo, 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-form-type="other"
                         className={cn('h-12 rounded-xl text-base pl-11 pr-11', isAr && 'text-right')}
                       />
                       <Lock className={cn('absolute top-1/2 -translate-y-1/2 size-4 text-muted-foreground', isAr ? 'right-3' : 'left-3')} />

@@ -143,6 +143,13 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Check if vendor is verified first
+      if (!context?.user?.isVerified) {
+        (context as any)?.hideLoading?.();
+        setLoading(false);
+        return;
+      }
+
       // Use global loader for initial dashboard hydration (essentials only)
       (context as any)?.showLoading?.(locale==='ar' ? 'جاري تحميل لوحة التحكم...' : 'Loading dashboard...');
 
@@ -348,6 +355,31 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
   };
 
   // Removed stock status color helper - section deleted
+
+  // Show verification message if not verified
+  if (!context?.user?.isVerified && !loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        <Header setCurrentPage={setCurrentPage} cartItems={context?.cartItems} user={context?.user} />
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-md mx-auto text-center">
+            <CardContent className="p-8">
+              <XCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold mb-2">{locale === 'ar' ? 'حساب غير موثق' : 'Account Not Verified'}</h2>
+              <p className="text-muted-foreground mb-4">
+                {locale === 'ar' 
+                  ? 'يجب توثيق حسابك من قبل الإدارة لتتمكن من الوصول إلى لوحة التحكم'
+                  : 'Your account must be verified by admin to access the dashboard'}
+              </p>
+              <Button onClick={() => setCurrentPage?.('home')} variant="outline">
+                {locale === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

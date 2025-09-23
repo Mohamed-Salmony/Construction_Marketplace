@@ -312,7 +312,10 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                 {isWorker ? (
                   <button onClick={() => go('technician-services')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'الخدمات' : 'Services'}</button>
                 ) : (
-                  <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
+                  // Only show projects if user is not vendor or if vendor is verified
+                  (!user || user.role !== 'vendor' || user.isVerified) && (
+                    <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
+                  )
                 )}
                 {/* Rentals: show for all logged-in users, including technicians */}
                 {user && (

@@ -60,19 +60,36 @@ class GlobalErrorHandler {
 
       // Handle console errors
       const originalConsoleError = console.error;
+      (console as any)._originalError = originalConsoleError;
+      
       console.error = (...args: any[]) => {
-        const message = args.map(arg => 
-          typeof arg === 'string' ? arg : JSON.stringify(arg, null, 2)
-        ).join(' ');
+        // Avoid infinite loop by checking if we're already in error handling
+        if ((console as any)._inErrorHandler) {
+          originalConsoleError.apply(console, args);
+          return;
+        }
 
-        this.logError({
-          message: `Console Error: ${message}`,
-          component: 'Console',
-          action: 'console.error',
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          url: window.location.href
-        });
+        (console as any)._inErrorHandler = true;
+        
+        try {
+          const message = args.map(arg => 
+            typeof arg === 'string' ? arg : JSON.stringify(arg, null, 2)
+          ).join(' ');
+
+          this.logError({
+            message: `Console Error: ${message}`,
+            component: 'Console',
+            action: 'console.error',
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: window.location.href
+          });
+        } catch (e) {
+          // If there's an error in error handling, just use original console
+          originalConsoleError('Error in error handler:', e);
+        } finally {
+          (console as any)._inErrorHandler = false;
+        }
 
         // Still call the original console.error
         originalConsoleError.apply(console, args);
@@ -89,16 +106,18 @@ class GlobalErrorHandler {
       this.errorQueue = this.errorQueue.slice(-this.maxErrors);
     }
 
-    // Log to console for development
+    // Log to console for development using original console methods
     if (process.env.NODE_ENV === 'development') {
-      console.group('🚨 Application Error');
-      console.error('Message:', error.message);
-      console.error('Component:', error.component);
-      console.error('Action:', error.action);
-      console.error('Stack:', error.stack);
-      console.error('URL:', error.url);
-      console.error('Timestamp:', error.timestamp);
-      console.groupEnd();
+      // Use original console methods to avoid infinite loop
+      const originalError = (console as any)._originalError || console.log;
+      originalError('🚨 Application Error:', {
+        message: error.message,
+        component: error.component,
+        action: error.action,
+        stack: error.stack,
+        url: error.url,
+        timestamp: error.timestamp
+      });
     }
 
     // Store in localStorage for debugging

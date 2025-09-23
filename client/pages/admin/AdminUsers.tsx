@@ -52,6 +52,13 @@ export type UserRow = {
   totalSpent?: string;
   joinDate?: string;
   profilePicture?: string;
+  // New vendor fields
+  registryNumber?: string;
+  storeName?: string;
+  taxNumber?: string;
+  commercialRegistryUrl?: string;
+  licenseUrl?: string;
+  additionalDocumentUrl?: string;
 };
 
 export default function AdminUsers({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -129,6 +136,13 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
           totalSpent: '—',
           joinDate: u.createdAt || '',
           profilePicture: u.profilePicture || '',
+          // Add new vendor fields
+          registryNumber: u.registryNumber || '',
+          storeName: u.storeName || '',
+          taxNumber: u.taxNumber || '',
+          commercialRegistryUrl: u.commercialRegistryUrl || '',
+          licenseUrl: u.licenseUrl || '',
+          additionalDocumentUrl: u.additionalDocumentUrl || '',
         } as UserRow;
       });
       setUsers(rows);
@@ -511,6 +525,35 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
                 <Label>{t('totalSpentLabel')}</Label>
                 <Input value={form.totalSpent || '0 ر.س'} onChange={(e) => setForm(f => ({ ...f, totalSpent: e.target.value }))} />
               </div>
+              {/* Vendor-specific fields */}
+              {form.role === 'vendor' && (
+                <>
+                  <div>
+                    <Label>{isArabic ? 'رقم السجل التجاري' : 'Registry Number'}</Label>
+                    <Input value={form.registryNumber || ''} onChange={(e) => setForm(f => ({ ...f, registryNumber: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'اسم المتجر' : 'Store Name'}</Label>
+                    <Input value={form.storeName || ''} onChange={(e) => setForm(f => ({ ...f, storeName: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'الرقم الضريبي' : 'Tax Number'}</Label>
+                    <Input value={form.taxNumber || ''} onChange={(e) => setForm(f => ({ ...f, taxNumber: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'السجل التجاري' : 'Commercial Registry'}</Label>
+                    <Input value={form.commercialRegistryUrl || ''} readOnly className="bg-muted" placeholder={isArabic ? 'رابط الملف' : 'File URL'} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'الرخصة' : 'License'}</Label>
+                    <Input value={form.licenseUrl || ''} readOnly className="bg-muted" placeholder={isArabic ? 'رابط الملف' : 'File URL'} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'مستند إضافي' : 'Additional Document'}</Label>
+                    <Input value={form.additionalDocumentUrl || ''} readOnly className="bg-muted" placeholder={isArabic ? 'رابط الملف' : 'File URL'} />
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => { setFormOpen(false); setEditMode(null); }}>

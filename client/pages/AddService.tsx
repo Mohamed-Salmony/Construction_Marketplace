@@ -40,9 +40,37 @@ interface TechnicianSpecialty {
   dailyRate: number;
 }
 
-export default function AddService({ setCurrentPage, ...rest }: AddServiceProps) {
+export default function AddService({ setCurrentPage, user, ...rest }: AddServiceProps) {
   const { t, locale } = useTranslation();
   const currency = locale === "ar" ? "ر.س" : "SAR";
+
+  // Check if technician is verified first
+  if (user?.role === 'worker' && !user?.isVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        <Header setCurrentPage={setCurrentPage} user={user} {...rest} />
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-md mx-auto text-center">
+            <CardContent className="p-8">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h2 className="text-xl font-bold mb-2">{locale === 'ar' ? 'حساب غير موثق' : 'Account Not Verified'}</h2>
+              <p className="text-muted-foreground mb-4">
+                {locale === 'ar' 
+                  ? 'يجب توثيق حسابك من قبل الإدارة لتتمكن من تقديم الخدمات'
+                  : 'Your account must be verified by admin to provide services'}
+              </p>
+              <Button onClick={() => setCurrentPage?.('home')} variant="outline">
+                {locale === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <Footer setCurrentPage={setCurrentPage!} />
+      </div>
+    );
+  }
 
   const [stype, setStype] = useState<string>("");
   const [techOptions, setTechOptions] = useState<ServiceTypeItem[]>([]);

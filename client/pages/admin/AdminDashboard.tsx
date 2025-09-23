@@ -28,7 +28,7 @@ import UserAvatar from '../../components/UserAvatar';
 // useStableCallback removed to avoid build issues
 import React from 'react';
 import { toastSuccess, toastError } from '../../utils/alerts';
-import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser, approveService as approveServiceAdmin, rejectService as rejectServiceAdmin } from '@/services/admin';
+import { getPendingMerchants, approveMerchant, suspendMerchant, getUsers, getPendingProducts, approveProduct, rejectProduct, getAdminAnalyticsOverview, getAdminOption, setAdminOption, approveTechnician, suspendTechnician, AdminUser, approveService as approveServiceAdmin, rejectService as rejectServiceAdmin, getUserById } from '@/services/admin';
 import { getAdminPendingServices } from '@/services/services';
 import { getPromoCodes } from '@/services/promoCodes';
 
@@ -55,8 +55,10 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   const [productDialogData, setProductDialogData] = React.useState<any | null>(null);
   const [merchantDialogOpen, setMerchantDialogOpen] = React.useState(false);
   const [merchantDialogData, setMerchantDialogData] = React.useState<AdminUser | null>(null);
+  const [merchantDialogLoading, setMerchantDialogLoading] = React.useState(false);
   const [techDialogOpen, setTechDialogOpen] = React.useState(false);
   const [techDialogData, setTechDialogData] = React.useState<AdminUser | null>(null);
+  const [techDialogLoading, setTechDialogLoading] = React.useState(false);
 
   const [stats, setStats] = React.useState({ totalUsers: 0, activeVendors: 0, technicians: 0, pendingCount: 0 });
   const [growthPct, setGrowthPct] = React.useState<{ customers: number; merchants: number; technicians: number }>({ customers: 0, merchants: 0, technicians: 0 });
@@ -77,13 +79,11 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
     // Safety timer declared outside try so we can clear in finally
     let autoHideTimer: any = null;
     try {
-      // Use global loading overlay for consistent UX
-      (context as any)?.showLoading?.(isAr ? 'جاري تحميل البيانات...' : 'Loading data...');
       // Auto-hide the overlay as a safety net; we will also hide explicitly in finally
       try {
         autoHideTimer = setTimeout(() => {
           try { (context as any)?.hideLoading?.(); } catch {}
-        }, 600);
+        }, 10000); // Increased timeout to 10 seconds
       } catch {}
 
       const [mer, srv, prod, usersAll, usersActiveVendors, usersTech, overview, c1, c2, c3, c4, promos, qact] = await Promise.all([
@@ -352,6 +352,36 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
     } 
   };
 
+  const doApproveTech = async (id: string) => { 
+    try { 
+      const r = await approveTechnician(String(id)); 
+      if (r.ok) { 
+        toastSuccess(isAr? 'تم اعتماد الفني':'Technician approved', isAr); 
+        await loadAll(); 
+      } else {
+        toastError(isAr? 'فشل اعتماد الفني':'Failed to approve technician', isAr);
+      }
+    } catch (error) { 
+      console.error('Error approving technician:', error);
+      toastError(isAr? 'فشل اعتماد الفني':'Failed to approve technician', isAr);
+    } 
+  };
+
+  const doSuspendTech = async (id: string) => { 
+    try { 
+      const r = await suspendTechnician(String(id)); 
+      if (r.ok) { 
+        toastSuccess(isAr? 'تم إيقاف الفني':'Technician suspended', isAr); 
+        await loadAll(); 
+      } else {
+        toastError(isAr? 'فشل إيقاف الفني':'Failed to suspend technician', isAr);
+      }
+    } catch (error) { 
+      console.error('Error suspending technician:', error);
+      toastError(isAr? 'فشل إيقاف الفني':'Failed to suspend technician', isAr);
+    } 
+  };
+
   const openProductDetails = async (id: string) => {
     try {
       setProductDialogOpen(true);
@@ -367,14 +397,56 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   };
 
   // Handlers for viewing user details
-  const openMerchantDetails = (m: AdminUser) => {
-    setMerchantDialogData(m);
-    setMerchantDialogOpen(true);
+  const openMerchantDetails = async (m: AdminUser) => {
+    try {
+      setMerchantDialogOpen(true);
+      setMerchantDialogLoading(true);
+      setMerchantDialogData(null);
+      
+      const result = await getUserById(String(m.id));
+      
+      if (result.ok && result.data && result.data.item) {
+        setMerchantDialogData(result.data.item as any);
+      } else {
+        console.error('Failed to fetch merchant details:', result);
+        toastError(isAr ? 'فشل جلب تفاصيل التاجر' : 'Failed to fetch merchant details', isAr);
+        // Fallback to basic data
+        setMerchantDialogData(m);
+      }
+    } catch (error) {
+      console.error('Error fetching merchant details:', error);
+      toastError(isAr ? 'فشل جلب تفاصيل التاجر' : 'Failed to fetch merchant details', isAr);
+      // Fallback to basic data
+      setMerchantDialogData(m);
+    } finally {
+      setMerchantDialogLoading(false);
+    }
   };
 
-  const openTechDetails = (u: AdminUser) => {
-    setTechDialogData(u);
-    setTechDialogOpen(true);
+  const openTechDetails = async (u: AdminUser) => {
+    try {
+      setTechDialogOpen(true);
+      setTechDialogLoading(true);
+      setTechDialogData(null);
+      
+      const result = await getUserById(String(u.id));
+      
+      if (result.ok && result.data && result.data.item) {
+        setTechDialogData(result.data.item as any);
+      } else {
+        console.error('Failed to fetch technician details:', result);
+        toastError(isAr ? 'فشل جلب تفاصيل الفني' : 'Failed to fetch technician details', isAr);
+        // Fallback to basic data
+        setTechDialogData(u);
+      }
+    } catch (error) {
+      console.error('Error fetching technician details:', error);
+      toastError(isAr ? 'فشل جلب تفاصيل الفني' : 'Failed to fetch technician details', isAr);
+      // Fallback to basic data
+      setTechDialogData(u);
+    } finally {
+      setTechDialogLoading(false);
+    }
   };
 
   return (
@@ -457,13 +529,17 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                     <div>
                       <p className="font-medium text-sm">{m.name} ({m.email})</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <Badge variant="secondary">{t('vendor')}</Badge>
-                        <Badge variant="secondary">{m.companyName || 'N/A'}</Badge>
+                        <Badge variant="secondary">{isAr ? 'بائع' : 'Vendor'}</Badge>
+                        <Badge variant="secondary">
+                          {/* Use name as temporary store name until backend is restarted */}
+                          {(m as any)?.storeName || `${m.name} (متجر)` || (isAr ? 'لا يوجد اسم متجر' : 'No store name')}
+                        </Badge>
+                        {m.createdAt && (<span className="text-xs text-muted-foreground">{isAr ? 'انضم في' : 'Joined'}: {new Date(m.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}</span>)}
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openMerchantDetails(m)}>
+                    <Button size="sm" variant="outline" onClick={() => openMerchantDetails(m as any)}>
                       {locale==='ar' ? 'عرض' : 'View'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => doApproveMerchant(m.id)}>
@@ -528,10 +604,10 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                     <Button size="sm" variant="outline" onClick={() => openTechDetails(u)}>
                       {locale==='ar' ? 'عرض' : 'View'}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => approveTechnician(String(u.id))}>
+                    <Button size="sm" variant="outline" onClick={() => doApproveTech(String(u.id))}>
                       <CheckCircle className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => suspendTechnician(String(u.id))}>
+                    <Button size="sm" variant="outline" onClick={() => doSuspendTech(String(u.id))}>
                       <Ban className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1076,12 +1152,21 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
 
     {/* Merchant Details Dialog */}
     <Dialog open={merchantDialogOpen} onOpenChange={(o)=> { if (!o) { setMerchantDialogOpen(false); setMerchantDialogData(null); } }}>
-      {merchantDialogOpen && merchantDialogData && (
-        <DialogContent className="max-w-xl bg-white dark:bg-zinc-900">
+      {merchantDialogOpen && (
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-white dark:bg-zinc-900">
           <DialogHeader>
             <DialogTitle>{locale==='ar' ? 'تفاصيل التاجر (قيد الاعتماد)' : 'Merchant Details (Pending)'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 text-sm">
+          
+          {merchantDialogLoading ? (
+            <div className="py-8 text-center">
+              <div className="animate-spin mx-auto mb-4 h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              <p className="text-muted-foreground">{locale==='ar' ? 'جاري جلب التفاصيل...' : 'Loading details...'}</p>
+            </div>
+          ) : merchantDialogData ? (
+            <>
+          <div className="space-y-6 text-sm">
+            {/* Basic Info */}
             <div className="flex items-center gap-4">
               <UserAvatar 
                 src={merchantDialogData.profilePicture} 
@@ -1089,34 +1174,209 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                 size="xl"
               />
               <div>
-                <div className="font-medium text-base">{merchantDialogData.name}</div>
+                <div className="font-medium text-base">{merchantDialogData.name || (isAr ? 'غير محدد' : 'Not specified')}</div>
                 <div className="text-muted-foreground">{merchantDialogData.email}</div>
+                <div className="text-xs text-muted-foreground mt-1">{isAr ? 'بائع' : 'Vendor'}</div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {merchantDialogData.companyName && (<Badge variant="secondary">{locale==='ar'?'الشركة: ':'Company: '}{merchantDialogData.companyName}</Badge>)}
-              {merchantDialogData.city && (<Badge variant="secondary">{merchantDialogData.city}</Badge>)}
-              {merchantDialogData.country && (<Badge variant="secondary">{merchantDialogData.country}</Badge>)}
-              {merchantDialogData.createdAt && (<Badge variant="secondary">{locale==='ar'?'تاريخ التسجيل: ':'Joined: '}{new Date(merchantDialogData.createdAt).toLocaleString(locale==='ar'?'ar-EG':'en-US')}</Badge>)}
+
+            {/* Personal Details */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <span className="font-medium">{isAr ? 'الاسم الأول:' : 'First Name:'}</span>
+                <p className="text-muted-foreground">{(merchantDialogData as any).firstName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'الاسم الأوسط:' : 'Middle Name:'}</span>
+                <p className="text-muted-foreground">{(merchantDialogData as any).middleName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'الاسم الأخير:' : 'Last Name:'}</span>
+                <p className="text-muted-foreground">{(merchantDialogData as any).lastName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'رقم الهاتف:' : 'Phone:'}</span>
+                <p className="text-muted-foreground">{(merchantDialogData as any).phoneNumber || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'هاتف ثانوي:' : 'Secondary Phone:'}</span>
+                <p className="text-muted-foreground">{(merchantDialogData as any).phoneSecondary || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'تاريخ الميلاد:' : 'Date of Birth:'}</span>
+                <p className="text-muted-foreground">{(merchantDialogData as any).dateOfBirth ? new Date((merchantDialogData as any).dateOfBirth).toLocaleDateString(isAr ? 'ar-EG' : 'en-US') : (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
             </div>
-            <div className="flex gap-2 justify-end pt-2">
+
+            {/* Business Details */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">{isAr ? 'تفاصيل العمل' : 'Business Details'}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <span className="font-medium">{isAr ? 'اسم المتجر:' : 'Store Name:'}</span>
+                  <p className="text-muted-foreground">
+                    {(merchantDialogData as any).storeName || 
+                     (merchantDialogData as any).companyName || 
+                     (isAr ? 'غير محدد' : 'Not specified')}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'رقم السجل التجاري:' : 'Registry Number:'}</span>
+                  <p className="text-muted-foreground">
+                    {(merchantDialogData as any).registryNumber || 
+                     (isAr ? 'غير محدد' : 'Not specified')}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'الرقم الضريبي:' : 'Tax Number:'}</span>
+                  <p className="text-muted-foreground">{(merchantDialogData as any).taxNumber || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">{isAr ? 'العنوان' : 'Address'}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className="font-medium">{isAr ? 'رقم المبنى:' : 'Building Number:'}</span>
+                  <p className="text-muted-foreground">{(merchantDialogData as any).buildingNumber || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'الشارع:' : 'Street:'}</span>
+                  <p className="text-muted-foreground">{(merchantDialogData as any).streetName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'المدينة:' : 'City:'}</span>
+                  <p className="text-muted-foreground">{merchantDialogData.city || (merchantDialogData as any).cityName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'الرمز البريدي:' : 'Postal Code:'}</span>
+                  <p className="text-muted-foreground">{(merchantDialogData as any).postalCode || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Uploaded Documents */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">{isAr ? 'المستندات المرفوعة' : 'Uploaded Documents'}</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(merchantDialogData as any).documentUrl && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'مستند الهوية:' : 'ID Document:'}</span>
+                    <a 
+                      href={(merchantDialogData as any).documentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الملف' : 'View File'}
+                    </a>
+                  </div>
+                )}
+                {(merchantDialogData as any).licenseImageUrl && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'صورة الرخصة:' : 'License Image:'}</span>
+                    <a 
+                      href={(merchantDialogData as any).licenseImageUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الصورة' : 'View Image'}
+                    </a>
+                  </div>
+                )}
+                {(merchantDialogData as any).profileImageUrl && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'الصورة الشخصية:' : 'Profile Image:'}</span>
+                    <a 
+                      href={(merchantDialogData as any).profileImageUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الصورة' : 'View Image'}
+                    </a>
+                  </div>
+                )}
+                {(merchantDialogData as any).imageUrl && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'صورة:' : 'Image:'}</span>
+                    <a 
+                      href={(merchantDialogData as any).imageUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الصورة' : 'View Image'}
+                    </a>
+                  </div>
+                )}
+                {(merchantDialogData as any).documents && Array.isArray((merchantDialogData as any).documents) && (merchantDialogData as any).documents.length > 0 && (
+                  (merchantDialogData as any).documents.map((doc: any, idx: number) => (
+                    <div key={idx}>
+                      <span className="font-medium block mb-2">{isAr ? `مستند ${idx + 1}:` : `Document ${idx + 1}:`}</span>
+                      <a 
+                        href={doc.url || doc} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline text-sm"
+                      >
+                        {isAr ? 'عرض الملف' : 'View File'}
+                      </a>
+                    </div>
+                  ))
+                )}
+                {!(merchantDialogData as any).documentUrl && !(merchantDialogData as any).licenseImageUrl && !(merchantDialogData as any).profileImageUrl && !(merchantDialogData as any).imageUrl && (!(merchantDialogData as any).documents || (Array.isArray((merchantDialogData as any).documents) && (merchantDialogData as any).documents.length === 0)) && (
+                  <div className="col-span-3">
+                    <p className="text-muted-foreground">{isAr ? 'لا توجد مستندات مرفوعة' : 'No documents uploaded'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Registration Info */}
+            <div className="border-t pt-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{isAr ? 'حالة التوثيق:' : 'Verification:'} {merchantDialogData.isVerified ? (isAr ? 'موثق' : 'Verified') : (isAr ? 'غير موثق' : 'Not Verified')}</Badge>
+                <Badge variant="secondary">{isAr ? 'حالة النشاط:' : 'Status:'} {merchantDialogData.isActive ? (isAr ? 'نشط' : 'Active') : (isAr ? 'غير نشط' : 'Inactive')}</Badge>
+                {merchantDialogData.createdAt && (
+                  <Badge variant="outline">{isAr ? 'تاريخ التسجيل:' : 'Joined:'} {new Date(merchantDialogData.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US')}</Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4 border-t">
               <Button variant="outline" onClick={()=> setMerchantDialogOpen(false)}>{locale==='ar'?'إغلاق':'Close'}</Button>
               <Button onClick={()=> { setMerchantDialogOpen(false); void doApproveMerchant(String(merchantDialogData.id)); }}>{locale==='ar'?'اعتماد':'Approve'}</Button>
               <Button variant="destructive" onClick={()=> { setMerchantDialogOpen(false); void doSuspendMerchant(String(merchantDialogData.id)); }}>{locale==='ar'?'رفض':'Reject'}</Button>
             </div>
           </div>
+          </>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">{locale==='ar' ? 'تعذر جلب التفاصيل' : 'Failed to load details'}</div>
+          )}
         </DialogContent>
       )}
     </Dialog>
 
     {/* Technician Details Dialog */}
     <Dialog open={techDialogOpen} onOpenChange={(o)=> { if (!o) { setTechDialogOpen(false); setTechDialogData(null); } }}>
-      {techDialogOpen && techDialogData && (
-        <DialogContent className="max-w-xl bg-white dark:bg-zinc-900">
+      {techDialogOpen && (
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-white dark:bg-zinc-900">
           <DialogHeader>
-            <DialogTitle>{locale==='ar' ? 'تفاصيل العامل (قيد الاعتماد)' : 'Technician Details (Pending)'}</DialogTitle>
+            <DialogTitle>{locale==='ar' ? 'تفاصيل الفني (قيد الاعتماد)' : 'Technician Details (Pending)'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 text-sm">
+          
+          {techDialogLoading ? (
+            <div className="py-8 text-center">
+              <div className="animate-spin mx-auto mb-4 h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              <p className="text-muted-foreground">{locale==='ar' ? 'جاري جلب التفاصيل...' : 'Loading details...'}</p>
+            </div>
+          ) : techDialogData ? (
+            <div className="space-y-6 text-sm">
+            {/* Basic Info */}
             <div className="flex items-center gap-4">
               <UserAvatar 
                 src={techDialogData.profilePicture} 
@@ -1124,21 +1384,134 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                 size="xl"
               />
               <div>
-                <div className="font-medium text-base">{techDialogData.name || (locale==='ar'?'عامل':'Technician')}</div>
+                <div className="font-medium text-base">{techDialogData.name || (locale==='ar'?'فني':'Technician')}</div>
                 <div className="text-muted-foreground">{techDialogData.email}</div>
+                <div className="text-xs text-muted-foreground mt-1">{isAr ? 'فني' : 'Technician'}</div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {techDialogData.city && (<Badge variant="secondary">{techDialogData.city}</Badge>)}
-              {techDialogData.country && (<Badge variant="secondary">{techDialogData.country}</Badge>)}
-              {techDialogData.createdAt && (<Badge variant="secondary">{locale==='ar'?'تاريخ التسجيل: ':'Joined: '}{new Date(techDialogData.createdAt).toLocaleString(locale==='ar'?'ar-EG':'en-US')}</Badge>)}
+
+            {/* Personal Details */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <span className="font-medium">{isAr ? 'الاسم الأول:' : 'First Name:'}</span>
+                <p className="text-muted-foreground">{(techDialogData as any).firstName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'الاسم الأوسط:' : 'Middle Name:'}</span>
+                <p className="text-muted-foreground">{(techDialogData as any).middleName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'الاسم الأخير:' : 'Last Name:'}</span>
+                <p className="text-muted-foreground">{(techDialogData as any).lastName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'رقم الهاتف:' : 'Phone:'}</span>
+                <p className="text-muted-foreground">{(techDialogData as any).phoneNumber || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'تاريخ الميلاد:' : 'Date of Birth:'}</span>
+                <p className="text-muted-foreground">{(techDialogData as any).dateOfBirth ? new Date((techDialogData as any).dateOfBirth).toLocaleDateString(isAr ? 'ar-EG' : 'en-US') : (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
+              <div>
+                <span className="font-medium">{isAr ? 'المهنة:' : 'Profession:'}</span>
+                <p className="text-muted-foreground">{(techDialogData as any).profession || (isAr ? 'غير محدد' : 'Not specified')}</p>
+              </div>
             </div>
-            <div className="flex gap-2 justify-end pt-2">
+
+            {/* Address */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">{isAr ? 'العنوان' : 'Address'}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className="font-medium">{isAr ? 'رقم المبنى:' : 'Building Number:'}</span>
+                  <p className="text-muted-foreground">{(techDialogData as any).buildingNumber || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'الشارع:' : 'Street:'}</span>
+                  <p className="text-muted-foreground">{(techDialogData as any).streetName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'المدينة:' : 'City:'}</span>
+                  <p className="text-muted-foreground">{techDialogData.city || (techDialogData as any).cityName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+                <div>
+                  <span className="font-medium">{isAr ? 'الرمز البريدي:' : 'Postal Code:'}</span>
+                  <p className="text-muted-foreground">{(techDialogData as any).postalCode || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Documents */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">{isAr ? 'المستندات المرفوعة' : 'Uploaded Documents'}</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(techDialogData as any).documentUrl && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'مستند الهوية:' : 'ID Document:'}</span>
+                    <a 
+                      href={(techDialogData as any).documentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الملف' : 'View File'}
+                    </a>
+                  </div>
+                )}
+                {(techDialogData as any).imageUrl && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'صورة شخصية:' : 'Profile Image:'}</span>
+                    <a 
+                      href={(techDialogData as any).imageUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الصورة' : 'View Image'}
+                    </a>
+                  </div>
+                )}
+                {(techDialogData as any).licenseImage && (
+                  <div>
+                    <span className="font-medium block mb-2">{isAr ? 'رخصة المهنة:' : 'Professional License:'}</span>
+                    <a 
+                      href={(techDialogData as any).licenseImage} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      {isAr ? 'عرض الملف' : 'View File'}
+                    </a>
+                  </div>
+                )}
+                {!(techDialogData as any).documentUrl && !(techDialogData as any).imageUrl && !(techDialogData as any).licenseImage && (
+                  <div className="col-span-3">
+                    <p className="text-muted-foreground">{isAr ? 'لا توجد مستندات مرفوعة' : 'No documents uploaded'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Registration Info */}
+            <div className="border-t pt-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{isAr ? 'حالة التوثيق:' : 'Verification:'} {techDialogData.isVerified ? (isAr ? 'موثق' : 'Verified') : (isAr ? 'غير موثق' : 'Not Verified')}</Badge>
+                <Badge variant="secondary">{isAr ? 'حالة النشاط:' : 'Status:'} {techDialogData.isActive ? (isAr ? 'نشط' : 'Active') : (isAr ? 'غير نشط' : 'Inactive')}</Badge>
+                {techDialogData.createdAt && (
+                  <Badge variant="outline">{isAr ? 'تاريخ التسجيل:' : 'Joined:'} {new Date(techDialogData.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US')}</Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4 border-t">
               <Button variant="outline" onClick={()=> setTechDialogOpen(false)}>{locale==='ar'?'إغلاق':'Close'}</Button>
-              <Button onClick={()=> { setTechDialogOpen(false); void approveTechnician(String(techDialogData.id)); }}>{locale==='ar'?'اعتماد':'Approve'}</Button>
-              <Button variant="destructive" onClick={()=> { setTechDialogOpen(false); void suspendTechnician(String(techDialogData.id)); }}>{locale==='ar'?'رفض':'Reject'}</Button>
+              <Button onClick={()=> { setTechDialogOpen(false); void doApproveTech(String(techDialogData.id)); }}>{locale==='ar'?'اعتماد':'Approve'}</Button>
+              <Button variant="destructive" onClick={()=> { setTechDialogOpen(false); void doSuspendTech(String(techDialogData.id)); }}>{locale==='ar'?'رفض':'Reject'}</Button>
             </div>
           </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">{locale==='ar' ? 'تعذر جلب التفاصيل' : 'Failed to load details'}</div>
+          )}
         </DialogContent>
       )}
     </Dialog>
