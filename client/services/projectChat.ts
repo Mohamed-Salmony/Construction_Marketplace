@@ -1,8 +1,8 @@
 import { api } from '@/lib/api';
 
 export type ProjectConversationDto = {
-  id: number;
-  projectId: number;
+  id: string;
+  projectId: string;
   customerId: string;
   customerName?: string;
   merchantId: string;
@@ -10,30 +10,30 @@ export type ProjectConversationDto = {
 };
 
 export type ProjectMessageDto = {
-  id: number;
+  id: string;
   from: string;
   text: string;
   createdAt: string;
 };
 
-export async function createProjectConversation(projectId: number, merchantId: string) {
-  return api.post<{ id: number }>(`/api/ProjectChat/conversations`, { projectId, merchantId }, { auth: true });
+export async function createProjectConversation(projectId: string, merchantId: string) {
+  return api.post<{ id: string }>(`/api/ProjectChat/conversations`, { projectId, merchantId }, { auth: true });
 }
 
-export async function getProjectConversation(id: number) {
+export async function getProjectConversation(id: string) {
   return api.get<ProjectConversationDto>(`/api/ProjectChat/conversations/${id}`, { auth: true });
 }
 
-export async function getProjectConversationByKeys(projectId: number, merchantId: string) {
-  return api.get<{ id: number }>(`/api/ProjectChat/by?projectId=${projectId}&merchantId=${encodeURIComponent(merchantId)}`, { auth: true });
+export async function getProjectConversationByKeys(projectId: string, merchantId: string) {
+  return api.get<{ id: string }>(`/api/ProjectChat/by?projectId=${projectId}&merchantId=${encodeURIComponent(merchantId)}`, { auth: true });
 }
 
-export async function listProjectMessages(conversationId: number) {
+export async function listProjectMessages(conversationId: string) {
   return api.get<ProjectMessageDto[]>(`/api/ProjectChat/conversations/${conversationId}/messages`, { auth: true });
 }
 
-export async function sendProjectMessage(conversationId: number, text: string) {
-  return api.post<{ id: number }>(`/api/ProjectChat/conversations/${conversationId}/messages`, { text }, { auth: true });
+export async function sendProjectMessage(conversationId: string, text: string) {
+  return api.post<{ id: string }>(`/api/ProjectChat/conversations/${conversationId}/messages`, { text }, { auth: true });
 }
 
 // Notifications helpers for ProjectChat
@@ -42,7 +42,7 @@ export async function getVendorProjectMessageCount() {
 }
 
 export async function getVendorProjectRecentMessages() {
-  return api.get<Array<{ conversationId: number; projectId: number; message: string; at: string; from: string }>>(`/api/ProjectChat/messages/recent`, { auth: true });
+  return api.get<Array<{ conversationId: string; projectId: string; message: string; at: string; from: string }>>(`/api/ProjectChat/messages/recent`, { auth: true });
 }
 
 export async function getCustomerProjectMessageCount() {
@@ -50,5 +50,5 @@ export async function getCustomerProjectMessageCount() {
 }
 
 export async function getCustomerProjectRecentMessages() {
-  return api.get<Array<{ conversationId: number; projectId: number; message: string; at: string; from: string }>>(`/api/ProjectChat/customer/messages/recent`, { auth: true });
+  return api.get<Array<{ conversationId: string; projectId: string; message: string; at: string; from: string }>>(`/api/ProjectChat/customer/messages/recent`, { auth: true });
 }

@@ -21,13 +21,13 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
   const userRole = String((context as any)?.user?.role || '').toLowerCase();
   const userId = String((context as any)?.user?.id || '');
 
-  const [projectId, setProjectId] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<string>('');
   const [merchantId, setMerchantId] = useState<string>('');
-  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [conversationId, setConversationId] = useState<string>('');
   const [customerId, setCustomerId] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [merchantName, setMerchantName] = useState<string>('');
-  const [messages, setMessages] = useState<Array<{ id: number; from: string; text: string; ts: number }>>([]);
+  const [messages, setMessages] = useState<Array<{ id: string; from: string; text: string; ts: number }>>([]);
   const [text, setText] = useState<string>('');
   const boxRef = useRef<HTMLDivElement | null>(null);
   const firstInitRef = useRef(false);
@@ -36,61 +36,104 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     if (firstInitRef.current) return;
     firstInitRef.current = true;
     if (typeof window === 'undefined') return;
-    // Read from localStorage
-    const pidLs = Number(window.localStorage.getItem('project_chat_project_id') || '') || null;
-    const midLs = String(window.localStorage.getItem('project_chat_merchant_id') || '');
-    const midName = String(window.localStorage.getItem('project_chat_merchant_name') || '');
-    const cidLs = Number(window.localStorage.getItem('project_chat_conversation_id') || '') || null;
-    // Read from URL as fallback
-    let pidUrl: number | null = null;
-    let cidUrl: number | null = null;
+    // Extract from localStorage
+    let pidLs = '';
+    let cidLs = '';
+    try { pidLs = localStorage.getItem('project_chat_project_id') || ''; } catch {}
+    try { cidLs = localStorage.getItem('project_chat_conversation_id') || ''; } catch {}
+    let midLs = '';
+    try { midLs = localStorage.getItem('project_chat_merchant_id') || ''; } catch {}
+    let midName = '';
+    try { midName = localStorage.getItem('project_chat_merchant_name') || ''; } catch {}
+    // Extract from URL query params
+    let pidUrl = '';
+    let cidUrl = '';
     try {
       const url = new URL(window.location.href);
       const qpPid = url.searchParams.get('projectId');
       const qpCid = url.searchParams.get('conversationId');
-      if (qpPid) pidUrl = Number(qpPid) || null;
-      if (qpCid) cidUrl = Number(qpCid) || null;
+      if (qpPid) pidUrl = qpPid;
+      if (qpCid) cidUrl = qpCid;
     } catch {}
-    const pid = pidLs ?? pidUrl;
-    const cid = cidLs ?? cidUrl;
+    const pid = pidLs || pidUrl;
+    const cid = cidLs || cidUrl;
     setProjectId(pid);
     setMerchantId(midLs);
     if (midName) setMerchantName(midName);
     // Determine merchant id to use now (avoid stale state inside async)
     let midUsed = midLs;
+    console.log('[ProjectChat] Initial setup - pid:', pid, 'midUsed:', midUsed, 'userRole:', userRole, 'userId:', userId);
+    
+    // For merchants: use the stored merchant ID from localStorage (the other party)
+    // For customers: midUsed should be the merchant they want to chat with
     try {
       if (!midUsed && userRole === 'vendor' && userId) {
-        midUsed = userId;
-        setMerchantId(userId);
+        // If merchant and no merchantId stored, we can't determine who to chat with
+        console.log('[ProjectChat] Merchant but no stored merchant ID - need to get from project context');
       }
     } catch {}
+    
     (async () => {
       try {
         if (cid) {
+          console.log('[ProjectChat] Using existing conversation ID:', cid);
           setConversationId(cid);
           return;
         }
-        if (pid && midUsed) {
-          // Try resolve existing
+        if (pid) {
+          console.log('[ProjectChat] Trying to find conversations for project:', pid);
+          
+          // First, try to get all conversations for this project that user is part of
           try {
-            const found = await getProjectConversationByKeys(pid, midUsed);
-            if (found.ok && (found.data as any)?.id) {
-              const id = Number((found.data as any).id);
-              setConversationId(id);
-              try { window.localStorage.setItem('project_chat_conversation_id', String(id)); } catch {}
-              return;
+            const response = await fetch(`/api/ProjectChat/project/${pid}/conversations`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+              const conversations = await response.json();
+              console.log('[ProjectChat] Found conversations:', conversations);
+              
+              if (conversations && conversations.length > 0) {
+                // Use the first available conversation
+                const conv = conversations[0];
+                const id = String(conv.id);
+                setConversationId(id);
+                try { window.localStorage.setItem('project_chat_conversation_id', id); } catch {}
+                return;
+              }
             }
-          } catch {}
-          // Otherwise, create one
-          try {
-            const created = await createProjectConversation(pid, midUsed);
-            if (created.ok && (created.data as any)?.id) {
-              const id = Number((created.data as any).id);
-              setConversationId(id);
-              try { window.localStorage.setItem('project_chat_conversation_id', String(id)); } catch {}
-              return;
+          } catch (e) {
+            console.log('[ProjectChat] Error fetching project conversations:', e);
+          }
+          
+          // If no conversation found and we have merchantId, try to create or find one
+          if (midUsed) {
+            console.log('[ProjectChat] Trying to find/create conversation with merchant:', midUsed);
+            try {
+              const found = await getProjectConversationByKeys(pid, midUsed);
+              if (found.ok && (found.data as any)?.id) {
+                const id = String((found.data as any).id);
+                setConversationId(id);
+                try { window.localStorage.setItem('project_chat_conversation_id', id); } catch {}
+                return;
+              }
+            } catch {}
+            
+            // Create new conversation only if user is customer (not merchant)
+            if (userRole !== 'vendor') {
+              try {
+                const created = await createProjectConversation(pid, midUsed);
+                if (created.ok && (created.data as any)?.id) {
+                  const id = String((created.data as any).id);
+                  setConversationId(id);
+                  try { window.localStorage.setItem('project_chat_conversation_id', id); } catch {}
+                  return;
+                }
+              } catch {}
             }
-          } catch {}
+          }
         }
       } catch {}
       finally { try { hideFirstOverlay(); } catch {} }
@@ -100,11 +143,11 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     const onStorage = (e: StorageEvent) => {
       if (!e.key) return;
       if (e.key === 'project_chat_conversation_id' && e.newValue) {
-        const v = Number(e.newValue) || null;
+        const v = String(e.newValue).trim();
         if (v) setConversationId(v);
       }
       if (e.key === 'project_chat_project_id' && e.newValue) {
-        const v = Number(e.newValue) || null;
+        const v = String(e.newValue).trim();
         if (v) setProjectId(v);
       }
       if (e.key === 'project_chat_merchant_id' && e.newValue) {
@@ -138,7 +181,7 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
         if (!conversationId) return;
         const r = await listProjectMessages(conversationId);
         if (r.ok && Array.isArray(r.data)) {
-          const arr = (r.data as any[]).map(m => ({ id: m.id, from: m.from, text: m.text, ts: new Date(m.createdAt).getTime() }));
+          const arr = (r.data as any[]).map(m => ({ id: m.id || m._id, from: m.from || m.fromUserId, text: m.text, ts: new Date(m.createdAt).getTime() }));
           setMessages(arr);
         }
       } catch {}
@@ -148,7 +191,7 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
         try {
           const r = await listProjectMessages(conversationId);
           if (r.ok && Array.isArray(r.data)) {
-            const arr = (r.data as any[]).map(m => ({ id: m.id, from: m.from, text: m.text, ts: new Date(m.createdAt).getTime() }));
+            const arr = (r.data as any[]).map(m => ({ id: m.id || m._id, from: m.from || m.fromUserId, text: m.text, ts: new Date(m.createdAt).getTime() }));
             setMessages(arr);
           }
         } catch {}
@@ -189,6 +232,14 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
   const role = userRole;
   const myId = userId;
   const isVendor = role === 'vendor' || role === 'merchant';
+  
+  console.log('[ProjectChat] User role info:', { 
+    role, 
+    isVendor, 
+    userId: myId, 
+    customerName, 
+    merchantName 
+  });
 
   return (
     <div className="min-h-screen bg-background" dir={isAr ? 'rtl' : 'ltr'}>
@@ -246,7 +297,12 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
               <Input
                 value={text}
                 onChange={(e)=> setText(e.target.value)}
-                placeholder={conversationId ? (isAr ? 'اكتب رسالة...' : 'Type a message...') : (isAr ? 'لا توجد محادثة محددة' : 'No conversation selected')}
+                placeholder={conversationId ? 
+                  (isVendor ? 
+                    (isAr ? 'اكتب رسالة للعميل...' : 'Type a message to customer...') : 
+                    (isAr ? 'اكتب رسالة للتاجر...' : 'Type a message to merchant...')
+                  ) : (isAr ? 'لا توجد محادثة محددة' : 'No conversation selected')
+                }
                 disabled={!conversationId}
                 onKeyDown={(e)=> { if (e.key==='Enter') send(); }}
               />

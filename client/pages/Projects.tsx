@@ -16,7 +16,6 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import {
   Select,
@@ -148,43 +147,6 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
     description: string;
   };
 
-  const openInlineDetails = async (pid: string | number) => {
-    try {
-      setDetailsOpen(true);
-      setDetailsLoading(true);
-      setDetailsProject(null);
-      const idStr = String(pid ?? '').trim();
-      const valid = /^[a-fA-F0-9]{24}$/.test(idStr) || /^\d+$/.test(idStr);
-      if (!valid) { setDetailsLoading(false); setDetailsProject(null); return; }
-      const r = await getProjectById(idStr);
-      if (r.ok && r.data) {
-        const data: any = r.data as any;
-        const it0 = Array.isArray(data.items) && data.items.length ? data.items[0] : {};
-        const merged = {
-          ...data,
-          ptype: data.ptype ?? data.type ?? it0.ptype ?? it0.type ?? '',
-          type: data.type ?? it0.type ?? data.ptype ?? it0.ptype ?? '',
-          material: data.material ?? it0.material ?? '',
-          width: Number(data.width ?? it0.width ?? 0) || 0,
-          height: Number(data.height ?? it0.height ?? 0) || 0,
-          quantity: Number(data.quantity ?? it0.quantity ?? 0) || 0,
-          days: Number(data.days ?? it0.days ?? 0) || 0,
-          pricePerMeter: Number(data.pricePerMeter ?? it0.pricePerMeter ?? 0) || 0,
-          total: Number(data.total ?? it0.total ?? 0) || 0,
-          selectedAcc: Array.isArray(data.selectedAcc) ? data.selectedAcc : (Array.isArray(it0.selectedAcc) ? it0.selectedAcc : []),
-          accessories: Array.isArray(data.accessories) ? data.accessories : (Array.isArray(it0.accessories) ? it0.accessories : []),
-          description: data.description ?? it0.description ?? '',
-        };
-        setDetailsProject(merged);
-      } else {
-        setDetailsProject(null);
-      }
-    } catch {
-      setDetailsProject(null);
-    } finally {
-      setDetailsLoading(false);
-    }
-  };
   const blankBuilder = (): Builder => ({
     id: `b-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     ptype: '',
@@ -245,10 +207,6 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
   const [fAcc, setFAcc] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 0]);
 
-  // Inline details dialog state
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [detailsProject, setDetailsProject] = useState<any | null>(null);
 
   // Load admin product catalog to resolve localized names
   useEffect(() => {
@@ -1232,7 +1190,12 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                         <div className="text-sm text-muted-foreground">{locale==='ar' ? 'الإجمالي' : 'Total'}</div>
                         <div className="text-lg font-semibold text-primary">{currency} {up.total.toLocaleString(locale==='ar'?'ar-EG':'en-US')}</div>
                         <div className="mt-2 flex items-center gap-2 justify-end">
-                          <Button size="sm" variant="outline" onClick={() => openInlineDetails(up.id)} aria-label={locale==='ar' ? 'التفاصيل' : 'Details'}>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            try {
+                              localStorage.setItem('selected_project_id', String(up.id));
+                            } catch {}
+                            setCurrentPage && setCurrentPage('project-details');
+                          }} aria-label={locale==='ar' ? 'التفاصيل' : 'Details'}>
                             <Eye className="w-4 h-4 ml-1" /> {locale==='ar' ? 'التفاصيل' : 'Details'}
                           </Button>
                           <Button size="sm" variant="secondary" disabled={isLocked} onClick={() => {
@@ -1347,71 +1310,6 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
 
       <Footer setCurrentPage={setCurrentPage as any} />
 
-      {/* Inline Details Dialog */}
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-3xl bg-white/95 backdrop-blur-sm">
-          <DialogHeader>
-            <DialogTitle>{locale==='ar' ? 'تفاصيل المشروع' : 'Project Details'}</DialogTitle>
-          </DialogHeader>
-          {detailsLoading ? (
-            <div className="p-2 text-sm text-muted-foreground">{locale==='ar' ? 'جارٍ التحميل...' : 'Loading...'}</div>
-          ) : !detailsProject ? (
-            <div className="p-2 text-sm text-red-600">{locale==='ar' ? 'تعذر تحميل التفاصيل' : 'Failed to load details'}</div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'النوع:' : 'Type:'}</span> {resolveTypeLabel(String(detailsProject.ptype || detailsProject.type || '')) || (detailsProject.type||'-')}</div>
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'الخامة:' : 'Material:'}</span> {resolveMaterialLabel(String(detailsProject.ptype || detailsProject.type || ''), String(detailsProject.material || '')) || detailsProject.material || '-'}</div>
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'الأبعاد:' : 'Dimensions:'}</span> {detailsProject.width} × {detailsProject.height} m</div>
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'الكمية:' : 'Quantity:'}</span> {detailsProject.quantity}</div>
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'أيام التنفيذ:' : 'Days:'}</span> {detailsProject.days || '-'}</div>
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'سعر المتر:' : 'Price/m²:'}</span> {detailsProject.pricePerMeter || 0} {locale==='ar' ? 'ر.س' : 'SAR'}</div>
-                <div><span className="text-muted-foreground">{locale==='ar' ? 'الإجمالي:' : 'Total:'}</span> {(detailsProject.total || 0).toLocaleString(locale==='ar'?'ar-EG':'en-US')} {locale==='ar' ? 'ر.س' : 'SAR'}</div>
-                {(() => {
-                  const rawStatus = detailsProject?.status || detailsProject?.Status || detailsProject?.state || detailsProject?.State || '';
-                  const byApproval = (detailsProject?.isApproved === false || detailsProject?.approved === false)
-                    ? 'PendingApproval'
-                    : ((detailsProject?.isApproved === true || detailsProject?.approved === true) ? (rawStatus || 'Published') : rawStatus);
-                  const norm = normalizeStatus(byApproval || rawStatus).toLowerCase();
-                  const localized = (() => {
-                    if (!norm) return locale==='ar' ? 'غير معروف' : 'Unknown';
-                    if (norm==='draft') return locale==='ar' ? 'مسودة' : 'Draft';
-                    if (['pending','pendingapproval','inreview','underreview'].includes(norm)) return locale==='ar' ? 'قيد الاعتماد' : 'Pending Approval';
-                    if (norm==='inbidding') return locale==='ar' ? 'مفتوح للمناقصات' : 'In Bidding';
-                    if (norm==='published') return locale==='ar' ? 'منشور' : 'Published';
-                    if (norm==='inprogress') return locale==='ar' ? 'قيد التنفيذ' : 'In Progress';
-                    if (norm==='bidselected') return locale==='ar' ? 'تم اختيار عرض' : 'Bid Selected';
-                    if (norm==='completed') return locale==='ar' ? 'مكتمل' : 'Completed';
-                    if (norm==='cancelled' || norm==='canceled') return locale==='ar' ? 'ملغي' : 'Cancelled';
-                    return norm;
-                  })();
-                  return (
-                    <div><span className="text-muted-foreground">{locale==='ar' ? 'الحالة:' : 'Status:'}</span> {localized}</div>
-                  );
-                })()}
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground mb-1">{locale==='ar' ? 'الملحقات' : 'Accessories'}</div>
-                {(() => {
-                  const ids: string[] = Array.isArray(detailsProject.selectedAcc) ? detailsProject.selectedAcc : [];
-                  const names = ids.map((id:string)=> accessoriesCatalog.find(a=>a.id===id)?.[locale==='ar'?'ar':'en'] || id).filter(Boolean);
-                  return names.length ? (
-                    <div className="flex flex-wrap gap-2">{names.map((n,i)=>(<span key={i} className="px-2 py-1 rounded border text-xs">{n}</span>))}</div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">{locale==='ar' ? 'بدون' : 'None'}</div>
-                  );
-                })()}
-              </div>
-              {detailsProject.description && (
-                <div>
-                  <div className="text-sm text-muted-foreground mb-1">{locale==='ar' ? 'الوصف' : 'Description'}</div>
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/30 border rounded p-3">{detailsProject.description}</div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
