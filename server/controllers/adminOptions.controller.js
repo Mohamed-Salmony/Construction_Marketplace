@@ -31,67 +31,54 @@ export async function getOption(req, res) {
 export async function setOption(req, res) {
   try {
     const key = req.params.key;
-    
-    console.log('setOption received:', {
-      key,
-      body: req.body,
-      type: typeof req.body,
-      rawBody: JSON.stringify(req.body),
-      headers: req.headers['content-type']
-    });
-    
-    // Handle the value based on the actual data received
+
+    // Accept both primitive payloads and object { value }
+    const incoming = (req && typeof req.body === 'object' && req.body !== null && Object.prototype.hasOwnProperty.call(req.body, 'value'))
+      ? req.body.value
+      : req.body;
+
     let value;
-    
-    // The client now sends numbers directly for commission values
-    if (typeof req.body === 'number') {
-      value = String(req.body);
-    }
-    // If it's a string, use it directly
-    else if (typeof req.body === 'string') {
-      value = req.body;
-    }
-    // For commission values, handle null/undefined/NaN
-    else if (req.body === null || req.body === undefined || Number.isNaN(req.body)) {
-      console.log('Invalid value received, using default 0');
+    if (typeof incoming === 'number') {
+      value = String(incoming);
+    } else if (typeof incoming === 'string') {
+      value = incoming;
+    } else if (incoming === null || incoming === undefined) {
       value = '0';
+    } else {
+      // If an unexpected object/array is sent, try to coerce to number, else stringify
+      const maybe = Number(incoming);
+      value = Number.isFinite(maybe) ? String(maybe) : JSON.stringify(incoming);
     }
-    // If it's an object/array, stringify it
-    else if (typeof req.body === 'object' && req.body !== null) {
-      value = JSON.stringify(req.body);
-    }
-    // For anything else, use string representation
-    else {
-      value = String(req.body || '0');
-    }
-    
-    // Additional validation for commission keys
+
+    // Normalize trimming
+    value = (String(value || '')).trim();
+    if (!value) value = '0';
+
+    // Additional validation for commission keys (0-100 inclusive)
     if (key && key.startsWith('commission_')) {
       const numValue = Number(value);
-      if (isNaN(numValue) || numValue < 0 || numValue > 100) {
-        console.log(`Invalid commission value ${value}, using 0`);
-        value = '0';
+      if (!Number.isFinite(numValue)) {
+        return res.status(400).json({ success: false, message: 'Invalid commission value (not a number)' });
       }
+      if (numValue < 0 || numValue > 100) {
+        return res.status(400).json({ success: false, message: 'Commission must be between 0 and 100' });
+      }
+      // store normalized integer/decimal as string
+      value = String(numValue);
     }
-    
-    console.log(`Storing AdminOption: ${key} = "${value}"`);
-    
-    // Save to database
+
     const result = await AdminOption.findOneAndUpdate(
-      { key }, 
-      { $set: { key, value } }, 
+      { key },
+      { $set: { key, value } },
       { upsert: true, new: true }
     );
-    
-    console.log('AdminOption saved successfully:', { key: result.key, value: result.value });
-    
-    res.status(200).json({ 
-      success: true, 
-      key: result.key, 
+    res.status(200).json({
+      success: true,
+      key: result.key,
       value: result.value,
       message: 'Option saved successfully'
     });
-    
+  
   } catch (error) {
     console.error('Error in setOption:', error);
     res.status(500).json({ 

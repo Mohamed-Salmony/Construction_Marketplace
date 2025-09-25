@@ -12,7 +12,7 @@ import { logout as apiLogout } from '@/services/auth';
 import { getVendorMessageCount, getRecentVendorMessages, getCustomerMessageCount, getCustomerRecentMessages } from '@/services/rentals';
 import { getVendorProjectMessageCount, getVendorProjectRecentMessages, getCustomerProjectMessageCount, getCustomerProjectRecentMessages } from '@/services/projectChat';
 import { listMyNotifications, markNotificationRead, markAllNotificationsRead } from '@/services/notifications';
-import { getConversation } from '@/services/chat';
+import { getConversation, getConversationByKeys } from '@/services/chat';
 import { getAdminPendingNotifications, getAdminPendingCount } from '@/services/adminNotifications';
 import { getVendorNotifications, getVendorNotificationCount } from '@/services/vendorNotifications';
 import { getTechnicianNotifications, getTechnicianNotificationCount } from '@/services/technicianNotifications';
@@ -187,6 +187,7 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   const { isAdminProtected, isInAdminArea } = useAdminGuard(user, current, setCurrentPage || (() => {}));
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
   const [vendorMsgCount, setVendorMsgCount] = useState<number>(0);
   // Chat state (dedicated icon)
   const [chatOpen, setChatOpen] = useState(false);
@@ -195,6 +196,7 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
   // Track latest chat timestamp for change detection (used in loadChats) without causing re-renders
   const lastChatTsRef = useRef<number>(0);
   const loadNotifications = async () => {
+    setNotifLoading(true);
     try {
       if (isAdmin) {
         // For admin, show pending items that need approval
@@ -243,88 +245,116 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
         }
       }
     } catch { setNotifications([]); }
+    finally { setNotifLoading(false); }
   };
   
+  // Global admin loading overlay (works across all admin pages)
+  const [adminLoadingCount, setAdminLoadingCount] = useState(0);
+  const isAdminRoute = (() => {
+    if (typeof window === 'undefined') return false;
+    const p = window.location?.pathname || '';
+    return /\/admin/i.test(p);
+  })();
+  useEffect(() => {
+    if (!isAdminRoute) return;
+    const onStart = () => setAdminLoadingCount((c) => c + 1);
+    const onEnd = () => setAdminLoadingCount((c) => Math.max(0, c - 1));
+    window.addEventListener('admin-loading-start', onStart);
+    window.addEventListener('admin-loading-end', onEnd);
+
+    // Expose imperative API for pages that want to explicitly control it
+    (window as any).AdminLoading = {
+      start: onStart,
+      end: onEnd,
+    };
+
+    return () => {
+      window.removeEventListener('admin-loading-start', onStart);
+      window.removeEventListener('admin-loading-end', onEnd);
+      if ((window as any).AdminLoading) delete (window as any).AdminLoading;
+    };
+  }, [isAdminRoute]);
+
   return (
     <>
-    <header className="w-full">
-      {/* Top promotional banner removed per request */}
+      <header className="w-full">
+        {/* Top promotional banner removed per request */}
 
-      {/* Main header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              {/* Back button */}
-              {!isHome && !hideBack && (
-                <button
-                  onClick={() => {
-                    // Special case: from notifications page, vendors go back to vendor dashboard
-                    if (current === 'notifications' && isVendor) { go('vendor-dashboard'); return; }
-                    if (goBack) return goBack();
-                    // Try using stored previous page from Router if available
-                    if (typeof window !== 'undefined') {
-                      try {
-                        const prev = localStorage.getItem('mock_prev_page');
-                        if (prev) { go(prev); return; }
-                      } catch {}
-                    }
-                    // Fallback to browser history
-                    if (typeof window !== 'undefined' && window.history.length > 1) {
-                      try { window.history.back(); return; } catch {}
-                    }
-                    // Final fallback
-                    go('home');
-                  }}
-                  className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-                  aria-label={locale==='ar' ? 'رجوع' : 'Back'}
-                  title={locale==='ar' ? 'رجوع' : 'Back'}
-                >
-                  {locale === 'ar' ? (
-                    <ArrowRight className="w-5 h-5" />
-                  ) : (
-                    <ArrowLeft className="w-5 h-5" />
-                  )}
-                </button>
-              )}
+        {/* Main header */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              {/* Logo */}
+              <div className="flex items-center gap-3">
+                {/* Back button */}
+                {!isHome && !hideBack && (
+                  <button
+                    onClick={() => {
+                      // Special case: from notifications page, vendors go back to vendor dashboard
+                      if (current === 'notifications' && isVendor) { go('vendor-dashboard'); return; }
+                      if (goBack) return goBack();
+                      // Try using stored previous page from Router if available
+                      if (typeof window !== 'undefined') {
+                        try {
+                          const prev = localStorage.getItem('mock_prev_page');
+                          if (prev) { go(prev); return; }
+                        } catch {}
+                      }
+                      // Fallback to browser history
+                      if (typeof window !== 'undefined' && window.history.length > 1) {
+                        try { window.history.back(); return; } catch {}
+                      }
+                      // Final fallback
+                      go('home');
+                    }}
+                    className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                    aria-label={locale==='ar' ? 'رجوع' : 'Back'}
+                    title={locale==='ar' ? 'رجوع' : 'Back'}
+                  >
+                    {locale === 'ar' ? (
+                      <ArrowRight className="w-5 h-5" />
+                    ) : (
+                      <ArrowLeft className="w-5 h-5" />
+                    )}
+                  </button>
+                )}
 
-              <button onClick={() => go('home')} className="flex items-center gap-2" aria-label={t('brandLogo')}>
-                <div className="bg-primary text-white p-2 rounded-lg">
-                  <div className="w-8 h-8 flex items-center justify-center font-bold text-lg">
-                    {t('brandName').charAt(0)}
+                <button onClick={() => go('home')} className="flex items-center gap-2" aria-label={t('brandLogo')}>
+                  <div className="bg-primary text-white p-2 rounded-lg">
+                    <div className="w-8 h-8 flex items-center justify-center font-bold text-lg">
+                      {t('brandName').charAt(0)}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-primary">{t('brandName')}</h1>
-                  <p className="text-xs text-muted-foreground">{t('brandSubtitle')}</p>
-                </div>
-              </button>
-            </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-primary">{t('brandName')}</h1>
+                    <p className="text-xs text-muted-foreground">{t('brandSubtitle')}</p>
+                  </div>
+                </button>
+              </div>
 
-            {/* Navigation */}
-            {!isRestricted && (
-              <nav className="hidden md:flex items-center gap-8">
-                <button onClick={() => go('home')} className="text-foreground hover:text-primary transition-colors">{t('home')}</button>
-                <button onClick={() => go('products')} className="text-foreground hover:text-primary transition-colors">{t('products')}</button>
-                <button onClick={() => go('offers')} className="text-foreground hover:text-primary transition-colors">{t('offers')}</button>
-                {/* Projects/Services: for workers show Services instead of Projects */}
-                {isWorker ? (
-                  <button onClick={() => go('technician-services')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'الخدمات' : 'Services'}</button>
-                ) : (
-                  // Only show projects if user is not vendor or if vendor is verified
-                  (!user || user.role !== 'vendor' || user.isVerified) && (
-                    <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
-                  )
-                )}
-                {/* Rentals: show for all logged-in users, including technicians */}
-                {user && (
-                  <button onClick={() => go('rentals')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'التأجير' : 'Rentals'}</button>
-                )}
-                {/* Removed separate technician quick link as services replaces projects above */}
-                <button onClick={() => go('about')} className="text-foreground hover:text-primary transition-colors">{t('about')}</button>
-              </nav>
-            )}
+              {/* Navigation */}
+              {!isRestricted && (
+                <nav className="hidden md:flex items-center gap-8">
+                  <button onClick={() => go('home')} className="text-foreground hover:text-primary transition-colors">{t('home')}</button>
+                  <button onClick={() => go('products')} className="text-foreground hover:text-primary transition-colors">{t('products')}</button>
+                  <button onClick={() => go('offers')} className="text-foreground hover:text-primary transition-colors">{t('offers')}</button>
+                  {/* Projects/Services: for workers show Services instead of Projects */}
+                  {isWorker ? (
+                    <button onClick={() => go('technician-services')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'الخدمات' : 'Services'}</button>
+                  ) : (
+                    // Only show projects if user is not vendor or if vendor is verified
+                    (!user || user.role !== 'vendor' || user.isVerified) && (
+                      <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
+                    )
+                  )}
+                  {/* Rentals: show for all logged-in users, including technicians */}
+                  {user && (
+                    <button onClick={() => go('rentals')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'التأجير' : 'Rentals'}</button>
+                  )}
+                  {/* Removed separate technician quick link as services replaces projects above */}
+                  <button onClick={() => go('about')} className="text-foreground hover:text-primary transition-colors">{t('about')}</button>
+                </nav>
+              )}
 
             {/* Contact info & actions */}
             <div className="flex items-center gap-4">
@@ -345,13 +375,13 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                 <LanguageSwitcher />
                 {/* Guest favorites button removed per request */}
                 {user && (
-                  <Popover open={notifOpen} onOpenChange={async (o)=>{ setNotifOpen(o); if (o) { await markAllNotificationsRead().catch(()=>{}); loadNotifications(); setVendorMsgCount(0); } }}>
+                  <Popover open={notifOpen} onOpenChange={async (o)=>{ setNotifOpen(o); if (o) { setNotifLoading(true); await markAllNotificationsRead().catch(()=>{}); loadNotifications(); setVendorMsgCount(0); } }}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="relative"
-                        onMouseDown={(e)=>{ e.preventDefault(); if (!notifOpen) { setNotifOpen(true); loadNotifications(); } }}
+                        onMouseDown={(e)=>{ e.preventDefault(); if (!notifOpen) { setNotifOpen(true); setNotifLoading(true); loadNotifications(); } }}
                         onClick={(e)=>{ e.preventDefault(); }}
                         aria-label={locale==='ar' ? 'التنبيهات' : 'Notifications'}
                         title={locale==='ar' ? 'التنبيهات' : 'Notifications'}
@@ -369,11 +399,15 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                         {locale==='ar' ? 'التنبيهات' : 'Notifications'}
                       </div>
                       <div className="p-3 space-y-3 max-h-80 overflow-auto">
-                        {notifications.length === 0 && (
+                        {notifLoading ? (
+                          <div className="text-sm text-muted-foreground">
+                            {locale==='ar' ? 'جاري تحميل التنبيهات...' : 'Loading notifications...'}
+                          </div>
+                        ) : notifications.length === 0 ? (
                           <div className="text-sm text-muted-foreground">
                             {locale==='ar' ? 'لا توجد تنبيهات حالياً.' : 'No notifications yet.'}
                           </div>
-                        )}
+                        ) : null}
                         {notifications.map((n:any, idx:number) => (
                           <button
                             key={idx}
@@ -454,34 +488,75 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                               }
                               
                               // Handle chat.message first using conversationId to open existing chat
-                              if (n.type === 'chat.message' && n.conversationId) {
+                              if (n.type === 'chat.message') {
                                 (async () => {
                                   try {
-                                    const cid = String(n.conversationId);
-                                    try { if (n._id) await markNotificationRead(String(n._id)); } catch {}
-                                    try { localStorage.setItem('chat_conversation_id', cid); } catch {}
-                                    const c = await getConversation(cid);
-                                    if (c.ok && c.data) {
-                                      const roleLower = role;
-                                      if (roleLower === 'vendor') {
-                                        const techId = String((c.data as any).technicianId || '');
-                                        const sid = String((c.data as any).serviceRequestId || '');
-                                        try { if (techId) localStorage.setItem('chat_technician_id', techId); } catch {}
-                                        try { if (sid) localStorage.setItem('chat_service_id', sid); } catch {}
-                                        if (setCurrentPage) setCurrentPage('vendor-chat'); else {
-                                          const url = new URL(window.location.href); url.searchParams.set('page','vendor-chat'); window.location.href = url.toString();
-                                        }
-                                      } else {
-                                        // technician or others
-                                        const sid = String((c.data as any).serviceRequestId || '');
-                                        try { if (sid) localStorage.setItem('chat_service_id', sid); } catch {}
-                                        if (setCurrentPage) setCurrentPage('technician-chat'); else {
-                                          const url = new URL(window.location.href); url.searchParams.set('page','technician-chat'); window.location.href = url.toString();
+                                    const cid = String(n.conversationId || (n.data?.conversationId ?? ''));
+                                    const serviceId = n.data?.serviceRequestId ? String(n.data.serviceRequestId) : '';
+                                    const techId = n.data?.technicianId ? String(n.data.technicianId) : '';
+                                    if (n._id) { try { await markNotificationRead(String(n._id)); } catch {} }
+                                    if (cid) { try { localStorage.setItem('chat_conversation_id', cid); } catch {} }
+                                    // Try to fetch conversation; on 404 fallback to keys or direct page navigation
+                                    let convOk = false;
+                                    try {
+                                      if (cid) {
+                                        const c = await getConversation(cid);
+                                        convOk = !!(c.ok && c.data);
+                                        if (convOk) {
+                                          const roleLower = role;
+                                          const dataAny: any = c.data as any;
+                                          const kTech = String(dataAny?.technicianId || techId || '');
+                                          const kSvc = String(dataAny?.serviceRequestId || serviceId || '');
+                                          try { if (kTech) localStorage.setItem('chat_technician_id', kTech); } catch {}
+                                          try { if (kSvc) localStorage.setItem('chat_service_id', kSvc); } catch {}
+                                          if (roleLower === 'vendor') {
+                                            if (setCurrentPage) setCurrentPage('vendor-chat'); else {
+                                              const url = new URL(window.location.href); url.searchParams.set('page','vendor-chat'); window.location.href = url.toString();
+                                            }
+                                          } else {
+                                            if (setCurrentPage) setCurrentPage('technician-chat'); else {
+                                              const url = new URL(window.location.href); url.searchParams.set('page','technician-chat'); window.location.href = url.toString();
+                                            }
+                                          }
+                                          return;
                                         }
                                       }
-                                      return;
+                                    } catch {
+                                      // ignore and try fallback
                                     }
-                                  } catch {}
+                                    // Fallback: try get by keys if available
+                                    if (!convOk && serviceId && techId) {
+                                      try {
+                                        const r = await getConversationByKeys(serviceId, techId);
+                                        const foundId = (r as any)?.data?.id || (r as any)?.data?._id;
+                                        if (foundId) {
+                                          try { localStorage.setItem('chat_conversation_id', String(foundId)); } catch {}
+                                          try { localStorage.setItem('chat_technician_id', techId); } catch {}
+                                          try { localStorage.setItem('chat_service_id', serviceId); } catch {}
+                                          if (role === 'vendor') {
+                                            if (setCurrentPage) setCurrentPage('vendor-chat'); else {
+                                              const url = new URL(window.location.href); url.searchParams.set('page','vendor-chat'); window.location.href = url.toString();
+                                            }
+                                          } else {
+                                            if (setCurrentPage) setCurrentPage('technician-chat'); else {
+                                              const url = new URL(window.location.href); url.searchParams.set('page','technician-chat'); window.location.href = url.toString();
+                                            }
+                                          }
+                                          return;
+                                        }
+                                      } catch { /* continue */ }
+                                    }
+                                    // Final fallback: navigate to chat page based on role with whatever we have
+                                    if (role === 'vendor') {
+                                      if (setCurrentPage) setCurrentPage('vendor-chat'); else {
+                                        const url = new URL(window.location.href); url.searchParams.set('page','vendor-chat'); window.location.href = url.toString();
+                                      }
+                                    } else {
+                                      if (setCurrentPage) setCurrentPage('technician-chat'); else {
+                                        const url = new URL(window.location.href); url.searchParams.set('page','technician-chat'); window.location.href = url.toString();
+                                      }
+                                    }
+                                  } catch { /* swallow */ }
                                 })();
                                 return;
                               }

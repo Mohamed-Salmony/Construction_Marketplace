@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, requireRoles } from '../middlewares/auth.js';
-import { list, listOpen, getById, create, update, remove, getMyProjects, listBids, createBid, selectBid, acceptBid, rejectBid, validateCreateProject, validateUpdateProject, validateCreateBid } from '../controllers/projects.controller.js';
+import { list, listOpen, getById, create, update, remove, getMyProjects, listBids, createBid, selectBid, acceptBid, rejectBid, validateCreateProject, validateUpdateProject, validateCreateBid, deliverProject, acceptDelivery, rejectDelivery, rateMerchant } from '../controllers/projects.controller.js';
 
 const router = express.Router();
 
@@ -15,6 +15,12 @@ router.post('/:projectId/select-bid/:bidId', protect, selectBid);
 router.post('/bids/:bidId/accept', protect, acceptBid);
 router.post('/bids/:bidId/reject', protect, rejectBid);
 router.get('/bids/merchant/my-bids', protect, requireRoles('Merchant', 'Admin'), listBids);
+
+// Lifecycle actions
+router.post('/:id/deliver', protect, requireRoles('Merchant', 'Admin'), deliverProject);
+router.post('/:id/accept-delivery', protect, requireRoles('Customer', 'Admin'), acceptDelivery);
+router.post('/:id/reject-delivery', protect, requireRoles('Customer', 'Admin'), rejectDelivery);
+router.post('/:id/rate-merchant', protect, requireRoles('Customer', 'Admin'), rateMerchant);
 
 // CRUD
 router.post('/', protect, requireRoles('Customer', 'Admin'), validateCreateProject, create);

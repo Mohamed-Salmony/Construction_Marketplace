@@ -17,10 +17,22 @@ type Dimensions = { width?: boolean; height?: boolean; length?: boolean };
 type MaterialWithPrice = { id: string; en?: string; ar?: string; pricePerM2?: number };
 // Subtype now can contain its own materials list
 type SubtypeCfg = { id: string; en?: string; ar?: string; materials?: MaterialWithPrice[] };
+
+// أنماط القياس المختلفة
+type MeasurementMode =
+  | 'area_wh'            // عرض × ارتفاع
+  | 'area_wl'            // عرض × طول  
+  | 'height_only'        // ارتفاع فقط
+  | 'length_only'        // طول فقط
+  | 'custom_wh'          // عرض × ارتفاع فقط (بدون طول)
+  | 'other_3d';          // لِخيار "أخرى": عرض + طول + ارتفاع
+
 type ProductCfg = {
   id: string;
   en?: string; ar?: string;
   dimensions?: Dimensions;
+  // نمط القياس يحدد طريقة الحساب
+  measurementMode?: MeasurementMode;
   // Default price (used for legacy/back-compat or when material price not set)
   basePricePerM2?: number;
   subtypes?: SubtypeCfg[];
@@ -28,6 +40,8 @@ type ProductCfg = {
   materials?: Labeled[];
   colors?: Labeled[];
   accessories?: Accessory[];
+  // علامة لتمييز منتج "أخرى" 
+  isOther?: boolean;
 };
 
 type Catalog = { products: ProductCfg[] };
@@ -43,7 +57,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
   // New product card visibility
   const [showNewCard, setShowNewCard] = React.useState(false);
   // Draft inputs for adding items
-  const [newProduct, setNewProduct] = React.useState<ProductCfg>({ id: '', en: '', ar: '', dimensions: { width: true, height: true }, basePricePerM2: 0, subtypes: [], materials: [], colors: [], accessories: [] });
+  const [newProduct, setNewProduct] = React.useState<ProductCfg>({ id: '', en: '', ar: '', dimensions: { width: true, height: true }, measurementMode: 'area_wh', basePricePerM2: 0, subtypes: [], materials: [], colors: [], accessories: [] });
   // New-product inline collections
   const [npSubtypes, setNpSubtypes] = React.useState<SubtypeCfg[]>([]);
   // For new product, materials are added under a selected subtype
@@ -90,12 +104,35 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                 return {
                   ...p,
                   subtypes,
+                  // تعيين قيم افتراضية لـ measurementMode وisOther
+                  measurementMode: p.measurementMode || 'area_wh',
+                  isOther: p.isOther || false,
                   // Keep legacy materials list as a flattened list of labels (without price)
                   materials: Array.from(new Map(
                     subtypes.flatMap(s => (s.materials||[])).map(m => [m.id, { id: m.id, ar: m.ar, en: m.en }])
                   ).values()),
                 } as ProductCfg;
               });
+              
+              // إضافة منتج "أخرى" إذا لم يكن موجوداً
+              const hasOtherProduct = normalized.some(p => p.isOther === true || p.id === 'other');
+              if (!hasOtherProduct) {
+                const otherProduct: ProductCfg = {
+                  id: 'other',
+                  ar: 'أخرى',
+                  en: 'Other',
+                  measurementMode: 'other_3d',
+                  dimensions: { width: true, height: true, length: true },
+                  basePricePerM2: 0,
+                  subtypes: [],
+                  materials: [],
+                  colors: [],
+                  accessories: [],
+                  isOther: true
+                };
+                normalized.push(otherProduct);
+              }
+              
               setProducts(normalized);
               setLoading(false);
               return;
@@ -111,14 +148,34 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
         const typeArr: Labeled[] = (() => { try { const v = JSON.parse((types.data as any)?.value || '[]'); if (Array.isArray(v)) return v.map((x:any)=> typeof x==='string'? {id:x}:{id:String(x.id||x.value||''), en:x.en, ar:x.ar}).filter((x:any)=>x.id); } catch{} return []; })();
         const matArr: Labeled[] = (() => { try { const v = JSON.parse((mats.data as any)?.value || '[]'); if (Array.isArray(v)) return v.map((x:any)=> typeof x==='string'? {id:x}:{id:String(x.id||x.value||''), en:x.en, ar:x.ar}).filter((x:any)=>x.id); } catch{} return []; })();
         const priceRules: Record<string, number> = (() => { try { const v = JSON.parse((rules.data as any)?.value || '{}'); if (v && typeof v==='object') return v; } catch{} return {}; })();
-        const built: ProductCfg[] = typeArr.map(t => ({ id: t.id, en: t.en, ar: t.ar, dimensions: { width: true, height: true }, basePricePerM2: Number(priceRules[t.id]||0), subtypes: [], materials: matArr, colors: [], accessories: [] }));
+        const built: ProductCfg[] = typeArr.map(t => ({ id: t.id, en: t.en, ar: t.ar, dimensions: { width: true, height: true }, measurementMode: 'area_wh' as MeasurementMode, basePricePerM2: Number(priceRules[t.id]||0), subtypes: [], materials: matArr, colors: [], accessories: [], isOther: false }));
+        
+        // إضافة منتج "أخرى" إذا لم يكن موجوداً
+        const hasOtherProduct = built.some(p => p.isOther === true || p.id === 'other');
+        if (!hasOtherProduct) {
+          const otherProduct: ProductCfg = {
+            id: 'other',
+            ar: 'أخرى',
+            en: 'Other',
+            measurementMode: 'other_3d',
+            dimensions: { width: true, height: true, length: true },
+            basePricePerM2: 0,
+            subtypes: [],
+            materials: [],
+            colors: [],
+            accessories: [],
+            isOther: true
+          };
+          built.push(otherProduct);
+        }
+        
         if (!cancelled) setProducts(built);
       } catch {
         if (!cancelled) toastError(isAr ? 'تعذر تحميل الإعدادات' : 'Failed to load options', isAr);
       } finally { if (!cancelled) { setLoading(false); hideFirstOverlay(); } }
     })();
     return () => { cancelled = true; };
-  }, [isAr, hideFirstOverlay]);
+  }, [isAr]);
 
   const slugify = (s: string) => {
     return String(s || '')
@@ -129,6 +186,29 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
       .toLowerCase();
   };
   const norm = (s?: string) => String(s || '').trim().toLowerCase();
+
+  // دالة لتطبيق الأبعاد تلقائياً بناءً على نمط القياس
+  const getDimensionsFromMeasurementMode = (mode: MeasurementMode): Dimensions => {
+    switch (mode) {
+      case 'area_wh': return { width: true, height: true, length: false };
+      case 'area_wl': return { width: true, height: false, length: true };
+      case 'height_only': return { width: false, height: true, length: false };
+      case 'length_only': return { width: false, height: false, length: true };
+      case 'custom_wh': return { width: true, height: true, length: false };
+      case 'other_3d': return { width: true, height: true, length: true };
+      default: return { width: true, height: true, length: false };
+    }
+  };
+
+  // أسماء أنماط القياس للواجهة
+  const measurementModeNames = {
+    'area_wh': { ar: 'عرض × ارتفاع', en: 'Width × Height' },
+    'area_wl': { ar: 'عرض × طول', en: 'Width × Length' },
+    'height_only': { ar: 'ارتفاع فقط', en: 'Height Only' },
+    'length_only': { ar: 'طول فقط', en: 'Length Only' },
+    'custom_wh': { ar: 'عرض × ارتفاع فقط', en: 'Width × Height Only' },
+    'other_3d': { ar: 'ثلاثي الأبعاد (أخرى)', en: '3D (Other)' }
+  };
 
   const saveAllWith = async (prodList: ProductCfg[]) => {
     try {
@@ -187,7 +267,17 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
     // Auto-generate ID from AR/EN name
     const baseName = newProduct.en?.trim() || newProduct.ar?.trim() || '';
     if (!baseName) { toastError(isAr? 'أدخل اسم المنتج':'Enter product name', isAr); return; }
-    if (!(Number(newProduct.basePricePerM2) > 0)) { toastError(isAr? 'أدخل سعرًا صحيحًا للمتر':'Enter a valid base price per m²', isAr); return; }
+    // Accept either a base price OR at least one material with a valid price
+    const hasAnyMaterialPrice = (npSubtypes || []).some(st => (st.materials || []).some(m => Number(m.pricePerM2 || 0) > 0));
+    const hasValidBasePrice = Number(newProduct.basePricePerM2) > 0;
+    if (!(hasValidBasePrice || hasAnyMaterialPrice)) {
+      toastError(
+        isAr
+          ? 'أدخل سعرًا صحيحًا (سعر أساسي للمتر أو سعر خامة واحدة على الأقل)'
+          : 'Enter a valid price (either a base price per m² or at least one material price)'
+        , isAr);
+      return;
+    }
     const hasAnyDim = !!newProduct.dimensions?.width || !!newProduct.dimensions?.height || !!newProduct.dimensions?.length;
     if (!hasAnyDim) { toastError(isAr? 'اختر بُعدًا واحدًا على الأقل (عرض/ارتفاع/طول)':'Select at least one dimension (width/height/length)', isAr); return; }
     const existing = new Set(products.map(p => p.id));
@@ -202,7 +292,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
     ];
     await saveAllWith(nextList);
     // Clear drafts after persistence attempt; toasts are handled inside saveAllWith
-    setNewProduct({ id: '', en: '', ar: '', dimensions: { width: true, height: true }, basePricePerM2: 0, subtypes: [], materials: [], colors: [], accessories: [] });
+    setNewProduct({ id: '', en: '', ar: '', dimensions: { width: true, height: true }, measurementMode: 'area_wh', basePricePerM2: 0, subtypes: [], materials: [], colors: [], accessories: [], isOther: false });
     setNpSubtypes([]); setNpColors([]); setNpAccessories([]);
     setNpSelectedSubtypeForMaterial('');
     setNpDraftSubtype({ id: '', ar: '', en: '' }); setNpDraftMaterial({ id: '', ar: '', en: '', pricePerM2: 0 }); setNpDraftColor({ id: '', ar: '', en: '' }); setNpDraftAccessory({ id: '', price: 0 });
@@ -327,15 +417,53 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                   <div className="text-[11px] text-red-600 mt-1">{isAr ? 'الاسم مطلوب (عربي أو إنجليزي)' : 'Name is required (Arabic or English)'}</div>
                 )}
               </div>
+              
+              {/* نمط القياس */}
+              <div className="col-span-1 md:col-span-2">
+                <label className="text-xs block mb-1">{isAr ? 'نمط القياس' : 'Measurement Mode'}</label>
+                <select 
+                  className="w-full border rounded px-2 py-2 text-sm" 
+                  value={newProduct.measurementMode || 'area_wh'} 
+                  onChange={(e) => {
+                    const mode = e.target.value as MeasurementMode;
+                    const autoDimensions = getDimensionsFromMeasurementMode(mode);
+                    setNewProduct(p => ({ 
+                      ...p, 
+                      measurementMode: mode, 
+                      dimensions: autoDimensions,
+                      isOther: mode === 'other_3d'
+                    }));
+                  }}
+                >
+                  {Object.entries(measurementModeNames).map(([key, names]) => (
+                    <option key={key} value={key}>
+                      {isAr ? names.ar : names.en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
               {/* Removed base price field as requested */}
-              <div className="col-span-1 md:col-span-2 lg:col-span-4 grid grid-cols-3 gap-3">
-                <label className="text-xs col-span-3">{isAr? 'الأبعاد المطلوبة':'Required dimensions'}</label>
-                <div className="flex items-center gap-2"><input type="checkbox" checked={!!newProduct.dimensions?.width} onChange={(e)=>setNewProduct(p=>({...p, dimensions:{ ...(p.dimensions||{}), width: e.target.checked }}))} /> <span>{isAr ? 'العرض' : 'Width'}</span></div>
-                <div className="flex items-center gap-2"><input type="checkbox" checked={!!newProduct.dimensions?.height} onChange={(e)=>setNewProduct(p=>({...p, dimensions:{ ...(p.dimensions||{}), height: e.target.checked }}))} /> <span>{isAr ? 'الارتفاع' : 'Height'}</span></div>
-                <div className="flex items-center gap-2"><input type="checkbox" checked={!!newProduct.dimensions?.length} onChange={(e)=>setNewProduct(p=>({...p, dimensions:{ ...(p.dimensions||{}), length: e.target.checked }}))} /> <span>{isAr ? 'الطول' : 'Length'}</span></div>
-                {newProdDimsInvalid && (
-                  <div className="col-span-3 text-[11px] text-red-600">{isAr ? 'اختر بُعدًا واحدًا على الأقل (عرض/ارتفاع/طول)' : 'Select at least one dimension (width/height/length)'}</div>
-                )}
+              {/* عرض الأبعاد المحددة تلقائياً */}
+              <div className="col-span-1 md:col-span-2 lg:col-span-4">
+                <label className="text-xs block mb-1">{isAr ? 'الأبعاد المطلوبة (محددة تلقائياً)' : 'Required Dimensions (Auto-set)'}</label>
+                <div className="flex gap-4 text-sm p-2 bg-gray-50 rounded border">
+                  <div className="flex items-center gap-1">
+                    <span className={newProduct.dimensions?.width ? 'text-green-600 font-medium' : 'text-gray-400'}>
+                      {isAr ? 'العرض' : 'Width'} {newProduct.dimensions?.width ? '✓' : '✗'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className={newProduct.dimensions?.height ? 'text-green-600 font-medium' : 'text-gray-400'}>
+                      {isAr ? 'الارتفاع' : 'Height'} {newProduct.dimensions?.height ? '✓' : '✗'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className={newProduct.dimensions?.length ? 'text-green-600 font-medium' : 'text-gray-400'}>
+                      {isAr ? 'الطول' : 'Length'} {newProduct.dimensions?.length ? '✓' : '✗'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -493,7 +621,7 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
             <div className="flex gap-2">
               <Button onClick={addProduct} disabled={loading}>{isAr ? 'حفظ المنتج' : 'Save Product'}</Button>
               <Button variant="outline" onClick={()=>{
-                setNewProduct({ id: '', en: '', ar: '', dimensions: { width: true, height: true }, basePricePerM2: 0, subtypes: [], materials: [], colors: [], accessories: [] });
+                setNewProduct({ id: '', en: '', ar: '', dimensions: { width: true, height: true }, measurementMode: 'area_wh', basePricePerM2: 0, subtypes: [], materials: [], colors: [], accessories: [], isOther: false });
                 setNpSubtypes([]); setNpColors([]); setNpAccessories([]);
                 setNpSelectedSubtypeForMaterial('');
                 setNpDraftSubtype({ id: '', ar: '', en: '' }); setNpDraftMaterial({ id: '', ar: '', en: '', pricePerM2: 0 }); setNpDraftColor({ id: '', ar: '', en: '' }); setNpDraftAccessory({ id: '', price: 0 });
@@ -531,6 +659,31 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
                     <label className="text-xs block mb-1">{isAr? 'الإنجليزي':'English'}</label>
                     <Input value={p.en || ''} onChange={(e)=>updateProduct(idx, { en: e.target.value })} />
                   </div>
+                  
+                  {/* نمط القياس للمنتج الحالي */}
+                  <div>
+                    <label className="text-xs block mb-1">{isAr ? 'نمط القياس' : 'Measurement Mode'}</label>
+                    <select 
+                      className="w-full border rounded px-2 py-2 text-sm" 
+                      value={p.measurementMode || 'area_wh'} 
+                      onChange={(e) => {
+                        const mode = e.target.value as MeasurementMode;
+                        const autoDimensions = getDimensionsFromMeasurementMode(mode);
+                        updateProduct(idx, { 
+                          measurementMode: mode, 
+                          dimensions: autoDimensions,
+                          isOther: mode === 'other_3d'
+                        });
+                      }}
+                    >
+                      {Object.entries(measurementModeNames).map(([key, names]) => (
+                        <option key={key} value={key}>
+                          {isAr ? names.ar : names.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
                   {/* Removed base price field as requested */}
                   <div className="col-span-1 md:col-span-2 lg:col-span-4 grid grid-cols-3 gap-3">
                     <label className="text-xs col-span-3">{isAr? 'الأبعاد المطلوبة':'Required dimensions'}</label>

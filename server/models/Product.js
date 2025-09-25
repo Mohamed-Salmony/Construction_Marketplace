@@ -28,6 +28,9 @@ const productSchema = new mongoose.Schema({
   discountPrice: { type: Number, default: null },
   currency: { type: String, default: 'SAR' },
   stockQuantity: { type: Number, default: 0 },
+  // Unit type: quantity (default) or meters. When meters, use pricePerMeter for pricing.
+  unitType: { type: String, enum: ['quantity', 'meters'], default: 'quantity' },
+  pricePerMeter: { type: Number, default: null },
   allowCustomDimensions: { type: Boolean, default: false },
   isAvailableForRent: { type: Boolean, default: false },
   rentPricePerDay: { type: Number, default: null },

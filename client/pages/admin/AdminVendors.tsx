@@ -85,6 +85,14 @@ type VendorRow = {
 
 export default function AdminVendors({ setCurrentPage, ...context }: Partial<RouteContext>) {
   const { t, locale } = useTranslation();
+  // Safe translate with fallback: if t(key) returns the key itself, use fallback
+  const tt = useCallback((key: string, fallback: string) => {
+    try {
+      const out = t(key) as unknown as string;
+      if (typeof out === 'string' && out && out !== key) return out;
+      return fallback;
+    } catch { return fallback; }
+  }, [t]);
   const hideFirstOverlay = useFirstLoadOverlay(context, locale==='ar' ? 'جاري تحميل البائعين' : 'Loading vendors', locale==='ar' ? 'يرجى الانتظار' : 'Please wait');
   const [rows, setRows] = useState<VendorRow[]>([]);
   const [search, setSearch] = useState('');
@@ -97,21 +105,21 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
   const [profileImgError, setProfileImgError] = useState(false);
   const [docImgError, setDocImgError] = useState(false);
 
-  const loadVendors = useCallback(async () => {
+  const loadVendors = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await adminGetUsers({ role: 'Merchant' });
+      const res = await adminGetUsers({ role: 'Merchant', page: 1, pageSize: 200 }, { signal });
       if (res.ok && res.data && Array.isArray((res.data as any).items)) {
         const list = (res.data as any).items.map((u:any) => ({
           id: String(u.id),
           name: u.name || '',
           email: u.email || '',
           phone: u.phoneNumber || '',
-          status: u.isActive ? 'active' : (u.isVerified ? 'active' : 'pending'),
+          status: (u.isActive === false) ? 'suspended' : (u.isVerified === false ? 'pending' : 'active'),
           profilePicture: u.profilePicture || ''
         } as VendorRow));
         setRows(list);
       } else setRows([]);
-    } catch { setRows([]); }
+    } catch (e:any) { if (e?.name !== 'AbortError') setRows([]); }
   }, []);
 
   const openView = async (userId: string) => {
@@ -129,15 +137,24 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
     }
     finally { setViewLoading(false); }
   };
-  const loadPending = useCallback(async () => {
+  const loadPending = useCallback(async (signal?: AbortSignal) => {
     try {
-      const r = await getPendingMerchants();
+      const r = await getPendingMerchants({ signal });
       if (r.ok && r.data && Array.isArray((r.data as any).items)) setPendingVendors((r.data as any).items);
       else setPendingVendors([]);
-    } catch { setPendingVendors([]); }
+    } catch (e:any) { if (e?.name !== 'AbortError') setPendingVendors([]); }
   }, []);
 
-  useEffect(() => { (async () => { await Promise.all([loadVendors(), loadPending()]); hideFirstOverlay(); })(); }, [loadVendors, loadPending, hideFirstOverlay]);
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      await Promise.all([loadVendors(controller.signal), loadPending(controller.signal)]);
+      hideFirstOverlay();
+    })();
+    return () => {
+      try { controller.abort(); } catch {}
+    };
+  }, [loadVendors, loadPending]);
 
   const filtered = rows.filter(r => {
     const s = search.trim().toLowerCase();
@@ -147,11 +164,11 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
   });
 
   const approveVendor = async (u: { id: string; name?: string }) => {
-    try { const r = await approveMerchant(u.id); if (r.ok) { await successAlert(t('activatedSuccessfully') || 'تم التفعيل بنجاح', true); await loadPending(); await loadVendors(); } }
+    try { const r = await approveMerchant(u.id); if (r.ok) { await successAlert(tt('activatedSuccessfully', 'تم التفعيل بنجاح'), true); await loadPending(); await loadVendors(); } }
     catch { /* ignore */ }
   };
   const rejectVendor = async (u: { id: string; name?: string }) => {
-    try { const r = await suspendMerchant(u.id); if (r.ok) { await warningAlert(t('suspendedSuccessfully') || 'تم التعليق', true); await loadPending(); await loadVendors(); } }
+    try { const r = await suspendMerchant(u.id); if (r.ok) { await warningAlert(tt('suspendedSuccessfully', 'تم التعليق'), true); await loadPending(); await loadVendors(); } }
     catch { /* ignore */ }
   };
 
@@ -174,7 +191,7 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
         {pendingVendors.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center"><Store className="mr-2 h-5 w-5" />{t('pendingVendors') || 'طلبات بائعين قيد المراجعة'}</CardTitle>
+              <CardTitle className="flex items-center"><Store className="mr-2 h-5 w-5" />{tt('pendingVendors', 'البائعين قيد الانتظار')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -185,8 +202,8 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
                       <div className="text-sm text-muted-foreground break-words">{u.email}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={()=>approveVendor(u)}><CheckCircle className="h-4 w-4 mr-1" />{t('approve') || 'موافقة'}</Button>
-                      <Button size="sm" variant="outline" onClick={()=>rejectVendor(u)}><Ban className="h-4 w-4 mr-1" />{t('reject') || 'رفض'}</Button>
+                      <Button size="sm" variant="outline" onClick={()=>approveVendor(u)}><CheckCircle className="h-4 w-4 mr-1" />{tt('approve', 'موافقة')}</Button>
+                      <Button size="sm" variant="outline" onClick={()=>rejectVendor(u)}><Ban className="h-4 w-4 mr-1" />{tt('reject', 'رفض')}</Button>
                     </div>
                   </div>
                 ))}
@@ -197,21 +214,21 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center"><Filter className="mr-2 h-5 w-5" />{t('searchAndFilter')}</CardTitle>
+            <CardTitle className="flex items-center"><Filter className="mr-2 h-5 w-5" />{tt('searchAndFilter', 'بحث وتصفية')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="relative">
                 <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input placeholder={t('searchByNameOrEmail')} value={search} onChange={e=>setSearch(e.target.value)} className="pr-10" />
+                <Input placeholder={tt('searchByNameOrEmail', 'ابحث بالاسم أو البريد الإلكتروني')} value={search} onChange={e=>setSearch(e.target.value)} className="pr-10" />
               </div>
               <Select value={status} onValueChange={(v:any)=>setStatus(v)}>
-                <SelectTrigger><SelectValue placeholder={t('statusLabel')} /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={tt('statusLabel', 'الحالة')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t('allStatuses')}</SelectItem>
-                  <SelectItem value="active">{t('activeStatus')}</SelectItem>
-                  <SelectItem value="pending">{t('pendingStatus')}</SelectItem>
-                  <SelectItem value="suspended">{t('suspendedStatus')}</SelectItem>
+                  <SelectItem value="all">{tt('allStatuses', 'كل الحالات')}</SelectItem>
+                  <SelectItem value="active">{tt('activeStatus', 'نشط')}</SelectItem>
+                  <SelectItem value="pending">{tt('pendingStatus', 'قيد الانتظار')}</SelectItem>
+                  <SelectItem value="suspended">{tt('suspendedStatus', 'معلق')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -220,7 +237,7 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center"><Store className="mr-2 h-5 w-5" />{t('vendors')} ({filtered.length})</CardTitle>
+            <CardTitle className="flex items-center"><Store className="mr-2 h-5 w-5" />{tt('vendors', 'البائعون')} ({filtered.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -237,7 +254,7 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{r.name}</h3>
                         <Badge variant={r.status==='active'?'default': r.status==='pending'? 'secondary':'destructive'}>
-                          {r.status==='active'? t('activeStatus') : r.status==='pending' ? t('pendingStatus') : t('suspendedStatus')}
+                          {r.status==='active' ? tt('activeStatus', 'نشط') : r.status==='pending' ? tt('pendingStatus', 'قيد الانتظار') : tt('suspendedStatus', 'معلق')}
                         </Badge>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -246,18 +263,18 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={()=>openView(r.id)}><Eye className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="outline" onClick={()=>openView(r.id)}><Eye className="h-4 w-4 mr-1" />{tt('view', 'عرض')}</Button>
                     {r.status==='active' ? (
-                      <Button size="sm" variant="outline" onClick={()=>suspendMerchant(r.id)}><Ban className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={()=>rejectVendor({ id: r.id })}><Ban className="h-4 w-4 mr-1" />{tt('reject', 'تعليق')}</Button>
                     ) : (
-                      <Button size="sm" variant="outline" onClick={()=>approveMerchant(r.id)}><CheckCircle className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={()=>approveVendor({ id: r.id })}><CheckCircle className="h-4 w-4 mr-1" />{tt('approve', 'تفعيل')}</Button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
             {filtered.length===0 && (
-              <div className="text-center py-8 text-muted-foreground">{t('noResults')}</div>
+              <div className="text-center py-8 text-muted-foreground">{tt('noResults', 'لا توجد نتائج')}</div>
             )}
           </CardContent>
         </Card>
@@ -396,8 +413,8 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
                     <div>{viewUser.isVerified ? 'موثق' : 'غير موثق'}</div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">الشركة</Label>
-                    <div>{viewUser.companyName || (viewUser as any).businessName || (viewUser as any).company || '—'}</div>
+                    <Label className="text-muted-foreground">اسم الشركة / المتجر</Label>
+                    <div>{(viewUser as any).storeName || viewUser.companyName || (viewUser as any).businessName || (viewUser as any).company || '—'}</div>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">المدينة / الدولة</Label>
@@ -425,12 +442,8 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
                     <div dir="ltr">{viewUser.iban || '—'}</div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">بداية السجل</Label>
-                    <div>{viewUser.registryStart || (viewUser as any).registryStartDate || (viewUser as any).commercialRegisterStart || '—'}</div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">نهاية السجل</Label>
-                    <div>{viewUser.registryEnd || (viewUser as any).registryEndDate || (viewUser as any).commercialRegisterEnd || '—'}</div>
+                    <Label className="text-muted-foreground">رقم السجل التجاري</Label>
+                    <div>{(viewUser as any).registryNumber || (viewUser as any).commercialRegistryNumber || (viewUser as any).crNumber || '—'}</div>
                   </div>
                 </div>
               </div>

@@ -390,6 +390,9 @@ export type CreateOrUpdateProductDto = {
   price: number;
   discountPrice?: number;
   stockQuantity: number;
+  // New unit-based selling support
+  unitType?: 'quantity' | 'meters';
+  pricePerMeter?: number;
   allowCustomDimensions?: boolean;
   isAvailableForRent?: boolean;
   rentPricePerDay?: number | null;

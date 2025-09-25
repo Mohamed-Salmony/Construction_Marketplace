@@ -117,6 +117,17 @@ export async function create(req, res) {
     if (uploaded.length) body.images = uploaded;
     else delete body.images; // avoid invalid schema shape
   }
+  // Normalize unit fields
+  try {
+    if (typeof body.unitType === 'string') {
+      const u = String(body.unitType).toLowerCase();
+      body.unitType = (u === 'meters') ? 'meters' : 'quantity';
+    }
+    if (body.unitType === 'meters') {
+      // Ensure pricePerMeter is numeric; keep price as list/reference price for legacy UIs
+      body.pricePerMeter = Number(body.pricePerMeter || body.price || 0);
+    }
+  } catch {}
   const created = await Product.create(body);
   res.status(201).json(created);
 }
@@ -158,7 +169,21 @@ export async function update(req, res) {
     }
     updates.images = mapped;
   }
-  const updated = await Product.findOneAndUpdate({ _id: req.params.id, merchantId: req.user._id }, updates, { new: true });
+  // Admin can update any product; Merchant can only update their own product
+  const filter = (req.user?.role === 'Admin')
+    ? { _id: req.params.id }
+    : { _id: req.params.id, merchantId: req.user._id };
+  // Normalize unit fields on update as well
+  try {
+    if (typeof updates.unitType === 'string') {
+      const u = String(updates.unitType).toLowerCase();
+      updates.unitType = (u === 'meters') ? 'meters' : 'quantity';
+    }
+    if (updates.unitType === 'meters') {
+      updates.pricePerMeter = Number(updates.pricePerMeter ?? updates.price ?? 0);
+    }
+  } catch {}
+  const updated = await Product.findOneAndUpdate(filter, updates, { new: true });
   if (!updated) return res.status(404).json({ success: false, message: 'Product not found' });
   res.json(updated);
 }
@@ -237,6 +262,8 @@ export const validateCreateProduct = [
   body('categoryId').notEmpty(),
   body('price').isNumeric(),
   body('stockQuantity').optional().isInt({ min: 0 }),
+  body('unitType').optional().isIn(['quantity','meters']),
+  body('pricePerMeter').optional().isNumeric(),
 ];
 
 export const validateUpdateProduct = [
@@ -245,5 +272,7 @@ export const validateUpdateProduct = [
   body('categoryId').optional().isMongoId().withMessage('categoryId must be a valid Mongo ObjectId'),
   body('price').optional().isNumeric(),
   body('stockQuantity').optional().isInt({ min: 0 }),
+  body('unitType').optional().isIn(['quantity','meters']),
+  body('pricePerMeter').optional().isNumeric(),
 ];
 

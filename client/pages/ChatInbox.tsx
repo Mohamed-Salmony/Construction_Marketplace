@@ -3,17 +3,39 @@ import type { RouteContext } from '../components/Router';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useTranslation } from '../hooks/useTranslation';
-import { getConversation, getMyConversations, listMessages as listServiceMessages } from '@/services/chat';
-import { getCustomerProjectRecentMessages, getVendorProjectRecentMessages } from '@/services/projectChat';
-import { getCustomerRecentMessages, getRecentVendorMessages, getMyRecentMessages, getMyRecentTechMessages, getMyVendorRecentTechMessages, listMyRentals, listRentalMessages, sendRentalMessage, listTechRentalMessages, sendTechRentalMessage } from '@/services/rentals';
+import { getConversation, getMyConversations, listMessages as listServiceMessages, getConversationByService } from '@/services/chat';
+import { getCustomerProjectRecentMessages, getVendorProjectRecentMessages, getVendorProjectMessageCount, getCustomerProjectMessageCount } from '@/services/projectChat';
+import { getCustomerRecentMessages, getRecentVendorMessages, getMyRecentMessages, getMyRecentTechMessages, getMyVendorRecentTechMessages, listMyRentals, listRentalMessages, sendRentalMessage, listTechRentalMessages, sendTechRentalMessage, getVendorMessageCount, getCustomerMessageCount } from '@/services/rentals';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { MessageCircle, Search } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
+import { Skeleton } from '../components/ui/skeleton';
+import { getUserById } from '@/services/admin';
 
 export default function ChatInbox(context: RouteContext = {} as RouteContext) {
   const { t, locale } = useTranslation();
+  // Robust navigation similar to Header.go
+  const goto = (page: string) => {
+    if (context.setCurrentPage) return context.setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', page);
+        window.location.href = url.toString();
+      } catch {}
+    }
+  };
+  const fmtDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString(locale==='ar'?'ar-EG':'en-GB', {
+        year: '2-digit', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      } as any);
+    } catch { return iso; }
+  };
   const [loading, setLoading] = useState(true);
   const [projectItems, setProjectItems] = useState<Array<{ conversationId: string; projectId: string; message: string; at: string }>>([]);
   const [rentalItems, setRentalItems] = useState<Array<{ rentalId: string; message: string; at: string }>>([]);
@@ -24,6 +46,41 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
   const [vendorTechRentalItems, setVendorTechRentalItems] = useState<Array<{ rentalId: string; message: string; at: string }>>([]);
   const [vendorTab, setVendorTab] = useState<'users' | 'tech'>('users');
   const [q, setQ] = useState('');
+  // Conversation metadata and profile cache for nicer UI
+  const [convMeta, setConvMeta] = useState<Record<string, { vendorId?: string; technicianId?: string; vendorName?: string; technicianName?: string; vendorPic?: string; technicianPic?: string }>>({});
+  const [profiles, setProfiles] = useState<Record<string, { name?: string; profilePicture?: string }>>({});
+  const getProfileCached = async (userId?: string) => {
+    if (!userId) return undefined;
+    if (profiles[userId]) return profiles[userId];
+    try {
+      const res = await getUserById(userId);
+      if (res.ok && (res.data as any)?.success) {
+        const u = (res.data as any).item || {};
+        const p = { name: String(u.name || u.companyName || ''), profilePicture: String(u.profilePicture || '') };
+        setProfiles((prev)=> ({ ...prev, [userId]: p }));
+        return p;
+      }
+    } catch {}
+    return undefined;
+  };
+  // When conversation meta changes, prefetch counterpart profiles (best-effort)
+  useEffect(() => {
+    const ids = new Set<string>();
+    Object.values(convMeta).forEach(m => {
+      if (m.vendorId) ids.add(String(m.vendorId));
+      if (m.technicianId) ids.add(String(m.technicianId));
+    });
+    const toFetch = Array.from(ids).filter(id => !profiles[id]);
+    if (!toFetch.length) return;
+    (async () => {
+      for (const id of toFetch) {
+        try { await getProfileCached(id); } catch {}
+      }
+    })();
+  }, [JSON.stringify(convMeta)]);
+  // Unread counts (if endpoints available)
+  const [projectUnreadCount, setProjectUnreadCount] = useState<number | null>(null);
+  const [rentalUnreadCount, setRentalUnreadCount] = useState<number | null>(null);
   // Inline rental reply modal state
   const [rentalModalOpen, setRentalModalOpen] = useState(false);
   const [activeRentalId, setActiveRentalId] = useState<string>('');
@@ -55,6 +112,20 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
             const top = arr
               .sort((a:any,b:any)=> new Date(b.updatedAt||b.createdAt||0).getTime() - new Date(a.updatedAt||a.createdAt||0).getTime())
               .slice(0, 20);
+            // Capture meta for counterpart identity
+            const meta: Record<string, { vendorId?: string; technicianId?: string; vendorName?: string; technicianName?: string; vendorPic?: string; technicianPic?: string }> = {};
+            for (const c of top) {
+              const cid = String(c.id);
+              meta[cid] = {
+                vendorId: String(c.vendorId || c.merchantId || ''),
+                technicianId: String(c.technicianId || ''),
+                vendorName: String(c.vendorName || c.merchantName || ''),
+                technicianName: String(c.technicianName || ''),
+                vendorPic: String(c.vendorProfilePicture || c.merchantProfilePicture || ''),
+                technicianPic: String(c.technicianProfilePicture || ''),
+              };
+            }
+            setConvMeta(meta);
             const withLatest = await Promise.all(top.map(async (c:any) => {
               try {
                 const msgs = await listServiceMessages(String(c.id));
@@ -222,6 +293,20 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
             ])
           : Promise.resolve([null, null] as any);
         const [proj, rent, extra] = await Promise.all([projPromise, rentPromise, vendorExtra]);
+        // Fetch unread counters if available
+        try {
+          if (role === 'vendor') {
+            const [pc, rc] = await Promise.allSettled([getVendorProjectMessageCount(), getVendorMessageCount()]);
+            if (pc.status==='fulfilled' && (pc.value as any)?.ok && typeof (pc.value as any)?.data?.count === 'number') setProjectUnreadCount((pc.value as any).data.count);
+            if (rc.status==='fulfilled' && typeof (rc.value as any)==='number') setRentalUnreadCount(rc.value as any);
+          } else if (!(role === 'technician' || role === 'worker')) {
+            const [pc, rc] = await Promise.allSettled([getCustomerProjectMessageCount(), getCustomerMessageCount()]);
+            if (pc.status==='fulfilled' && (pc.value as any)?.ok && typeof (pc.value as any)?.data?.count === 'number') setProjectUnreadCount((pc.value as any).data.count);
+            if (rc.status==='fulfilled' && typeof (rc.value as any)==='number') setRentalUnreadCount(rc.value as any);
+          } else {
+            setProjectUnreadCount(null); setRentalUnreadCount(null);
+          }
+        } catch { setProjectUnreadCount(null); setRentalUnreadCount(null); }
         try {
           // Debug info for diagnostics
           console.debug('[ChatInbox] role=', role, 'proj.ok=', (proj as any)?.ok, 'rent.ok=', (rent as any)?.ok);
@@ -385,29 +470,94 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
     return rentalItems.filter((r)=> [r.rentalId, r.message].some((v)=> String(v||'').toLowerCase().includes(s)));
   }, [rentalItems, q]);
 
-  const openConversation = async (cid: string) => {
+  // Unread helpers
+  const lastSeenServices = getLastSeen(lsServiceKey);
+  const lastSeenRentals = getLastSeen(lsRentalKey);
+  const vendorUsersProjectsUnread = useMemo(() => vendorUserProjectItems.filter(p=> new Date(p.at).getTime() > lastSeenServices).length, [vendorUserProjectItems, lastSeenServices]);
+  const vendorServicesUnread = useMemo(() => vendorServiceItems.filter(p=> new Date(p.at).getTime() > lastSeenServices).length, [vendorServiceItems, lastSeenServices]);
+  const vendorUsersRentalsUnread = useMemo(() => vendorUserRentalItems.filter(r=> new Date(r.at).getTime() > lastSeenRentals).length, [vendorUserRentalItems, lastSeenRentals]);
+  const vendorTechRentalsUnread = useMemo(() => vendorTechRentalItems.filter(r=> new Date(r.at).getTime() > lastSeenRentals).length, [vendorTechRentalItems, lastSeenRentals]);
+  const nonVendorProjectsUnread = useMemo(() => filteredProjects.filter(p=> new Date(p.at).getTime() > lastSeenServices).length, [filteredProjects, lastSeenServices]);
+  const nonVendorRentalsUnread = useMemo(() => filteredRentals.filter(r=> new Date(r.at).getTime() > lastSeenRentals).length, [filteredRentals, lastSeenRentals]);
+
+  // Skeleton renderer
+  const CardSkeleton = () => (
+    <Card className="hover:shadow-sm transition">
+      <CardContent className="p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3 w-full">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-3 w-64" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        </div>
+        <Skeleton className="h-5 w-10 rounded-full" />
+      </CardContent>
+    </Card>
+  );
+
+  const openConversation = async (cid: string, projectId?: string) => {
+    // Prefer by-service when we have projectId to avoid 404 on stale conversationId
+    if (projectId) {
+      try {
+        const bySvc = await getConversationByService(projectId);
+        const foundId = (bySvc as any)?.data?.id || (bySvc as any)?.data?._id;
+        if (foundId) {
+          try { localStorage.setItem('chat_conversation_id', String(foundId)); } catch {}
+          const role = (context?.user?.role || '').toString().toLowerCase();
+          if (role === 'vendor') goto('vendor-chat');
+          else if (role === 'worker' || role === 'technician') goto('technician-chat');
+          else goto('project-chat');
+          return;
+        }
+      } catch { /* ignore and fall through to direct navigation */ }
+      // If by-service did not return, pass along IDs and navigate without calling by-id to avoid 404 noise
+      try {
+        const role2 = (context?.user?.role || '').toString().toLowerCase();
+        if (role2 === 'vendor' || role2 === 'worker' || role2 === 'technician') {
+          localStorage.setItem('chat_service_id', String(projectId));
+        } else {
+          localStorage.setItem('project_chat_project_id', String(projectId));
+        }
+      } catch {}
+      const role3 = (context?.user?.role || '').toString().toLowerCase();
+      if (role3 === 'vendor') goto('vendor-chat');
+      else if (role3 === 'worker' || role3 === 'technician') goto('technician-chat');
+      else goto('project-chat');
+      return;
+    }
+    // No projectId: fallback to direct by conversation id
     try {
       const c = await getConversation(cid);
-      if (c.ok && c.data) {
+      if ((c as any).ok && (c as any).data) {
         try { localStorage.setItem('chat_conversation_id', cid); } catch {}
         const role = (context?.user?.role || '').toString().toLowerCase();
         if (role === 'vendor') {
-          const techId = String((c.data as any).technicianId || '');
-          const sid = String((c.data as any).serviceRequestId || '');
+          const techId = String(((c as any).data as any).technicianId || '');
+          const sid = String(((c as any).data as any).serviceRequestId || '');
           try { if (techId) localStorage.setItem('chat_technician_id', techId); } catch {}
           try { if (sid) localStorage.setItem('chat_service_id', sid); } catch {}
-          context.setCurrentPage ? context.setCurrentPage('vendor-chat') : undefined;
+          goto('vendor-chat');
         } else if (role === 'worker' || role === 'technician') {
-          const sid = String((c.data as any).serviceRequestId || '');
+          const sid = String(((c as any).data as any).serviceRequestId || '');
           try { if (sid) localStorage.setItem('chat_service_id', sid); } catch {}
-          context.setCurrentPage ? context.setCurrentPage('technician-chat') : undefined;
+          goto('technician-chat');
         } else {
-          const pid = String((c.data as any).projectId || '');
+          const pid = String(((c as any).data as any).projectId || '');
           try { if (pid) localStorage.setItem('project_chat_project_id', pid); } catch {}
-          context.setCurrentPage ? context.setCurrentPage('project-chat') : undefined;
+          goto('project-chat');
         }
+        return;
       }
-    } catch {}
+    } catch {
+      // ignore; will try fallback
+    }
+    // Last resort: navigate to a generic chat page to avoid dead-end
+    const role = (context?.user?.role || '').toString().toLowerCase();
+    if (role === 'vendor') goto('vendor-chat');
+    else if (role === 'worker' || role === 'technician') goto('technician-chat');
+    else goto('project-chat');
   };
 
   const openRentalThread = async (rentalId: string, lastMessage?: string) => {
@@ -497,13 +647,39 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
                   ) : (
                     <div className="space-y-3">
                       {vendorUserProjectItems.map((p)=> (
-                        <Card key={`u-${p.conversationId}-${p.projectId}`} className="hover:shadow-sm transition">
+                        <Card
+                          key={`u-${p.conversationId}-${p.projectId}`}
+                          className="hover:shadow-sm transition cursor-pointer"
+                          onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId), String(p.projectId||'')); }}
+                        >
                           <CardContent className="p-4 flex items-center justify-between">
-                            <div className={`rounded-md p-2 ${new Date(p.at).getTime() > getLastSeen(lsServiceKey) ? 'bg-yellow-50' : ''}`}>
-                              <div className="font-medium text-sm">{locale==='ar' ? 'محادثة مشروع' : 'Project chat'}</div>
-                              <div className="text-xs text-muted-foreground line-clamp-2">{p.message}</div>
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                {(() => {
+                                  const meta = convMeta[p.conversationId] || {};
+                                  const peerId = roleLower==='vendor' ? meta.vendorId /* customer side not available here */ : meta.vendorId;
+                                  const prof = peerId ? (profiles[peerId] || { name: meta.vendorName, profilePicture: meta.vendorPic }) : { name: meta.vendorName, profilePicture: meta.vendorPic };
+                                  return prof?.profilePicture ? (
+                                    <AvatarImage src={prof.profilePicture} alt={prof.name || 'User'} />
+                                  ) : (
+                                    <AvatarFallback>{(prof?.name || (locale==='ar'?'م':'U')).slice(0,1)}</AvatarFallback>
+                                  );
+                                })()}
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <div className="font-medium text-sm">{(() => {
+                                  const meta = convMeta[p.conversationId] || {};
+                                  const peerId = roleLower==='vendor' ? meta.vendorId : meta.vendorId;
+                                  const prof = peerId ? (profiles[peerId] || { name: meta.vendorName, profilePicture: meta.vendorPic }) : { name: meta.vendorName };
+                                  return prof?.name || (locale==='ar' ? 'محادثة مشروع' : 'Project chat');
+                                })()}</div>
+                                <div className="text-xs text-muted-foreground line-clamp-1">{p.message}</div>
+                                <div className="text-[11px] text-muted-foreground">{fmtDate(p.at)}</div>
+                              </div>
                             </div>
-                            <Button size="sm" variant="outline" onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId)); }}>{locale==='ar' ? 'فتح' : 'Open'}</Button>
+                            {new Date(p.at).getTime() > getLastSeen(lsServiceKey) && (
+                              <span className="text-xs bg-primary text-white rounded-full px-2 py-0.5">{locale==='ar' ? 'جديد' : 'New'}</span>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
@@ -511,7 +687,7 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-medium mb-2">{locale==='ar' ? 'التأجير' : 'Rentals'}</h3>
+                  <h3 className="font-medium mb-2">{locale==='ar' ? 'التأجير' : 'Rentals'}{(rentalUnreadCount ?? vendorUsersRentalsUnread) ? ` (${rentalUnreadCount ?? vendorUsersRentalsUnread})` : ''}</h3>
                   {vendorUserRentalItems.length === 0 ? (
                     <div className="text-muted-foreground text-sm">{locale==='ar' ? 'لا توجد محادثات تأجير.' : 'No rental chats.'}</div>
                   ) : (
@@ -540,19 +716,45 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
               <h2 className="text-lg font-semibold mb-4">{locale==='ar' ? 'الفنيين' : 'Technicians'}</h2>
               <div className="space-y-6">
                 <div>
-                  <h3 className="font-medium mb-2">{locale==='ar' ? 'الخدمات' : 'Services'}</h3>
+                  <h3 className="font-medium mb-2">{locale==='ar' ? 'الخدمات' : 'Services'}{vendorServicesUnread ? ` (${vendorServicesUnread})` : ''}</h3>
                   {vendorServiceItems.length === 0 ? (
                     <div className="text-muted-foreground text-sm">{locale==='ar' ? 'لا توجد محادثات خدمات.' : 'No service chats.'}</div>
                   ) : (
                     <div className="space-y-3">
                       {vendorServiceItems.map((p)=> (
-                        <Card key={`s-${p.conversationId}-${p.projectId}`} className="hover:shadow-sm transition">
+                        <Card
+                          key={`s-${p.conversationId}-${p.projectId}`}
+                          className="hover:shadow-sm transition cursor-pointer"
+                          onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId), String(p.projectId||'')); }}
+                        >
                           <CardContent className="p-4 flex items-center justify-between">
-                            <div className={`rounded-md p-2 ${new Date(p.at).getTime() > getLastSeen(lsServiceKey) ? 'bg-yellow-50' : ''}`}>
-                              <div className="font-medium text-sm">{locale==='ar' ? 'محادثة خدمة' : 'Service chat'}</div>
-                              <div className="text-xs text-muted-foreground line-clamp-2">{p.message}</div>
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                {(() => {
+                                  const meta = convMeta[p.conversationId] || {};
+                                  const peerId = roleLower==='vendor' ? meta.technicianId : meta.vendorId;
+                                  const prof = peerId ? (profiles[peerId] || { name: (peerId===meta.technicianId?meta.technicianName:meta.vendorName), profilePicture: (peerId===meta.technicianId?meta.technicianPic:meta.vendorPic) }) : undefined;
+                                  return prof?.profilePicture ? (
+                                    <AvatarImage src={prof.profilePicture} alt={prof?.name || 'User'} />
+                                  ) : (
+                                    <AvatarFallback>{((prof?.name) || (locale==='ar'?'م':'U')).slice(0,1)}</AvatarFallback>
+                                  );
+                                })()}
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <div className="font-medium text-sm">{(() => {
+                                  const meta = convMeta[p.conversationId] || {};
+                                  const peerId = roleLower==='vendor' ? meta.technicianId : meta.vendorId;
+                                  const prof = peerId ? (profiles[peerId] || { name: (peerId===meta.technicianId?meta.technicianName:meta.vendorName) }) : undefined;
+                                  return prof?.name || (locale==='ar' ? 'محادثة خدمة' : 'Service chat');
+                                })()}</div>
+                                <div className="text-xs text-muted-foreground line-clamp-1">{p.message}</div>
+                                <div className="text-[11px] text-muted-foreground">{fmtDate(p.at)}</div>
+                              </div>
                             </div>
-                            <Button size="sm" variant="outline" onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId)); }}>{locale==='ar' ? 'فتح' : 'Open'}</Button>
+                            {new Date(p.at).getTime() > getLastSeen(lsServiceKey) && (
+                              <span className="text-xs bg-primary text-white rounded-full px-2 py-0.5">{locale==='ar' ? 'جديد' : 'New'}</span>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
@@ -560,7 +762,7 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-medium mb-2">{locale==='ar' ? 'التأجير' : 'Rentals'}</h3>
+                  <h3 className="font-medium mb-2">{locale==='ar' ? 'التأجير' : 'Rentals'}{vendorTechRentalsUnread ? ` (${vendorTechRentalsUnread})` : ''}</h3>
                   {vendorTechRentalItems.length === 0 ? (
                     <div className="text-muted-foreground text-sm">{locale==='ar' ? 'لا توجد محادثات تأجير.' : 'No rental chats.'}</div>
                   ) : (
@@ -588,19 +790,45 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
         {!loading && roleLower!=='vendor' && (
           <div className="space-y-8">
             <section>
-              <h2 className="font-semibold mb-3">{projectHeader}</h2>
+              <h2 className="font-semibold mb-3">{`${projectHeader}${(projectUnreadCount ?? nonVendorProjectsUnread) ? ` (${projectUnreadCount ?? nonVendorProjectsUnread})` : ''}`}</h2>
               {filteredProjects.length === 0 ? (
                 <div className="text-muted-foreground text-sm">{projectEmpty}</div>
               ) : (
                 <div className="space-y-3">
                   {filteredProjects.map((p) => (
-                    <Card key={`${p.conversationId}-${p.projectId}`} className="hover:shadow-sm transition">
+                    <Card
+                      key={`${p.conversationId}-${p.projectId}`}
+                      className="hover:shadow-sm transition cursor-pointer"
+                      onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId), String(p.projectId||'')); }}
+                    >
                       <CardContent className="p-4 flex items-center justify-between">
-                        <div className={`rounded-md p-2 ${new Date(p.at).getTime() > getLastSeen(lsServiceKey) ? 'bg-yellow-50' : ''}`}>
-                          <div className="font-medium text-sm">{roleLower==='technician'||roleLower==='worker' ? (locale==='ar' ? 'محادثة خدمة' : 'Service chat') : (locale==='ar' ? 'محادثة مشروع' : 'Project chat')}</div>
-                          <div className="text-xs text-muted-foreground line-clamp-2">{p.message}</div>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            {(() => {
+                              const meta = convMeta[p.conversationId] || {};
+                              const peerId = (roleLower==='technician'||roleLower==='worker') ? meta.vendorId : undefined;
+                              const prof = peerId ? (profiles[peerId] || { name: meta.vendorName, profilePicture: meta.vendorPic }) : undefined;
+                              return prof?.profilePicture ? (
+                                <AvatarImage src={prof.profilePicture} alt={prof.name || 'User'} />
+                              ) : (
+                                <AvatarFallback>{(prof?.name || (locale==='ar'?'م':'U')).slice(0,1)}</AvatarFallback>
+                              );
+                            })()}
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <div className="font-medium text-sm">{(() => {
+                              const meta = convMeta[p.conversationId] || {};
+                              const peerId = (roleLower==='technician'||roleLower==='worker') ? meta.vendorId : undefined;
+                              const prof = peerId ? (profiles[peerId] || { name: meta.vendorName }) : undefined;
+                              return prof?.name || (roleLower==='technician'||roleLower==='worker' ? (locale==='ar'?'محادثة خدمة':'Service chat') : (locale==='ar'?'محادثة مشروع':'Project chat'));
+                            })()}</div>
+                            <div className="text-xs text-muted-foreground line-clamp-1">{p.message}</div>
+                            <div className="text-[11px] text-muted-foreground">{fmtDate(p.at)}</div>
+                          </div>
                         </div>
-                        <Button size="sm" variant="outline" onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId)); }}>{locale==='ar' ? 'فتح' : 'Open'}</Button>
+                        {new Date(p.at).getTime() > getLastSeen(lsServiceKey) && (
+                          <span className="text-xs bg-primary text-white rounded-full px-2 py-0.5">{locale==='ar' ? 'جديد' : 'New'}</span>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -609,7 +837,7 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
             </section>
 
             <section>
-              <h2 className="font-semibold mb-3">{locale==='ar' ? 'التأجير' : 'Rentals'}</h2>
+              <h2 className="font-semibold mb-3">{`${locale==='ar' ? 'التأجير' : 'Rentals'}${(rentalUnreadCount ?? nonVendorRentalsUnread) ? ` (${rentalUnreadCount ?? nonVendorRentalsUnread})` : ''}`}</h2>
               {filteredRentals.length === 0 ? (
                 <div className="text-muted-foreground text-sm">{locale==='ar' ? 'لا توجد محادثات تأجير.' : 'No rental chats.'}</div>
               ) : (

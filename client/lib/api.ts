@@ -91,6 +91,11 @@ export async function apiFetch<T>(path: string, options?: {
   auth?: boolean; // include bearer token from storage (default: true)
   signal?: AbortSignal;
   cache?: RequestCache; // e.g., 'no-store' to bypass 304 caches
+  // Optional timeout override in milliseconds (default: 30000, or 60000 for registration)
+  timeoutMs?: number;
+  // Optional retry settings
+  retryAttempts?: number; // number of additional attempts on network/5xx/429 (default 0)
+  retryBackoffMs?: number; // base backoff in ms (exponential) (default 500)
 }): Promise<{ data: T | null; ok: boolean; status: number; error?: any }> {
 
   const url = (() => {
@@ -100,8 +105,8 @@ export async function apiFetch<T>(path: string, options?: {
     const base = RUNTIME_BASE;
     const fullUrl = `${base}${path.startsWith('/') ? path : `/${path}`}`;
     
-    // Log API calls in production for debugging
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    // Log API calls only when explicitly enabled via window.__API_DEBUG__
+    if (typeof window !== 'undefined' && (window as any).__API_DEBUG__) {
       console.log('[API Debug]', options?.method || 'GET', fullUrl);
     }
     
@@ -134,89 +139,121 @@ export async function apiFetch<T>(path: string, options?: {
 
   const method = options?.method || 'GET';
 
-  // Add timeout for requests (60 seconds for registration, 30 for others)
+  // Add timeout for requests (60 seconds for registration, 30 for others) with per-call override
   const isRegistration = path.includes('/register') || path.includes('/Auth/register');
-  const timeoutMs = isRegistration ? 60000 : 30000;
+  const timeoutMs = typeof options?.timeoutMs === 'number' && options?.timeoutMs! > 0
+    ? options.timeoutMs!
+    : (isRegistration ? 60000 : 30000);
   
-  const controller = new AbortController();
-  let timeoutId: NodeJS.Timeout | undefined;
-  
-  try {
-    timeoutId = setTimeout(() => {
-      console.warn(`[api] Request timeout after ${timeoutMs}ms for ${path}`);
-      controller.abort();
-    }, timeoutMs);
-    
-    // Use provided signal if available, otherwise use our controller
-    const finalSignal = options?.signal || controller.signal;
-    
-    const response = await fetch(url, { 
-      method, 
-      body: isForm ? options?.body : JSON.stringify(options?.body), 
-      headers, 
-      signal: finalSignal,
-      credentials: useCredentials ? 'include' : undefined, 
-      cache: options?.cache 
-    });
-
-    clearTimeout(timeoutId);
-
-    // Log response for debugging in production
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-      console.log('[API Response]', response.status, url);
-      if (!response.ok) {
-        console.error('[API Error]', response.status, response.statusText, url);
-      }
-    }
-
-    let data: T | null = null;
+  // Simple rate-limited warning for timeouts (per-path, 10s window)
+  const warnKey = `[api-timeout] ${path}`;
+  const canWarn = () => {
     try {
-      // Only attempt JSON parsing if response body has content
-      data = await response.json();
-    } catch (jsonErr) {
-      if (response.bodyUsed || !response.body) {
-        // No body expected or already consumed
-      } else {
-        console.warn(`Failed to parse JSON from ${url}:`, jsonErr);
-      }
-    }
+      if (typeof window === 'undefined') return true;
+      const map = ((window as any).__apiWarns ||= new Map<string, number>());
+      const now = Date.now();
+      const last = map.get(warnKey) || 0;
+      if (now - last > 10000) { map.set(warnKey, now); return true; }
+      return false;
+    } catch { return true; }
+  };
 
-    return {
-      data,
-      ok: response.ok,
-      status: response.status,
-      error: !response.ok ? { status: response.status, message: response.statusText || 'Request failed' } : undefined,
-    };
-  } catch (error: any) {
-    // Make sure to clear timeout in error case too
-    if (timeoutId) {
+  const attempts = Math.max(0, Number(options?.retryAttempts ?? 0));
+  const baseBackoff = Math.max(0, Number(options?.retryBackoffMs ?? 500));
+
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= attempts; attempt++) {
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
+    try {
+      timeoutId = setTimeout(() => {
+        if (canWarn()) console.warn(`[api] Request timeout after ${timeoutMs}ms for ${path}`);
+        controller.abort();
+      }, timeoutMs);
+
+      const finalSignal = options?.signal || controller.signal;
+
+      const response = await fetch(url, {
+        method,
+        body: isForm ? options?.body : JSON.stringify(options?.body),
+        headers,
+        signal: finalSignal,
+        credentials: useCredentials ? 'include' : undefined,
+        cache: options?.cache,
+      });
+
       clearTimeout(timeoutId);
-    }
-    
-    // Enhanced error logging for production debugging
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-      console.error('[API Network Error]', error.message, url);
-    }
-    
-    // Only log to error handler if it's not a timeout abort
-    if (error.name !== 'AbortError' || !error.message.includes('timeout')) {
-      handleApiError(error, `API: ${method} ${url}`);
-    }
-    
-    // Return proper API error response format
-    return {
-      data: null,
-      ok: false,
-      status: error.name === 'AbortError' ? 408 : 0,
-      error: {
-        status: error.name === 'AbortError' ? 408 : 0,
-        message: error.name === 'AbortError' && error.message.includes('timeout') 
-          ? `Request timeout after ${timeoutMs || 30000}ms` 
-          : error.message || 'Network error',
-        name: error.name
+
+      // Log response only when debug is enabled
+      if (typeof window !== 'undefined' && (window as any).__API_DEBUG__) {
+        console.log('[API Response]', response.status, url);
+        if (!response.ok) {
+          console.error('[API Error]', response.status, response.statusText, url);
+        }
       }
-    };
+
+      // Retry on 429/5xx when attempts remain
+      if (!response.ok && attempt < attempts && (response.status === 429 || response.status >= 500)) {
+        const delay = baseBackoff * Math.pow(2, attempt);
+        await sleep(delay);
+        continue;
+      }
+
+      let data: T | null = null;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        if (!(response.bodyUsed || !response.body)) {
+          if ((window as any).__API_DEBUG__) console.warn(`Failed to parse JSON from ${url}:`, jsonErr);
+        }
+      }
+
+      return {
+        data,
+        ok: response.ok,
+        status: response.status,
+        error: !response.ok ? { status: response.status, message: response.statusText || 'Request failed' } : undefined,
+      };
+    } catch (error: any) {
+      if (timeoutId) clearTimeout(timeoutId);
+      lastError = error;
+      // Only log in debug mode
+      if (typeof window !== 'undefined' && (window as any).__API_DEBUG__) {
+        console.error('[API Network Error]', error?.message || error, url);
+      }
+      // Do not handle abort here; will retry if attempts remain
+      if (attempt < attempts) {
+        const delay = baseBackoff * Math.pow(2, attempt);
+        await sleep(delay);
+        continue;
+      }
+      // Fall-through: return error response
+      const isAbort = error?.name === 'AbortError';
+      if (!isAbort) handleApiError(error, `API: ${method} ${url}`);
+      return {
+        data: null,
+        ok: false,
+        status: isAbort ? 408 : 0,
+        error: {
+          status: isAbort ? 408 : 0,
+          message: isAbort && (error?.message || '').includes('timeout')
+            ? `Request timeout after ${timeoutMs || 30000}ms`
+            : error?.message || 'Network error',
+          name: error?.name || 'Error',
+        },
+      };
+    }
   }
+
+  // Should never reach here, but return last error if it happens
+  return {
+    data: null,
+    ok: false,
+    status: 0,
+    error: { status: 0, message: lastError?.message || 'Unknown error', name: lastError?.name || 'Error' },
+  };
 }
 
 export const api = {

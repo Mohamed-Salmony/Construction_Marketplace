@@ -1,5 +1,6 @@
 import { safeAsync, handleApiError } from '../utils/errorHandler';
 import { safeGet } from '../utils/safeApi';
+import { api } from '@/lib/api';
 
 // Customer notification types
 export interface CustomerNotification {
@@ -93,19 +94,19 @@ export async function getCustomerNotifications(): Promise<CustomerNotification[]
       });
     }
 
-    // Get rentals using safe API endpoints (try different endpoints)
+    // Get rentals using existing backend routes; suppress 404 noise
     const rentalsData = await safeAsync(async () => {
-      // Try the simple endpoint first
-      let response = await safeGet('/api/Rentals', {}, [], 'Available Rentals');
-      if (!response || !Array.isArray(response)) {
-        // If that doesn't work, try the customer endpoint
-        response = await safeGet('/api/Rentals/customer', {}, [], 'Customer Rentals');
-        if (!response || !Array.isArray(response)) {
-          // If that doesn't work either, return empty array
-          return [];
-        }
+      // Prefer public list, then fall back to mine (auth)
+      const tryEndpoints: Array<{ path: string; auth?: boolean }> = [
+        { path: '/api/Rentals/public', auth: false },
+        { path: '/api/Rentals/mine', auth: true },
+      ];
+      for (const ep of tryEndpoints) {
+        const r = await api.get<any[]>(ep.path, { timeoutMs: 5000, auth: ep.auth !== false });
+        if (r.ok && Array.isArray(r.data)) return r.data as any[];
+        if (r.status === 404) continue; // endpoint not available; try next
       }
-      return response;
+      return [] as any[];
     }, [], 'Rentals API');
 
     if (rentalsData && Array.isArray(rentalsData)) {
@@ -147,10 +148,21 @@ export async function getCustomerNotifications(): Promise<CustomerNotification[]
       });
     }
 
-    // Get messages/chat notifications  
+    // Get messages/chat notifications via existing endpoints (suppress 404)
+    // Combine counts from ProjectChat and Rentals message counts
     const messagesData = await safeAsync(async () => {
-      const response = await safeGet('/api/Chat/customer/unread', {}, { count: 0 }, 'Customer Messages');
-      return response && typeof response === 'object' && 'count' in response ? response : { count: 0 };
+      let total = 0;
+      const endpoints = [
+        '/api/ProjectChat/customer/message-count',
+        '/api/Rentals/customer/message-count',
+      ];
+      for (const ep of endpoints) {
+        const r = await api.get<{ count: number }>(ep, { timeoutMs: 5000, auth: true });
+        if (r.ok && r.data && typeof (r.data as any).count === 'number') {
+          total += Number((r.data as any).count) || 0;
+        }
+      }
+      return { count: total } as any;
     }, { count: 0 }, 'Customer Messages API');
 
     if (messagesData && messagesData.count > 0) {
@@ -166,47 +178,17 @@ export async function getCustomerNotifications(): Promise<CustomerNotification[]
       });
     }
 
-    // Get bids on customer projects
-    const bidsData = await safeAsync(async () => {
-      // Try different bid endpoints
-      let response = await safeGet('/api/Bids/customer', {}, [], 'Customer Bids');
-      if (!response || !Array.isArray(response)) {
-        response = await safeGet('/api/Bids', {}, [], 'All Bids');
-        if (!response || !Array.isArray(response)) {
-          return [];
-        }
-      }
-      return response;
-    }, [], 'Bids API');
+    // Bids: backend does not expose /api/Bids endpoints; skip to avoid 404 noise
 
-    if (bidsData && Array.isArray(bidsData)) {
-      bidsData.slice(0, 2).forEach((bid: any) => {
-        if (bid.status === 'Pending' || bid.status === 'Submitted') {
-          notifications.push({
-            id: `bid_received_${bid.id}_${Date.now()}`,
-            type: 'bid_received',
-            title: 'عرض جديد على مشروعك! 💼',
-            message: `تم استلام عرض بقيمة ${bid.amount ? `${bid.amount.toLocaleString()} ريال` : 'غير محدد'} على مشروع "${bid.projectTitle || 'غير محدد'}"`,
-            data: { bidId: bid.id, projectId: bid.projectId, amount: bid.amount },
-            page: 'project-details',
-            createdAt: bid.createdAt || new Date().toISOString(),
-            isRead: false
-          });
-        }
-      });
-    }
-
-    // Get wishlist notifications (if items are on sale)
+    // Get wishlist notifications (if items are on sale) (suppress 404)
     const wishlistData = await safeAsync(async () => {
-      // Try different wishlist endpoints
-      let response = await safeGet('/api/Wishlist', {}, [], 'Customer Wishlist');
-      if (!response || !Array.isArray(response)) {
-        response = await safeGet('/api/Wishlist/me', {}, [], 'My Wishlist');
-        if (!response || !Array.isArray(response)) {
-          return [];
-        }
+      const tryEndpoints = ['/api/Wishlist', '/api/Wishlist/me'];
+      for (const ep of tryEndpoints) {
+        const r = await api.get<any[]>(ep, { timeoutMs: 5000, auth: true });
+        if (r.ok && Array.isArray(r.data)) return r.data as any[];
+        if (r.status === 404) continue;
       }
-      return response;
+      return [] as any[];
     }, [], 'Wishlist API');
 
     if (wishlistData && Array.isArray(wishlistData)) {

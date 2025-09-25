@@ -23,23 +23,56 @@ function mapUser(u) {
 
 // GET /api/Admin/users?role=&status=
 export async function adminListUsers(req, res) {
-  const { role, status } = req.query || {};
-  const q = {};
-  // Role filter (Admin | Merchant | Technician | Customer)
-  if (role) {
-    // Treat 'Technician' filter as both 'Technician' and legacy 'Worker'
-    if (String(role) === 'Technician') q.role = { $in: ['Technician', 'Worker'] };
-    else q.role = role;
+  try {
+    const { role, status } = req.query || {};
+    // Pagination with sane defaults
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSizeRaw = Number(req.query.pageSize) || 50;
+    const pageSize = Math.min(Math.max(1, pageSizeRaw), 500);
+    const skip = (page - 1) * pageSize;
+
+    const q = {};
+    // Role filter (Admin | Merchant | Technician | Customer)
+    if (role) {
+      // Treat 'Technician' filter as both 'Technician' and legacy 'Worker'
+      if (String(role) === 'Technician') q.role = { $in: ['Technician', 'Worker'] };
+      else q.role = role;
+    }
+    // Status mapping
+    if (status) {
+      const s = String(status).toLowerCase();
+      if (s === 'active') { q.isActive = true; q.isVerified = true; }
+      else if (s === 'pending') { q.isVerified = false; }
+      else if (s === 'suspended' || s === 'banned') { q.isActive = false; }
+    }
+
+    // Use projection to limit fields; lean() for speed/memory
+    const projection = {
+      name: 1,
+      firstName: 1,
+      lastName: 1,
+      email: 1,
+      phoneNumber: 1,
+      role: 1,
+      isActive: 1,
+      isVerified: 1,
+      createdAt: 1,
+      companyName: 1,
+      city: 1,
+      country: 1,
+      profilePicture: 1,
+    };
+
+    const [rows, totalCount] = await Promise.all([
+      User.find(q, projection).sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+      User.countDocuments(q),
+    ]);
+
+    res.json({ success: true, items: rows.map(mapUser), totalCount, page, pageSize });
+  } catch (err) {
+    console.warn('[admin] list users error:', err?.message || err);
+    res.status(500).json({ success: false, items: [], message: 'Failed to fetch users' });
   }
-  // Status mapping
-  if (status) {
-    const s = String(status).toLowerCase();
-    if (s === 'active') { q.isActive = true; q.isVerified = true; }
-    else if (s === 'pending') { q.isVerified = false; }
-    else if (s === 'suspended' || s === 'banned') { q.isActive = false; }
-  }
-  const users = await User.find(q).sort({ createdAt: -1 }).limit(500);
-  res.json({ success: true, items: users.map(mapUser) });
 }
 
 // POST /api/Admin/users/:id/status { status }

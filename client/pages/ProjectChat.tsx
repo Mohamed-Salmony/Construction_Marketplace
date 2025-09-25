@@ -31,6 +31,7 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
   const [text, setText] = useState<string>('');
   const boxRef = useRef<HTMLDivElement | null>(null);
   const firstInitRef = useRef(false);
+  const [merchantAvatar, setMerchantAvatar] = useState<string>('');
 
   useEffect(() => {
     if (firstInitRef.current) return;
@@ -45,6 +46,10 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     try { midLs = localStorage.getItem('project_chat_merchant_id') || ''; } catch {}
     let midName = '';
     try { midName = localStorage.getItem('project_chat_merchant_name') || ''; } catch {}
+    // Optional avatar
+    let midAvatar = '';
+    try { midAvatar = localStorage.getItem('project_chat_merchant_avatar') || ''; } catch {}
+    if (midAvatar) setMerchantAvatar(midAvatar);
     // Extract from URL query params
     let pidUrl = '';
     let cidUrl = '';
@@ -55,6 +60,13 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
       if (qpPid) pidUrl = qpPid;
       if (qpCid) cidUrl = qpCid;
     } catch {}
+    // Fallback to selected_project_id if dedicated key missing
+    if (!pidLs) {
+      try {
+        const sel = localStorage.getItem('selected_project_id') || '';
+        if (sel) pidLs = sel;
+      } catch {}
+    }
     const pid = pidLs || pidUrl;
     const cid = cidLs || cidUrl;
     setProjectId(pid);
@@ -62,26 +74,26 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
     if (midName) setMerchantName(midName);
     // Determine merchant id to use now (avoid stale state inside async)
     let midUsed = midLs;
-    console.log('[ProjectChat] Initial setup - pid:', pid, 'midUsed:', midUsed, 'userRole:', userRole, 'userId:', userId);
+    // debug log removed
     
     // For merchants: use the stored merchant ID from localStorage (the other party)
     // For customers: midUsed should be the merchant they want to chat with
     try {
       if (!midUsed && userRole === 'vendor' && userId) {
         // If merchant and no merchantId stored, we can't determine who to chat with
-        console.log('[ProjectChat] Merchant but no stored merchant ID - need to get from project context');
+        // debug log removed
       }
     } catch {}
     
     (async () => {
       try {
         if (cid) {
-          console.log('[ProjectChat] Using existing conversation ID:', cid);
+          // debug log removed
           setConversationId(cid);
           return;
         }
         if (pid) {
-          console.log('[ProjectChat] Trying to find conversations for project:', pid);
+          // debug log removed
           
           // First, try to get all conversations for this project that user is part of
           try {
@@ -93,7 +105,7 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
             
             if (response.ok) {
               const conversations = await response.json();
-              console.log('[ProjectChat] Found conversations:', conversations);
+              // debug log removed
               
               if (conversations && conversations.length > 0) {
                 // Use the first available conversation
@@ -105,12 +117,12 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
               }
             }
           } catch (e) {
-            console.log('[ProjectChat] Error fetching project conversations:', e);
+            // debug log removed
           }
           
           // If no conversation found and we have merchantId, try to create or find one
           if (midUsed) {
-            console.log('[ProjectChat] Trying to find/create conversation with merchant:', midUsed);
+            // debug log removed
             try {
               const found = await getProjectConversationByKeys(pid, midUsed);
               if (found.ok && (found.data as any)?.id) {
@@ -165,9 +177,16 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
         const c = await getProjectConversation(conversationId);
         if (c.ok && c.data) {
           setMerchantId((prev) => String((c.data as any).merchantId || '') || prev);
-          setMerchantName((c.data as any).merchantName || '');
+          // Server getConversation currently returns only IDs; keep existing name if none provided
+          setMerchantName((prev) => {
+            const name = (c.data as any).merchantName;
+            return (typeof name === 'string' && name.trim()) ? String(name) : prev;
+          });
           setCustomerId((prev) => String((c.data as any).customerId || '') || prev);
-          setCustomerName((c.data as any).customerName || '');
+          setCustomerName((prev) => {
+            const name = (c.data as any).customerName;
+            return (typeof name === 'string' && name.trim()) ? String(name) : prev;
+          });
         }
       } catch {}
     })();
@@ -232,14 +251,7 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
   const role = userRole;
   const myId = userId;
   const isVendor = role === 'vendor' || role === 'merchant';
-  
-  console.log('[ProjectChat] User role info:', { 
-    role, 
-    isVendor, 
-    userId: myId, 
-    customerName, 
-    merchantName 
-  });
+  // debug log removed
 
   return (
     <div className="min-h-screen bg-background" dir={isAr ? 'rtl' : 'ltr'}>
@@ -248,7 +260,18 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
         <Card className="max-w-3xl mx-auto">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
-              <span>{isVendor ? (isAr ? 'مراسلة العميل' : 'Message Customer') : (isAr ? 'مراسلة التاجر' : 'Message Merchant')}</span>
+              <div className="flex items-center gap-3">
+                {!isVendor && (
+                  merchantAvatar ? (
+                    <img src={merchantAvatar} alt={merchantName || 'Merchant'} className="w-8 h-8 rounded-full object-cover border" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                      {(merchantName || '').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || 'M'}
+                    </div>
+                  )
+                )}
+                <span>{isVendor ? (isAr ? 'مراسلة العميل' : 'Message Customer') : (isAr ? 'مراسلة التاجر' : 'Message Merchant')}</span>
+              </div>
               <div className="text-xs text-muted-foreground">
                 {isVendor
                   ? (isAr ? `العميل: ${customerName || (isAr ? 'غير معرّف' : 'Unknown')}` : `Customer: ${customerName || 'Unknown'}`)
@@ -280,8 +303,8 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
                     return (
                       <div key={m.id ?? i} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <div className="max-w-[70%]">
-                          <div className={`rounded-lg px-3 py-2 text-sm ${isMine ? 'bg-blue-600 text-white' : 'bg-white border'}`}>
-                            <div>{m.text}</div>
+                          <div className={`rounded-2xl px-3 py-2 text-sm shadow-sm ${isMine ? 'bg-blue-600 text-white' : 'bg-white border'} `}>
+                            <div className="whitespace-pre-wrap break-words">{m.text}</div>
                             <div className={`text-[10px] opacity-70 mt-1 ${isMine ? 'text-right' : 'text-left'}`}>
                               {name} • {new Date(m.ts).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
                             </div>

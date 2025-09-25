@@ -11,6 +11,7 @@ import ProductForm from '../../components/vendor/ProductForm';
 import { Package, Search, Filter, Plus, Edit, Trash2, Store, Tag, ArrowRight, Clock } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getProducts, createProduct, updateProduct, deleteProduct, getAllCategories, getProductById } from '../../services/products';
+import { toastSuccess, toastError } from '@/utils/alerts';
 import { getPendingProducts, approveProduct as approveProductAdmin, rejectProduct as rejectProductAdmin } from '@/services/admin';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 
@@ -184,17 +185,50 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
         // de-dup while preserving order
         return Array.from(new Set(all));
       })(),
+      // Unit fields
+      unitType: (data.unitType === 'meters' ? 'meters' : 'quantity'),
+      pricePerMeter: data.unitType === 'meters' ? Number(data.pricePerMeter || data.price || 0) : undefined,
     };
-    if (editId) {
-      const idToUpdate = selectedBackendId || String(editId);
-      await updateProduct(idToUpdate as any, payload);
-    } else {
-      await createProduct(payload);
+    try {
+      if (editId) {
+        const idToUpdate = selectedBackendId || String(editId);
+        const r = await updateProduct(idToUpdate as any, payload);
+        if ((r as any)?.ok !== false) {
+          toastSuccess('تم حفظ المنتج بنجاح', true);
+        } else {
+          toastError('تعذر حفظ التغييرات', true);
+        }
+      } else {
+        const r = await createProduct(payload);
+        if ((r as any)?.ok !== false) {
+          toastSuccess('تم إضافة المنتج بنجاح', true);
+        } else {
+          toastError('تعذر إضافة المنتج', true);
+        }
+      }
+    } catch {
+      toastError('حدث خطأ أثناء الحفظ', true);
     }
     setFormOpen(false); setEditId(null); await reload();
   };
 
-  const removeRow = async (r: ProductRow) => { const realId = String((r as any).backendId || r.id); await deleteProduct(realId as any); await reload(); };
+  const removeRow = async (r: ProductRow) => {
+    const realId = String((r as any).backendId || r.id);
+    // Optimistic UI: remove immediately
+    setRows(prev => prev.filter(x => x.id !== r.id));
+    try {
+      const resp = await deleteProduct(realId as any);
+      if ((resp as any)?.ok !== false) {
+        toastSuccess('تم حذف المنتج بنجاح', true);
+      } else {
+        toastError('تعذر حذف المنتج', true);
+        await reload(); // rollback to server truth
+      }
+    } catch {
+      toastError('حدث خطأ أثناء الحذف', true);
+      await reload(); // rollback on error
+    }
+  };
 
   const doApproveProduct = async (id: string) => {
 

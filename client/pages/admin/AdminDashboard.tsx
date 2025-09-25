@@ -79,6 +79,8 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
     // Safety timer declared outside try so we can clear in finally
     let autoHideTimer: any = null;
     try {
+      // Ask app shell (if available) to show global loading
+      try { (context as any)?.showLoading?.(); } catch {}
       // Auto-hide the overlay as a safety net; we will also hide explicitly in finally
       try {
         autoHideTimer = setTimeout(() => {
@@ -452,6 +454,21 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
   return (
     <div className="min-h-screen bg-background">
       <Header {...context} />
+      {isLoading && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm"
+          aria-live="polite"
+          aria-busy="true"
+          role="status"
+        >
+          <div className="flex flex-col items-center gap-3 p-6 rounded-lg border bg-white dark:bg-zinc-900 shadow-lg">
+            <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-sm text-muted-foreground">
+              {locale==='ar' ? 'جاري التحميل...' : 'Loading...'}
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -530,10 +547,9 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
                       <p className="font-medium text-sm">{m.name} ({m.email})</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         <Badge variant="secondary">{isAr ? 'بائع' : 'Vendor'}</Badge>
-                        <Badge variant="secondary">
-                          {/* Use name as temporary store name until backend is restarted */}
-                          {(m as any)?.storeName || `${m.name} (متجر)` || (isAr ? 'لا يوجد اسم متجر' : 'No store name')}
-                        </Badge>
+                        {(((m as any)?.storeName) || ((m as any)?.companyName) || ((m as any)?.shopName) || ((m as any)?.businessName)) && (
+                          <Badge variant="secondary">{(m as any)?.storeName || (m as any)?.companyName || (m as any)?.shopName || (m as any)?.businessName}</Badge>
+                        )}
                         {m.createdAt && (<span className="text-xs text-muted-foreground">{isAr ? 'انضم في' : 'Joined'}: {new Date(m.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}</span>)}
                       </div>
                     </div>
@@ -1423,12 +1439,16 @@ export default function AdminDashboard({ setCurrentPage, ...context }: Partial<R
               <h4 className="font-medium mb-3">{isAr ? 'العنوان' : 'Address'}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <span className="font-medium">{isAr ? 'رقم المبنى:' : 'Building Number:'}</span>
-                  <p className="text-muted-foreground">{(techDialogData as any).buildingNumber || (isAr ? 'غير محدد' : 'Not specified')}</p>
-                </div>
-                <div>
                   <span className="font-medium">{isAr ? 'الشارع:' : 'Street:'}</span>
-                  <p className="text-muted-foreground">{(techDialogData as any).streetName || (isAr ? 'غير محدد' : 'Not specified')}</p>
+                  <p className="text-muted-foreground">{
+                    (techDialogData as any).address
+                    || (techDialogData as any).streetName
+                    || (techDialogData as any).street
+                    || (techDialogData as any).streetAddress
+                    || (techDialogData as any)?.address?.streetName
+                    || (techDialogData as any)?.address?.street
+                    || (isAr ? 'غير محدد' : 'Not specified')
+                  }</p>
                 </div>
                 <div>
                   <span className="font-medium">{isAr ? 'المدينة:' : 'City:'}</span>
