@@ -310,7 +310,10 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                 <button onClick={() => go('offers')} className="text-foreground hover:text-primary transition-colors">{t('offers')}</button>
                 {/* Projects/Services: for workers show Services instead of Projects */}
                 {isWorker ? (
-                  <button onClick={() => go('technician-services')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'الخدمات' : 'Services'}</button>
+                  <>
+                    <button onClick={() => go('technician-services')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'الخدمات' : 'Services'}</button>
+                    <button onClick={() => go('technician-offers')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'عروضي' : 'My Offers'}</button>
+                  </>
                 ) : (
                   <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
                 )}

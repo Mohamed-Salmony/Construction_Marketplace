@@ -893,7 +893,8 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
                       )}
                     </div>
 
-                    {/* License image preview (clickable in edit mode) */}
+                    {/* License image preview (clickable in edit mode) - Only for technicians */}
+                    {isTechnician && (
                     <div className="space-y-2">
                       <Label className="block">{locale==='en' ? 'License Image' : 'صورة الرخصة'}</Label>
                       <div
@@ -921,6 +922,7 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
                         />
                       </div>
                     </div>
+                    )}
                     {/* Vendor specific readout */}
                     {editedUser.role === 'vendor' && (
                       <div className="md:col-span-2 space-y-4">

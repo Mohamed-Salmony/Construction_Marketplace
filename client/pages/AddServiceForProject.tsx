@@ -12,7 +12,7 @@ import { getAdminTechnicianOptions } from "../lib/adminOptions";
 import { createService, updateService, listServiceTypes, type ServiceTypeItem } from "@/services/servicesCatalog";
 import { toastSuccess, toastError } from "../utils/alerts";
 import { getCommissionRates } from "@/services/commissions";
-import { getAdminOption } from "@/services/admin";
+import { getOption } from "@/services/options";
 import { getMyBids, getProjectById, type BidDto, type ProjectDto } from "@/services/projects";
 
 interface AddServiceForProjectProps extends Partial<RouteContext> {}
@@ -79,10 +79,10 @@ export default function AddServiceForProject({ setCurrentPage, ...rest }: AddSer
     } catch {}
   })(); }, []);
 
-  // Load technician specialties
+  // Load technician specialties (from public Options endpoint)
   useEffect(() => { (async () => {
     try {
-      const { ok, data } = await getAdminOption('technician_specialties');
+      const { ok, data } = await getOption('technician_specialties');
       if (ok && data) {
         const arr = JSON.parse(String((data as any).value || '[]'));
         if (Array.isArray(arr)) {
@@ -97,24 +97,42 @@ export default function AddServiceForProject({ setCurrentPage, ...rest }: AddSer
     } catch {}
   })(); }, []);
 
-  // Load types
+  // Load types (from DB Options first, then fallback to catalog service types)
   useEffect(() => {
     try {
       const loadTypes = async () => {
+        // Primary: public Options 'technician_specialties' (DB)
         try {
-          const r = await listServiceTypes();
-          if (r.ok && Array.isArray(r.data) && r.data.length) { setTechOptions(r.data as any); return; }
-        } catch {}
-        // Fallback to DB-stored admin option 'technician_specialties'
-        try {
-          const { ok, data } = await getAdminOption('technician_specialties');
+          const { ok, data } = await getOption('technician_specialties');
           if (ok && data) {
             const arr = JSON.parse(String((data as any).value || '[]'));
             if (Array.isArray(arr) && arr.length) {
-              setTechOptions(arr.map((name: any) => ({ id: String(name), ar: String(name), en: String(name) })) as any);
-              return;
+              const mapped = arr
+                .map((it: any) => {
+                  if (typeof it === 'string') {
+                    const id = it.trim();
+                    if (!id) return null;
+                    return { id, ar: it, en: it };
+                  }
+                  if (it && typeof it === 'object') {
+                    const id = String(it.id || it.value || it.name || '').trim();
+                    if (!id) return null;
+                    const ar = typeof it.ar === 'string' && it.ar.trim() ? it.ar : (typeof it.name === 'string' ? it.name : id);
+                    const en = typeof it.en === 'string' && it.en.trim() ? it.en : id;
+                    return { id, ar, en };
+                  }
+                  return null;
+                })
+                .filter((x: any) => x && x.id && String(x.id).trim() !== '');
+              if (mapped.length) { setTechOptions(mapped as any); return; }
             }
           }
+        } catch {}
+
+        // Fallback: services catalog types
+        try {
+          const r = await listServiceTypes();
+          if (r.ok && Array.isArray(r.data) && r.data.length) { setTechOptions(r.data as any); return; }
         } catch {}
       };
       loadTypes();
@@ -239,9 +257,11 @@ export default function AddServiceForProject({ setCurrentPage, ...rest }: AddSer
                   </SelectTrigger>
                   <SelectContent>
                     {techOptions.length > 0
-                      ? techOptions.map((opt) => (
-                          <SelectItem key={opt.id} value={opt.id}>{locale === 'ar' ? (opt.ar || opt.id) : (opt.en || opt.id)}</SelectItem>
-                        ))
+                      ? techOptions
+                          .filter((opt) => opt && typeof opt.id === 'string' && opt.id.trim() !== '')
+                          .map((opt) => (
+                            <SelectItem key={opt.id} value={opt.id}>{locale === 'ar' ? (opt.ar || opt.id) : (opt.en || opt.id)}</SelectItem>
+                          ))
                       : (
                           <div className="p-2 text-sm text-muted-foreground">{locale==='ar' ? 'لا توجد أنواع مسجلة' : 'No types available'}</div>
                         )}
