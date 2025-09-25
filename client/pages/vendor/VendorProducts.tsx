@@ -100,7 +100,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
 
     load();
     return () => { cancelled = true; };
-  }, [hideFirstOverlay, hideLoading, locale, showLoading]); // Include dependencies as indicated by ESLint
+  }, []); // FIXED: Removed locale dependency to prevent infinite loop and server overload
 
   // Load categories dynamically (public endpoint; no auth required)
   useEffect(() => {

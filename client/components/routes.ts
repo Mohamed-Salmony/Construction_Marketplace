@@ -29,6 +29,7 @@ import ProjectDetails from '../pages/ProjectDetails';
 import ProjectChat from '../pages/ProjectChat';
 import Favorites from '../pages/Favorites';
 import AddService from '../pages/AddService';
+import AddServiceForProject from '../pages/AddServiceForProject';
 import ServiceDetails from '../pages/ServiceDetails';
 import Support from '../pages/Support';
 import Checkout from '../pages/Checkout';
@@ -100,6 +101,7 @@ export const routes: Record<string, RouteConfig> = {
   'rental-details': { component: RentalDetails, title: 'تفاصيل التأجير', icon: Tag },
   'rental-contract': { component: RentalContract, title: 'عقد تأجير', icon: Tag },
   'add-service': { component: AddService, title: 'إضافة خدمة', icon: Tag },
+  'add-service-for-project': { component: AddServiceForProject, title: 'اطلب فني لمشروع', icon: Tag, requiresAuth: true, allowedRoles: ['vendor'] },
   'service-details': { component: ServiceDetails, title: 'تفاصيل الخدمة', icon: Tag },
   'projects-builder': { component: ProjectsBuilder, title: 'إضافة مشروع', icon: Tag, requiresAuth: true },
   'project-details': { component: ProjectDetails, title: 'تفاصيل المشروع', icon: Tag },

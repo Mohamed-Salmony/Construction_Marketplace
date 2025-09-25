@@ -716,51 +716,53 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                       ) : (
                         <div>
                           <div className="grid gap-2">
-                            <label className="text-sm">{locale==='ar' ? 'السعر المطلوب' : 'Your Price'}</label>
+                            <label className="text-sm">{locale==='ar' ? 'تعريف بالخدمة المقدمة' : 'Service Description'}</label>
                             <Input
                               type="number"
                               inputMode="decimal"
-                              min={0}
+                              min={minPrice || 0}
+                              max={maxPrice || undefined}
                               placeholder={
                                 locale==='ar'
-                                  ? `أدخل السعر المطلوب بالريال السعودي`
-                                  : `Enter your price in SAR`
+                                  ? `الحد الأدنى: ${currency} ${formatMoney(minPrice)} • الحد الأقصى: ${currency} ${formatMoney(maxPrice)}`
+                                  : `Min: ${currency} ${formatMoney(minPrice)} • Max: ${currency} ${formatMoney(maxPrice)}`
                               }
                               value={offerPrice}
                               onChange={(e)=> setOfferPrice(e.target.value)}
                             />
                             {(() => {
                               const v = Number(offerPrice);
-                              const invalid = offerPrice !== '' && (!isFinite(v) || v <= 0);
+                              const invalid = offerPrice !== '' && (!isFinite(v) || v < (minPrice||0) || v > (maxPrice||Number.POSITIVE_INFINITY));
                               if (invalid) {
                                 return (
                                   <span className="text-xs text-red-600">
                                     {locale==='ar'
-                                      ? 'يجب إدخال سعر صحيح أكبر من صفر'
-                                      : 'Please enter a valid price greater than zero'}
+                                      ? `السعر يجب أن يكون بين ${currency} ${formatMoney(minPrice)} و ${currency} ${formatMoney(maxPrice)}`
+                                      : `Price must be between ${currency} ${formatMoney(minPrice)} and ${currency} ${formatMoney(maxPrice)}`}
                                   </span>
                                 );
                               }
                               return (
                                 <span className="text-xs text-muted-foreground">
                                   {locale==='ar'
-                                    ? 'يمكنك تقديم أي سعر تراه مناسباً لتنفيذ هذا المشروع'
-                                    : 'You can offer any price you see fit for this project'}
+                                    ? `يمكنك تقديم عرض بين ${currency} ${formatMoney(minPrice)} و ${currency} ${formatMoney(maxPrice)}`
+                                    : `You can offer between ${currency} ${formatMoney(minPrice)} and ${currency} ${formatMoney(maxPrice)}`}
                                 </span>
                               );
                             })()}
                           </div>
 
                           <div className="grid gap-2">
-                            <label className="text-sm">{locale==='ar' ? 'المدة المطلوبة (أيام)' : 'Required Duration (days)'}</label>
+                            <label className="text-sm">{locale==='ar' ? 'المدة (أيام)' : 'Duration (days)'}</label>
                             <Input
                               type="number"
                               inputMode="numeric"
                               min={1}
+                              max={Number(project?.days) > 0 ? Number(project?.days) : undefined}
                               placeholder={
                                 Number(project?.days) > 0
-                                  ? (locale==='ar' ? 'أدخل عدد الأيام المطلوبة لإنجاز المشروع' : 'Enter number of days needed to complete the project')
-                                  : (locale==='ar' ? 'أدخل عدد الأيام المطلوبة لإنجاز المشروع' : 'Enter number of days needed to complete the project')
+                                  ? (locale==='ar' ? `من 1 إلى ${Number(project?.days)} يوم` : `From 1 to ${Number(project?.days)} days`)
+                                  : (locale==='ar' ? 'أقل قيمة: 1 يوم' : 'Minimum: 1 day')
                               }
                               value={offerDays}
                               onChange={(e)=>setOfferDays(e.target.value)}
@@ -768,12 +770,12 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                             {(() => {
                               const v = Number(offerDays);
                               const maxD = Number(project?.days) > 0 ? Number(project?.days) : Infinity;
-                              const invalid = offerDays !== '' && (!Number.isFinite(v) || v < 1);
+                              const invalid = offerDays !== '' && (!Number.isFinite(v) || v < 1 || v > maxD);
                               if (invalid) {
                                 return (
                                   <span className="text-xs text-red-600">
                                     {Number.isFinite(maxD)
-                                      ? (locale==='ar' ? 'يجب إدخال عدد أيام صحيح لا يقل عن 1' : `Days must be between 1 and ${maxD}`)
+                                      ? (locale==='ar' ? `عدد الأيام يجب أن يكون بين 1 و ${maxD}` : `Days must be between 1 and ${maxD}`)
                                       : (locale==='ar' ? 'عدد الأيام يجب ألا يقل عن 1' : 'Days must be at least 1')}
                                   </span>
                                 );
@@ -781,8 +783,8 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                               return (
                                 <span className="text-xs text-muted-foreground">
                                   {Number(project?.days) > 0
-                                    ? (locale==='ar' ? 'حدد المدة الزمنية التي تحتاجها لإنجاز المشروع بجودة عالية' : 'Set the time duration you need to complete the project with high quality')
-                                    : (locale==='ar' ? 'حدد المدة الزمنية التي تحتاجها لإنجاز المشروع بجودة عالية' : 'Set the time duration you need to complete the project with high quality')}
+                                    ? (locale==='ar' ? `لا يمكن تجاوز ${Number(project?.days)} يوم` : `Cannot exceed ${Number(project?.days)} days`)
+                                    : (locale==='ar' ? 'أقل مدة مسموحة هي يوم واحد' : 'Minimum allowed duration is 1 day')}
                                 </span>
                               );
                             })()}
@@ -804,8 +806,9 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                                 if (saving || hasSubmitted) return true;
                                 const vP = Number(offerPrice);
                                 const vD = Number(offerDays);
-                                const validP = offerPrice !== '' && isFinite(vP) && vP > 0;
-                                const validD = offerDays !== '' && Number.isFinite(vD) && vD >= 1;
+                                const validP = offerPrice !== '' && isFinite(vP) && vP >= (minPrice||0) && vP <= (maxPrice||Number.POSITIVE_INFINITY);
+                                const maxD = Number(project?.days) > 0 ? Number(project?.days) : Infinity;
+                                const validD = offerDays !== '' && Number.isFinite(vD) && vD >= 1 && vD <= maxD;
                                 return !(validP && validD);
                               })()}
                               onClick={() => {

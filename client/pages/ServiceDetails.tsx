@@ -8,6 +8,8 @@ import { Separator } from "../components/ui/separator";
 import { useTranslation } from "../hooks/useTranslation";
 import type { RouteContext } from "../components/routerTypes";
 import { getServiceById, deleteService as apiDeleteService } from "@/services/servicesCatalog";
+import { listServiceTypes, type ServiceTypeItem } from "@/services/servicesCatalog";
+import { getAdminTechnicianOptions } from "../lib/adminOptions";
 import { Info, Package, Calendar, ClipboardList, Check, X } from "lucide-react";
 import { listOffersForService, updateOfferStatus, type OfferDto } from "@/services/offers";
 import { getConversationByKeys, createConversation } from "@/services/chat";
@@ -25,14 +27,7 @@ type Service = {
   updatedAt?: string;
 };
 
-const SERVICE_TYPES = [
-  { id: 'plumber', ar: 'سباك', en: 'Plumber' },
-  { id: 'electrician', ar: 'كهربائي', en: 'Electrician' },
-  { id: 'carpenter', ar: 'نجار', en: 'Carpenter' },
-  { id: 'painter', ar: 'نقاش', en: 'Painter' },
-  { id: 'gypsum_installer', ar: 'فني تركيب جيبس بورد', en: 'Gypsum Board Installer' },
-  { id: 'marble_installer', ar: 'فني تركيب رخام', en: 'Marble Installer' },
-];
+// Dynamic type options from DB
 
 export default function ServiceDetails({ setCurrentPage, ...context }: ServiceDetailsProps) {
   const { locale } = useTranslation();
@@ -42,6 +37,7 @@ export default function ServiceDetails({ setCurrentPage, ...context }: ServiceDe
   const [proposals, setProposals] = useState<OfferDto[]>([]);
   const usersById = useMemo(() => ({} as Record<string,string>), []);
   const technicianId = String((context as any)?.user?.id || '');
+  const [techOptions, setTechOptions] = useState<ServiceTypeItem[]>([]);
 
   // Load selected service by id: backend first, then fallback to localStorage
   useEffect(() => {
@@ -114,12 +110,31 @@ export default function ServiceDetails({ setCurrentPage, ...context }: ServiceDe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load technician types dynamically from DB with admin-options fallback
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await listServiceTypes();
+        if (r.ok && Array.isArray(r.data) && r.data.length) {
+          setTechOptions(r.data as ServiceTypeItem[]);
+          return;
+        }
+      } catch {}
+      try {
+        const specs = getAdminTechnicianOptions().specialties || [];
+        if (Array.isArray(specs) && specs.length) {
+          setTechOptions(specs.map((name: any) => ({ id: String(name), ar: String(name), en: String(name) })) as ServiceTypeItem[]);
+        }
+      } catch {}
+    })();
+  }, []);
+
   const typeLabel = useMemo(() => {
     if (!service) return '';
     const key = (service as any).technicianType || (service as any).requiredSkills || service.type;
-    const item = SERVICE_TYPES.find(s => s.id === key);
-    return item ? (locale === 'ar' ? item.ar : item.en) : key;
-  }, [service, locale]);
+    const found = techOptions.find((o) => o.id === key);
+    return found ? (locale === 'ar' ? (found.ar || found.id) : (found.en || found.id)) : key;
+  }, [service, techOptions, locale]);
 
   const deleteService = async () => {
     try {

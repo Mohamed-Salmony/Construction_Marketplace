@@ -47,18 +47,35 @@ export default function VendorServices({ setCurrentPage, ...context }: Props) {
       setFetchError(locale==='ar' ? 'حدث خطأ أثناء الجلب' : 'An error occurred while fetching');
     } finally {
       setLoading(false);
-      if (firstLoadRef.current) { hideFirstOverlay(); firstLoadRef.current = false; }
+      if (firstLoadRef.current) { 
+        // Call hideFirstOverlay without including it in dependencies to prevent infinite loop
+        try { hideFirstOverlay(); } catch {}
+        firstLoadRef.current = false; 
+      }
     }
-  }, [hideFirstOverlay, locale]); // Include dependencies as indicated by ESLint
+  }, [locale]); // Removed hideFirstOverlay from dependencies to prevent infinite re-render
 
+  // Load services only once on mount
   useEffect(() => { 
     let mounted = true;
     const load = async () => {
-      if (mounted) await loadServices();
+      if (mounted) {
+        await loadServices();
+      }
     };
     load();
     return () => { mounted = false; };
-  }, [loadServices]);
+  }, []); // Empty dependency to run only once on mount
+
+  // Handle locale changes separately to avoid infinite loop
+  const previousLocaleRef = useRef(locale);
+  useEffect(() => {
+    if (previousLocaleRef.current !== locale && !firstLoadRef.current) {
+      // Reload services when locale changes (but not on first load)
+      loadServices();
+      previousLocaleRef.current = locale;
+    }
+  }, [locale, loadServices]);
 
 
   const labelForServiceType = (id: string) => {

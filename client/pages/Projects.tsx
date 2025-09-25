@@ -792,7 +792,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                       <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select type'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {productTypes.map(pt => (
+                      {productTypes.filter(pt => pt.id && pt.id.trim() !== '').map(pt => (
                         <SelectItem key={pt.id} value={pt.id}>{locale==='ar' ? pt.ar : pt.en}</SelectItem>
                       ))}
                     </SelectContent>
@@ -806,7 +806,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                       <SelectValue placeholder={locale==='ar' ? 'اختر الخامة' : 'Select material'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {materials.map(m => (
+                      {materials.filter(m => m.id && m.id.trim() !== '').map(m => (
                         <SelectItem key={m.id} value={m.id}>{locale==='ar' ? m.ar : m.en}</SelectItem>
                       ))}
                     </SelectContent>

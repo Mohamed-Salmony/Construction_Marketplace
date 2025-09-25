@@ -16,15 +16,6 @@ import { getAdminOption } from "@/services/admin";
 
 interface AddServiceProps extends Partial<RouteContext> {}
 
-const SERVICE_TYPES = [
-  { id: "plumber", ar: "سباك", en: "Plumber" },
-  { id: "electrician", ar: "كهربائي", en: "Electrician" },
-  { id: "carpenter", ar: "نجار", en: "Carpenter" },
-  { id: "painter", ar: "نقاش", en: "Painter" },
-  { id: "gypsum_installer", ar: "فني تركيب جيبس بورد", en: "Gypsum Board Installer" },
-  { id: "marble_installer", ar: "فني تركيب رخام", en: "Marble Installer" },
-];
-
 // Minimum daily wages per service type
 const MIN_WAGE: Record<string, number> = {
   plumber: 200,
@@ -124,31 +115,12 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
   const normalizeType = (val: string): string | null => {
     if (!val) return null;
     const v = String(val).trim().toLowerCase();
-    const map: Record<string, string> = {
-      plumber: 'plumber',
-      electrician: 'electrician',
-      carpenter: 'carpenter',
-      painter: 'painter',
-      'gypsum installer': 'gypsum_installer',
-      gypsum_installer: 'gypsum_installer',
-      'marble installer': 'marble_installer',
-      marble_installer: 'marble_installer',
-      daily: 'daily',
-      hourly: 'hourly',
-      project: 'project',
-      // Arabic labels
-      'سباك': 'plumber',
-      'كهربائي': 'electrician',
-      'نجار': 'carpenter',
-      'نقاش': 'painter',
-      'فني تركيب جيبس بورد': 'gypsum_installer',
-      'فني تركيب رخام': 'marble_installer',
-    };
-    // direct match
-    if (map[v]) return map[v];
-    // try to match any SERVICE_TYPES label
-    const fromStatic = SERVICE_TYPES.find(s => s.id === v || s.ar === val || s.en.toLowerCase() === v);
-    if (fromStatic) return fromStatic.id;
+    // Prefer dynamic options from backend
+    const fromOptions = techOptions.find(o => o.id.toLowerCase() === v || o.ar?.toLowerCase() === v || o.en?.toLowerCase() === v);
+    if (fromOptions) return fromOptions.id;
+    // Fallback to admin-configured specialties list
+    const fromSpecs = techSpecialties.find(s => s.name && s.name.toLowerCase() === v);
+    if (fromSpecs) return fromSpecs.name;
     return null;
   };
 
@@ -188,7 +160,7 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
 
   const canSubmit = Boolean(stype) && dailyWage >= (minForSelected || 0) && days >= 1;
 
-  // Load technician types dynamically from backend with fallbacks
+  // Load technician types dynamically from backend with admin-options fallback
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return;
@@ -203,13 +175,7 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
         // Fallback to admin-configured specialties if backend types unavailable
         const specs = getAdminTechnicianOptions().specialties || [];
         if (Array.isArray(specs) && specs.length) {
-          setTechOptions(specs.map((name) => {
-            const match = SERVICE_TYPES.find(s => s.ar === name || s.en === name || s.id === name);
-            return match ? { id: match.id, ar: match.ar, en: match.en } : { id: name, ar: name, en: name };
-          }));
-        } else {
-          // Final fallback to static list
-          setTechOptions(SERVICE_TYPES.map(s => ({ id: s.id, ar: s.ar, en: s.en })));
+          setTechOptions(specs.map((name) => ({ id: String(name), ar: String(name), en: String(name) } as any)));
         }
       };
       loadTypes();
@@ -264,17 +230,15 @@ export default function AddService({ setCurrentPage, ...rest }: AddServiceProps)
                     <SelectValue placeholder={locale === 'ar' ? 'اختر النوع' : 'Select type'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {techOptions.length > 0
-                      ? techOptions.map((opt) => (
-                          <SelectItem key={opt.id} value={opt.id}>
-                            {locale === 'ar' ? opt.ar : opt.en}
-                          </SelectItem>
-                        ))
-                      : SERVICE_TYPES.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {locale === 'ar' ? s.ar : s.en}
-                          </SelectItem>
-                        ))}
+                    {techOptions.length > 0 ? (
+                      techOptions.map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                          {locale === 'ar' ? (opt.ar || opt.id) : (opt.en || opt.id)}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground">{locale==='ar' ? 'لا توجد أنواع مسجلة' : 'No types available'}</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

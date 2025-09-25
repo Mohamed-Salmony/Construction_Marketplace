@@ -469,7 +469,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select type'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {productTypes.map(pt => (
+                    {productTypes.filter(pt => pt.id && pt.id.trim() !== '').map(pt => (
                       <SelectItem key={pt.id} value={pt.id}>{locale==='ar' ? (pt.ar ?? pt.id) : (pt.en ?? pt.id)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -482,7 +482,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select subtype'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(subtypes || []).map((st) => (
+                    {(subtypes || []).filter(st => st.id && st.id.trim() !== '').map((st) => (
                       <SelectItem key={st.id} value={st.id}>{locale==='ar' ? (st.ar || st.id) : (st.en || st.id)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -495,7 +495,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر الخامة' : 'Select material'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {materials.map(m => (
+                    {materials.filter(m => m.id && m.id.trim() !== '').map(m => (
                       <SelectItem key={m.id} value={m.id}>{locale==='ar' ? (m.ar ?? m.id) : (m.en ?? m.id)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -508,7 +508,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر اللون' : 'Select color'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {colors.map(c => (
+                    {colors.filter(c => c.id && c.id.trim() !== '').map(c => (
                       <SelectItem key={c.id} value={c.id}>{locale==='ar' ? c.ar : c.en}</SelectItem>
                     ))}
                   </SelectContent>
@@ -623,7 +623,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select type'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {productTypes.map((pt) => (
+                            {productTypes.filter(pt => pt.id && pt.id.trim() !== '').map((pt) => (
                               <SelectItem key={pt.id} value={pt.id}>{locale==='ar' ? pt.ar : pt.en}</SelectItem>
                             ))}
                           </SelectContent>
@@ -636,7 +636,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر النوع (عادي/وسط/دبل)' : 'Select subtype'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {(catalog?.products?.find(x=>x.id===b.ptype)?.subtypes || subtypes || []).map((st) => (
+                            {(catalog?.products?.find(x=>x.id===b.ptype)?.subtypes || subtypes || []).filter(st => st.id && st.id.trim() !== '').map((st) => (
                               <SelectItem key={st.id} value={st.id}>{locale==='ar' ? (st.ar || st.id) : (st.en || st.id)}</SelectItem>
                             ))}
                           </SelectContent>
@@ -649,7 +649,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر الخامة' : 'Select material'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {((st?.materials||[]) as any[]).map((m:any) => (
+                            {((st?.materials||[]) as any[]).filter((m:any) => m.id && m.id.trim() !== '').map((m:any) => (
                               <SelectItem key={m.id} value={m.id}>{locale==='ar' ? (m.ar || m.id) : (m.en || m.id)}</SelectItem>
                             ))}
                           </SelectContent>
@@ -662,7 +662,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر اللون' : 'Select color'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {colors.map((c) => (
+                            {colors.filter(c => c.id && c.id.trim() !== '').map((c) => (
                               <SelectItem key={c.id} value={c.id}>{locale==='ar' ? c.ar : c.en}</SelectItem>
                             ))}
                           </SelectContent>
