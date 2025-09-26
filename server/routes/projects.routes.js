@@ -1,7 +1,7 @@
 import express from 'express';
 import { protect, requireRoles } from '../middlewares/auth.js';
 
-import { list, listOpen, getById, create, update, remove, getMyProjects, listBids, createBid, selectBid, acceptBid, rejectBid, validateCreateProject, validateUpdateProject, validateCreateBid, deliverProject, acceptDelivery, rejectDelivery, rateMerchant } from '../controllers/projects.controller.js';
+import { list, listOpen, getById, create, update, remove, getMyProjects, listBids, createBid, selectBid, acceptBid, rejectBid, listBidsForCurrentMerchant, validateCreateProject, validateUpdateProject, validateCreateBid, deliverProject, acceptDelivery, rejectDelivery, rateMerchant, listAssignedForVendor } from '../controllers/projects.controller.js';
 
 const router = express.Router();
 

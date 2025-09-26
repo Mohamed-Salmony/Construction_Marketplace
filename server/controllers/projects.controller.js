@@ -400,6 +400,24 @@ export async function rejectBid(req, res) {
   res.json({ success: true, message: 'Bid rejected', bid: normalizeBid(updated) });
 }
 
+// List bids for current merchant
+export async function listBidsForCurrentMerchant(req, res) {
+  try {
+    const merchantId = req.user && req.user._id;
+    if (!merchantId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    
+    const bids = await Bid.find({ merchantId })
+      .populate('projectId', 'title description budget status')
+      .sort({ createdAt: -1 });
+    
+    const items = bids.map(bid => normalizeBid(bid));
+    res.json(items);
+  } catch (error) {
+    console.error('Error listing merchant bids:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 // Vendor: list projects assigned to me and in execution
 export async function listAssignedForVendor(req, res) {
   const vendorId = req.user && req.user._id;
