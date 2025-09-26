@@ -172,3 +172,42 @@ export async function listByTechnician(req, res) {
   const items = await Offer.find({ technicianId: req.params.id }).sort({ createdAt: -1 });
   res.json(items);
 }
+
+// List all offers for services owned by the current vendor (merchant)
+export async function listByVendor(req, res) {
+  try {
+    // Find services created by this vendor
+    const services = await Service.find({ vendorId: req.user._id }).select('_id').lean();
+    const serviceIds = services.map((s) => String(s._id));
+    if (serviceIds.length === 0) {
+      return res.json([]);
+    }
+    // Find offers targeting these services
+    const offers = await Offer.find({ targetType: 'service', serviceId: { $in: serviceIds } })
+      .populate('technicianId', 'name phoneNumber city country profession isVerified profilePicture dailyRate')
+      .sort({ createdAt: -1 });
+
+    const mapped = offers.map((offer) => {
+      const o = offer.toObject();
+      if (!o.id && o._id) o.id = String(o._id);
+      if (o.technicianId) {
+        const tech = o.technicianId;
+        o.technicianName = tech.name;
+        o.technicianPhone = tech.phoneNumber;
+        o.technicianCity = tech.city;
+        o.technicianCountry = tech.country;
+        o.technicianProfession = tech.profession;
+        o.technicianVerified = tech.isVerified;
+        o.technicianAvatar = tech.profilePicture;
+        o.technicianDailyRate = tech.dailyRate;
+        o.technicianId = String(tech._id);
+      }
+      // Ensure serviceId is string for client grouping
+      if (o.serviceId) o.serviceId = String(o.serviceId);
+      return o;
+    });
+    res.json(mapped);
+  } catch (err) {
+    res.status(400).json({ success: false, message: 'Failed to list vendor offers', error: String(err?.message || err) });
+  }
+}

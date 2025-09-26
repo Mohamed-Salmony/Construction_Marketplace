@@ -67,8 +67,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
             category: (p.categoryName) || (p.category?.name) || '',
             subCategoryAr: '',
             subCategoryEn: '',
-            price: Number(p.price || 0),
-            originalPrice: Number(p.originalPrice || p.price || 0),
+            // current price from discountPrice if present, else price
+            price: Number(((p as any).discountPrice ?? p.price ?? 0)),
+            // original price from base price
+            originalPrice: Number((p.price ?? (p as any).originalPrice ?? 0)),
             stock: Number(p.stockQuantity ?? p.stock ?? 0),
             // derive status: pending if not approved
             status: p.isApproved ? 'active' : 'pending',
@@ -251,8 +253,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
           brand: p.brand || 'عام',
           categoryId: p.categoryId,
           category: (p.categoryName) || (p.category?.name) || '',
-          price: Number(p.price || 0),
-          originalPrice: Number(p.originalPrice || p.price || 0),
+          // current price from discountPrice if present, else price
+          price: Number(((p as any).discountPrice ?? p.price ?? 0)),
+          // original price from base price
+          originalPrice: Number((p.price ?? (p as any).originalPrice ?? 0)),
           stock: Number(p.stockQuantity ?? p.stock ?? 0),
           status: p.isApproved ? 'active' : 'pending',
           isApproved: Boolean(p.isApproved),
@@ -273,8 +277,11 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       descriptionEn: String(productData?.descriptionEn || ''),
       descriptionAr: String(productData?.descriptionAr || ''),
       categoryId: String(productData?.categoryId || ''),
-      price: Number(productData?.price || 0),
-      discountPrice: productData?.originalPrice && Number(productData.originalPrice) > 0 ? Number(productData.originalPrice) : undefined,
+      // base/original price
+      price: Number((productData?.originalPrice ?? productData?.price) || 0),
+      // current/discounted price
+      discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
+
       stockQuantity: Number(productData?.stock || 0),
       allowCustomDimensions: false,
       isAvailableForRent: false,
@@ -336,74 +343,44 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
     // FIXED: إظهار رسالة التحميل بوضوح
     console.log('FIXED VendorProducts - Starting product edit:', productData.id);
     showLoading?.(locale==='ar' ? 'جاري حفظ التعديلات...' : 'Saving changes...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
-    
-    try {
-      // FIXED: إعداد payload محسن مع جميع البيانات اللازمة
-      const payload = {
-        nameEn: String(productData?.nameEn || ''),
-        nameAr: String(productData?.nameAr || productData?.name || ''),
-        descriptionEn: String(productData?.descriptionEn || ''),
-        descriptionAr: String(productData?.descriptionAr || ''),
-        categoryId: String(productData?.categoryId || ''),
-        price: Number(productData?.price || 0),
-        // FIXED: السعر الأصلي فقط إذا كان موجود
-        discountPrice: productData?.originalPrice && Number(productData.originalPrice) > 0 ? Number(productData.originalPrice) : undefined,
-        stockQuantity: Number(productData?.stock || 0),
-        // FIXED: إضافة ميزات جديدة
-        unitType: productData?.unitType || 'quantity',
-        pricePerMeter: productData?.unitType === 'meters' ? Number(productData?.pricePerMeter || productData?.price || 0) : undefined,
-        allowCustomDimensions: Boolean(productData?.allowCustomDimensions),
-        isAvailableForRent: Boolean(productData?.isAvailableForRent),
-        rentPricePerDay: productData?.isAvailableForRent ? Number(productData?.rentPricePerDay || 0) : undefined,
-        attributes: [] as Array<{ nameEn: string; nameAr: string; valueEn: string; valueAr: string }>,
-        // FIXED: إضافة المواصفات والتوافق
-        specifications: productData?.specifications || {},
-        compatibility: productData?.compatibility || [],
-        addonInstallation: productData?.addonInstallation || { enabled: false, feePerUnit: 0 }
-      };
-      
-      console.log('FIXED VendorProducts - Update payload:', payload);
-      const updateResult = await updateProduct(String(productData.id), payload as any);
-      
-      if (!(updateResult as any)?.ok) {
-        const status = (updateResult as any)?.status;
-        const errorMsg = locale === 'en' 
-          ? `Failed to update product${status ? ` (status ${status})` : ''}`
-          : `تعذر حفظ تعديلات المنتج${status ? ` (رمز ${status})` : ''}`;
-        toastError(errorMsg, locale === 'ar');
-        hideLoading?.();
-        return;
-      }
-  
-      // FIXED: معالجة محسنة للصور الجديدة
-      const files: File[] = Array.isArray(productData?._files) ? productData._files : [];
-      if (files.length > 0) {
-        console.log('FIXED VendorProducts - Uploading', files.length, 'new images');
-        setUploading(true); setUploadTotal(files.length); setUploadDone(0);
-        
-        const up = await api.uploadFiles(files, 'images');
-        if (up.ok && up.data && Array.isArray((up.data as any).items)) {
-          const items = (up.data as any).items as Array<{ url: string }>;
-          for (let i = 0; i < items.length; i++) {
-            try {
-              const it = items[i];
-              const res = await addProductImage(String(productData.id), {
-                imageUrl: it.url,
-                isPrimary: false,
-                sortOrder: i,
-              } as any);
-  
-              if ((res as any)?.ok) {
-                setUploadDone((d) => d + 1);
-                console.log('FIXED VendorProducts - Image uploaded:', it.url);
-              } else {
-                console.error('FIXED VendorProducts - Failed to attach image:', res);
-                toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
-              }
-            } catch (error) {
-              console.error('FIXED VendorProducts - Error uploading image:', error);
-              toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
-            }
+<
+    const payload = {
+      nameEn: String(productData?.nameEn || ''),
+      nameAr: String(productData?.nameAr || productData?.name || ''),
+      descriptionEn: String(productData?.descriptionEn || ''),
+      descriptionAr: String(productData?.descriptionAr || ''),
+      categoryId: String(productData?.categoryId || ''),
+      // base/original price
+      price: Number((productData?.originalPrice ?? productData?.price) || 0),
+      // current/discounted price
+      discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
+      stockQuantity: Number(productData?.stock || 0),
+      allowCustomDimensions: false,
+      isAvailableForRent: false,
+      rentPricePerDay: undefined as number | undefined,
+      attributes: [] as Array<{ nameEn: string; nameAr: string; valueEn: string; valueAr: string }>,
+    };
+    await updateProduct(String(productData.id), payload as any);
+
+    // Handle any newly added files
+    const files: File[] = Array.isArray(productData?._files) ? productData._files : [];
+    if (files.length > 0) {
+      setUploading(true); setUploadTotal(files.length); setUploadDone(0);
+      const up = await api.uploadFiles(files, 'images');
+      if (up.ok && up.data && Array.isArray((up.data as any).items)) {
+        const items = (up.data as any).items as Array<{ url: string }>;
+        for (let i = 0; i < items.length; i++) {
+          try {
+            const it = items[i];
+            const res = await addProductImage(String(productData.id), {
+              imageUrl: it.url,
+              isPrimary: false,
+              sortOrder: i,
+            } as any);
+
+            if ((res as any)?.ok) setUploadDone((d) => d + 1);
+          } catch {
+            toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
           }
           toastSuccess(locale === 'en' ? 'Images uploaded successfully' : 'تم رفع الصور بنجاح', locale === 'ar');
         } else {
