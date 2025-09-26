@@ -528,13 +528,6 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
     return `${parts.join(' × ')} m`;
   };
 
-  const formatDims = (W: number, H: number, L: number) => {
-    if (W > 0 && H > 0) return `${W} × ${H} m`;
-    if (W > 0 && L > 0) return `${W} × ${L} m`;
-    if (H > 0 && L > 0) return `${H} × ${L} m`;
-    return `${W || H || L || 0} m`;
-  };
-
   return (
     <div className="min-h-screen bg-background" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <Header currentPage="project-details" setCurrentPage={setCurrentPage as any} {...(rest as any)} />
