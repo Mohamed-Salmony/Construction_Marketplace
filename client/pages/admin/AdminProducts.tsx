@@ -20,7 +20,8 @@ interface ProductRow {
   name: string;
   sku: string;
   vendor: string;
-  price: number;
+  price: number; // current/discounted price if available
+  originalPrice?: number; // base/original price
   stock: number;
   notes?: string;
   createdAt: string;
@@ -76,7 +77,9 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
           name: p.nameAr || p.nameEn || p.name || '',
           sku: p.partNumber || '',
           vendor: p.merchantName || p.brand || '',
+          // current price prefers discountPrice, original is base price
           price: Number(p.discountPrice ?? p.price ?? 0),
+          originalPrice: Number(p.price ?? 0),
           stock: Number(p.stockQuantity ?? p.stock ?? 0),
           createdAt: p.createdAt || new Date().toISOString().slice(0,10),
           imageUrl: Array.isArray(p.images) && p.images.length ? p.images[0].imageUrl : undefined,
@@ -124,6 +127,7 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
           nameAr: r.name,
           nameEn: r.name,
           price: r.price,
+          originalPrice: r.originalPrice ?? r.price,
           stock: r.stock,
           partNumber: r.sku,
           descriptionAr: '',
@@ -136,6 +140,7 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
         nameAr: r.name,
         nameEn: r.name,
         price: r.price,
+        originalPrice: r.originalPrice ?? r.price,
         stock: r.stock,
         partNumber: r.sku,
         descriptionAr: '',
@@ -285,7 +290,17 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <div className="flex items-center break-words">{r.sku}</div>
                         <div className="flex items-center break-words"><Store className="mr-1 h-3 w-3" />{r.vendor}</div>
-                        <span className="break-words">{t('price')}: {r.price} SAR</span>
+                        <span className="break-words">
+                          {t('price')}: {r.originalPrice ?? r.price} SAR
+                          {r.originalPrice != null && r.price != null && r.price !== r.originalPrice && (
+                            <>
+                              {' '}
+                              <span className="text-emerald-600">
+                                {isAr ? 'الحالي: ' : 'Current: '}{r.price} SAR
+                              </span>
+                            </>
+                          )}
+                        </span>
                         <span className="break-words">{t('stock')}: {r.stock}</span>
                       </div>
                     </div>

@@ -57,3 +57,8 @@ export async function listOffersForProject(projectId: string | number) {
 export async function updateOfferStatus(id: string | number, status: 'accepted' | 'rejected' | 'pending') {
   return api.post<OfferDto>(`/api/Offers/${encodeURIComponent(String(id))}/status`, { Status: status }, { auth: true });
 }
+
+// Fetch all offers for services owned by the current vendor (merchant)
+export async function listOffersForVendorMine() {
+  return api.get<OfferDto[]>(`/api/Offers/vendor/mine`, { auth: true });
+}

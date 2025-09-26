@@ -147,7 +147,6 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
     if (typeof p.budgetMin === 'number') return Math.max(0, Number(p.budgetMin));
     if (typeof p.BudgetMin === 'number') return Math.max(0, Number(p.BudgetMin));
     // Fallback rough estimate
-    // Compute measure based on available dimensions (supports length)
     const W = Math.max(0, Number(p.width || 0));
     const H = Math.max(0, Number(p.height || 0));
     const L = Math.max(0, Number(p.length || 0));
@@ -350,54 +349,6 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
                   )}
                 </div>
 
-                {/* Additional items */}
-                {itemsArray.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground">
-                      {locale==='ar' ? 'عناصر إضافية ضمن هذا المشروع' : 'Additional items in this project'}
-                    </div>
-                    <div className="space-y-4">
-                      {itemsArray.map((it: any, idx: number) => (
-                        <div key={it?.id || idx} className="rounded-lg border p-4 bg-background shadow-sm">
-                          {!!(it?.ptype || it?.type) && (
-                            <div className="text-sm font-medium mb-2">
-                              {locale==='ar' ? 'النوع: ' : 'Type: '} {labelForProductType(it?.ptype || it?.type)}
-                            </div>
-                          )}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                            <div>
-                              <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <Ruler className="w-4 h-4" /> {locale==='ar' ? 'الأبعاد (متر)' : 'Dimensions (m)'}
-                              </div>
-                              <div className="mt-1 font-medium">
-                                {(it?.width||0)} × {(it?.height||0)}
-                                <span className="text-muted-foreground text-xs ms-1">m</span>
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <Boxes className="w-4 h-4" /> {locale==='ar' ? 'الكمية' : 'Quantity'}
-                              </div>
-                              <div className="mt-1 font-medium">{it?.quantity || 0}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> {locale==='ar' ? 'المدة (أيام)' : 'Duration (days)'}
-                              </div>
-                              <div className="mt-1 font-medium">{Number(it?.days) > 0 ? it.days : '-'}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <ClipboardList className="w-4 h-4" /> {locale==='ar' ? 'سعر المتر المربع' : 'Price per m²'}
-                              </div>
-                              <div className="mt-1 font-medium">{it?.pricePerMeter || 0} {currency}</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -470,36 +421,10 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
                         <Input
                           type="number"
                           inputMode="decimal"
-                          min={minPrice || 0}
-                          max={maxPrice || undefined}
-                          placeholder={
-                            locale==='ar'
-                              ? `الحد الأدنى: ${currency} ${formatMoney(minPrice)} • الحد الأقصى: ${currency} ${formatMoney(maxPrice)}`
-                              : `Min: ${currency} ${formatMoney(minPrice)} • Max: ${currency} ${formatMoney(maxPrice)}`
-                          }
+                          placeholder={locale==='ar' ? 'السعر' : 'Price'}
                           value={offerPrice}
                           onChange={(e)=> setOfferPrice(e.target.value)}
                         />
-                        {(() => {
-                          const v = Number(offerPrice);
-                          const invalid = offerPrice !== '' && (!isFinite(v) || v < (minPrice||0) || v > (maxPrice||Number.POSITIVE_INFINITY));
-                          if (invalid) {
-                            return (
-                              <span className="text-xs text-red-600">
-                                {locale==='ar'
-                                  ? `السعر يجب أن يكون بين ${currency} ${formatMoney(minPrice)} و ${currency} ${formatMoney(maxPrice)}`
-                                  : `Price must be between ${currency} ${formatMoney(minPrice)} and ${currency} ${formatMoney(maxPrice)}`}
-                              </span>
-                            );
-                          }
-                          return (
-                            <span className="text-xs text-muted-foreground">
-                              {locale==='ar'
-                                ? `يمكنك تقديم عرض بين ${currency} ${formatMoney(minPrice)} و ${currency} ${formatMoney(maxPrice)}`
-                                : `You can offer between ${currency} ${formatMoney(minPrice)} and ${currency} ${formatMoney(maxPrice)}`}
-                            </span>
-                          );
-                        })()}
                       </div>
 
                       <div className="grid gap-2">
@@ -507,37 +432,10 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
                         <Input
                           type="number"
                           inputMode="numeric"
-                          min={1}
-                          max={Number(project?.days) > 0 ? Number(project?.days) : undefined}
-                          placeholder={
-                            Number(project?.days) > 0
-                              ? (locale==='ar' ? `من 1 إلى ${Number(project?.days)} يوم` : `From 1 to ${Number(project?.days)} days`)
-                              : (locale==='ar' ? 'أقل قيمة: 1 يوم' : 'Minimum: 1 day')
-                          }
+                          placeholder={locale==='ar' ? 'الأيام' : 'Days'}
                           value={offerDays}
                           onChange={(e)=>setOfferDays(e.target.value)}
                         />
-                        {(() => {
-                          const v = Number(offerDays);
-                          const maxD = Number(project?.days) > 0 ? Number(project?.days) : Infinity;
-                          const invalid = offerDays !== '' && (!Number.isFinite(v) || v < 1 || v > maxD);
-                          if (invalid) {
-                            return (
-                              <span className="text-xs text-red-600">
-                                {Number.isFinite(maxD)
-                                  ? (locale==='ar' ? `عدد الأيام يجب أن يكون بين 1 و ${maxD}` : `Days must be between 1 and ${maxD}`)
-                                  : (locale==='ar' ? 'عدد الأيام يجب ألا يقل عن 1' : 'Days must be at least 1')}
-                              </span>
-                            );
-                          }
-                          return (
-                            <span className="text-xs text-muted-foreground">
-                              {Number(project?.days) > 0
-                                ? (locale==='ar' ? `لا يمكن تجاوز ${Number(project?.days)} يوم` : `Cannot exceed ${Number(project?.days)} days`)
-                                : (locale==='ar' ? 'أقل مدة مسموحة هي يوم واحد' : 'Minimum allowed duration is 1 day')}
-                            </span>
-                          );
-                        })()}
                       </div>
 
                       <div className="grid gap-2">
@@ -552,40 +450,11 @@ export default function VendorProjectDetails({ setCurrentPage, ...context }: Pro
 
                       <Button
                         className="w-full"
-                        disabled={(() => {
-                          if (saving || !project || (hasSubmitted && !isEditing)) return true;
-                          const vP = Number(offerPrice);
-                          const vD = Number(offerDays);
-                          const validP = offerPrice !== '' && isFinite(vP) && vP >= (minPrice||0) && vP <= (maxPrice||Number.POSITIVE_INFINITY);
-                          const maxD = Number(project?.days) > 0 ? Number(project?.days) : Infinity;
-                          const validD = offerDays !== '' && Number.isFinite(vD) && vD >= 1 && vD <= maxD;
-                          return !(validP && validD);
-                        })()}
+                        disabled={saving || !project || (hasSubmitted && !isEditing)}
                         onClick={() => {
                           if (!project) return;
-                          const vP = Number(offerPrice);
-                          const vD = Number(offerDays);
-                          if (!isFinite(vP) || vP < (minPrice||0) || vP > (maxPrice||Number.POSITIVE_INFINITY)) {
-                            Swal.fire({
-                              icon: 'error',
-                              title: locale==='ar' ? 'قيمة السعر غير صحيحة' : 'Invalid price',
-                              text: locale==='ar'
-                                ? `يجب أن يكون السعر بين ${currency} ${formatMoney(minPrice)} و ${currency} ${formatMoney(maxPrice)}`
-                                : `Price must be between ${currency} ${formatMoney(minPrice)} and ${currency} ${formatMoney(maxPrice)}`,
-                            });
-                            return;
-                          }
-                          const maxD = Number(project?.days) > 0 ? Number(project?.days) : Infinity;
-                          if (!Number.isFinite(vD) || vD < 1 || vD > maxD) {
-                            Swal.fire({
-                              icon: 'error',
-                              title: locale==='ar' ? 'قيمة الأيام غير صحيحة' : 'Invalid days',
-                              text: Number.isFinite(maxD)
-                                ? (locale==='ar' ? `عدد الأيام يجب أن يكون بين 1 و ${maxD}` : `Days must be between 1 and ${maxD}`)
-                                : (locale==='ar' ? 'عدد الأيام يجب ألا يقل عن 1' : 'Days must be at least 1'),
-                            });
-                            return;
-                          }
+                          const vP = Number(offerPrice || 0);
+                          const vD = Number(offerDays || 0);
                           (async () => {
                             try {
                               setSaving(true);

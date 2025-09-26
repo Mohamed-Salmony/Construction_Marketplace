@@ -43,10 +43,13 @@ export default function ProductItem({ product, onEdit, onDelete, onView }: Produ
           
           <div className="flex items-center gap-4 mt-2">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-primary">{formatCurrency(product.price, locale === 'en' ? 'en' : 'ar')}</span>
-              {product.originalPrice && product.originalPrice > product.price && (
-                <span className="text-sm text-muted-foreground line-through">
-                  {formatCurrency(product.originalPrice, locale === 'en' ? 'en' : 'ar')}
+              <span className="font-medium text-primary">
+                {formatCurrency((product.originalPrice ?? product.price), locale === 'en' ? 'en' : 'ar')}
+              </span>
+              {product.price != null && product.originalPrice != null && product.price !== product.originalPrice && (
+                <span className="text-sm text-emerald-600">
+                  {locale === 'en' ? 'Current: ' : 'السعر الحالي: '}
+                  {formatCurrency(product.price, locale === 'en' ? 'en' : 'ar')}
                 </span>
               )}
             </div>

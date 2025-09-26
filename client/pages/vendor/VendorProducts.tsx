@@ -67,8 +67,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
             category: (p.categoryName) || (p.category?.name) || '',
             subCategoryAr: '',
             subCategoryEn: '',
-            price: Number(p.price || 0),
-            originalPrice: Number(p.originalPrice || p.price || 0),
+            // current price from discountPrice if present, else price
+            price: Number(((p as any).discountPrice ?? p.price ?? 0)),
+            // original price from base price
+            originalPrice: Number((p.price ?? (p as any).originalPrice ?? 0)),
             stock: Number(p.stockQuantity ?? p.stock ?? 0),
             // derive status: pending if not approved
             status: p.isApproved ? 'active' : 'pending',
@@ -251,8 +253,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
           brand: p.brand || 'عام',
           categoryId: p.categoryId,
           category: (p.categoryName) || (p.category?.name) || '',
-          price: Number(p.price || 0),
-          originalPrice: Number(p.originalPrice || p.price || 0),
+          // current price from discountPrice if present, else price
+          price: Number(((p as any).discountPrice ?? p.price ?? 0)),
+          // original price from base price
+          originalPrice: Number((p.price ?? (p as any).originalPrice ?? 0)),
           stock: Number(p.stockQuantity ?? p.stock ?? 0),
           status: p.isApproved ? 'active' : 'pending',
           isApproved: Boolean(p.isApproved),
@@ -273,8 +277,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       descriptionEn: String(productData?.descriptionEn || ''),
       descriptionAr: String(productData?.descriptionAr || ''),
       categoryId: String(productData?.categoryId || ''),
-      price: Number(productData?.price || 0),
-      discountPrice: undefined as number | undefined,
+      // base/original price
+      price: Number((productData?.originalPrice ?? productData?.price) || 0),
+      // current/discounted price
+      discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
       stockQuantity: Number(productData?.stock || 0),
       allowCustomDimensions: false,
       isAvailableForRent: false,
@@ -340,8 +346,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       descriptionEn: String(productData?.descriptionEn || ''),
       descriptionAr: String(productData?.descriptionAr || ''),
       categoryId: String(productData?.categoryId || ''),
-      price: Number(productData?.price || 0),
-      discountPrice: undefined as number | undefined,
+      // base/original price
+      price: Number((productData?.originalPrice ?? productData?.price) || 0),
+      // current/discounted price
+      discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
       stockQuantity: Number(productData?.stock || 0),
       allowCustomDimensions: false,
       isAvailableForRent: false,
