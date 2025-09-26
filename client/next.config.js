@@ -71,6 +71,12 @@ const nextConfig = {
 
   // Reduce console output during build
   productionBrowserSourceMaps: false,
+  
+  // Suppress Tailwind console warnings
+  env: {
+    TAILWIND_MODE: 'build',
+    NODE_ENV: process.env.NODE_ENV,
+  },
 
   // Note: standalone output disabled due to prerendering issues on Render
   // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,

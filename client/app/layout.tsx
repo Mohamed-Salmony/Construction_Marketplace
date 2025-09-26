@@ -2,13 +2,18 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import './globals.css'
 // Analytics disabled to prevent 404 errors and reload loops
-// import { Analytics } from '@vercel/analytics/react'
-// import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Toaster } from '../components/ui/sonner'
 
 export const metadata: Metadata = {
   title: 'Neoteric - منصة المقاولات الشاملة',
   description: 'منصة شاملة لخدمات ومنتجات المقاولات في المملكة العربية السعودية',
+  icons: {
+    icon: '/icon.jpg',
+    shortcut: '/icon.jpg',
+    apple: '/icon.jpg',
+  },
 }
 
 export default function RootLayout({
