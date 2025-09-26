@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
-import { Users, Search, Filter, Eye, CheckCircle, Ban, ArrowRight, Pencil } from 'lucide-react';
+import { Users, Search, Filter, Eye, CheckCircle, Ban, Pencil } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import UserAvatar from '../../components/UserAvatar';
 import { getUsers as adminGetUsers } from '@/services/admin';
@@ -71,21 +71,114 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Avatars: cache + throttled fetch and lazy activation
+  const avatarCacheRef = React.useRef<Map<string, string>>(new Map());
+  const avatarPromiseCacheRef = React.useRef<Map<string, Promise<string | undefined>>>(new Map());
+  const delay = (ms:number)=> new Promise(res=> setTimeout(res, ms));
+  const maxAvatarConcurrency = 3;
+  const avatarInFlightRef = React.useRef(0);
+  const avatarWaitersRef = React.useRef<Array<() => void>>([]);
+  const acquireAvatarSlot = async (): Promise<() => void> => {
+    if (avatarInFlightRef.current < maxAvatarConcurrency) {
+      avatarInFlightRef.current++;
+      return () => {
+        avatarInFlightRef.current--;
+        const next = avatarWaitersRef.current.shift();
+        if (next) next();
+      };
+    }
+    return await new Promise<() => void>((resolve) => {
+      avatarWaitersRef.current.push(() => {
+        avatarInFlightRef.current++;
+        resolve(() => {
+          avatarInFlightRef.current--;
+          const nxt = avatarWaitersRef.current.shift();
+          if (nxt) nxt();
+        });
+      });
+    });
+  };
+
+  const AvatarById: React.FC<{ id: string; name: string; size?: 'sm'|'md'|'lg'|'xl'; className?: string; initialSrc?: string }>= ({ id, name, size='lg', className, initialSrc }) => {
+    const [src, setSrc] = React.useState<string | undefined>(()=> initialSrc || avatarCacheRef.current.get(id));
+    React.useEffect(()=>{
+      let mounted = true;
+      const run = async () => {
+        if (src) return;
+        const cached = avatarCacheRef.current.get(id);
+        if (cached) { setSrc(cached); return; }
+        try {
+          const runFetch = async (): Promise<string | undefined> => {
+            const attempts = [0, 400, 900];
+            for (let i=0;i<attempts.length;i++) {
+              if (attempts[i] > 0) await delay(attempts[i]);
+              const release = await acquireAvatarSlot();
+              try {
+                const r = await getAdminUserById(id);
+                if (r.ok && r.data && (r.data as any).item) {
+                  const u = (r.data as any).item as any;
+                  const pic = u?.profilePicture ? String(u.profilePicture) : undefined;
+                  return pic;
+                }
+              } finally { release(); }
+            }
+            return undefined;
+          };
+          let p = avatarPromiseCacheRef.current.get(id);
+          if (!p) { p = runFetch(); avatarPromiseCacheRef.current.set(id, p); }
+          const pic = await p;
+          if (mounted && pic) {
+            avatarCacheRef.current.set(id, pic);
+            setSrc(pic);
+          }
+        } catch {}
+      };
+      void run();
+      return () => { mounted = false; };
+    }, [id, src]);
+    return (<UserAvatar src={src} name={name} size={size} className={className} />);
+  };
+
+  const AvatarLazy: React.FC<{ id: string; name: string; initialSrc?: string; size?: 'sm'|'md'|'lg'|'xl'; className?: string }>= ({ id, name, initialSrc, size='lg', className }) => {
+    const ref = React.useRef<HTMLDivElement | null>(null);
+    const [visible, setVisible] = React.useState(false);
+    React.useEffect(() => {
+      const el = ref.current; if (!el) return;
+      const obs = new IntersectionObserver((entries)=>{
+        for (const e of entries) { if (e.isIntersecting) { setVisible(true); obs.disconnect(); break; } }
+      }, { root: null, rootMargin: '150px', threshold: 0.01 });
+      obs.observe(el);
+      return () => { try { obs.disconnect(); } catch {} };
+    }, []);
+    return (
+      <div ref={ref} className={className}>
+        {visible ? (
+          <AvatarById id={id} name={name} size={size} initialSrc={initialSrc} />
+        ) : (
+          <UserAvatar src={initialSrc} name={name} size={size} />
+        )}
+      </div>
+    );
+  };
+
   const load = async () => {
     try {
       const r = await adminGetUsers({ role: 'Technician' });
       if (r.ok && r.data && Array.isArray((r.data as any).items)) {
-        const list = (r.data as any).items.map((u: any) => ({
-          id: String(u.id),
-          name: u.name || '',
-          email: u.email || '',
-          phone: u.phoneNumber || '',
-          city: u.city,
-          country: u.country,
-          createdAt: u.createdAt,
-          status: (u.isActive ? 'active' : (!u.isVerified ? 'pending' : 'suspended')) as Row['status'],
-          profilePicture: u.profilePicture || ''
-        })) as Row[];
+        const list = (r.data as any).items.map((u: any) => {
+          const profilePic = u?.profilePicture || '';
+          return ({
+            id: String(u.id),
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phoneNumber || '',
+            city: u.city,
+            country: u.country,
+            createdAt: u.createdAt,
+            status: (u.isActive ? 'active' : (!u.isVerified ? 'pending' : 'suspended')) as Row['status'],
+            profilePicture: profilePic,
+          }) as Row;
+        });
         setRows(list);
       } else setRows([]);
     } catch { setRows([]); }
@@ -175,12 +268,6 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
       <Header {...context} />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Button variant="outline" onClick={() => setCurrentPage && setCurrentPage('admin-dashboard')} className="mr-4">
-              <ArrowRight className="ml-2 h-4 w-4" />
-              {isAr ? 'العودة للوحة التحكم' : 'Back to Dashboard'}
-            </Button>
-          </div>
           <h1 className="mb-2">{isAr ? 'إدارة الفنيين' : 'Manage Technicians'}</h1>
           <p className="text-muted-foreground">{isAr ? 'عرض جميع الفنيين (المعتمدين وقيد المراجعة) مع مراجعة بيانات التسجيل قبل الموافقة.' : 'View all technicians (approved and pending) and review registration data before approval.'}</p>
         </div>
@@ -217,12 +304,7 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
               {filtered.map(u => (
                 <div key={u.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
-                    <UserAvatar 
-                      src={u.profilePicture} 
-                      name={u.name} 
-                      size="lg"
-                      className="shrink-0"
-                    />
+                    <AvatarLazy id={u.id} name={u.name} size="lg" className="shrink-0" initialSrc={u.profilePicture} />
                     <div className="space-y-1 w-full min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{u.name}</h3>
@@ -305,7 +387,21 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
               {viewLoading && (<div className="text-sm text-muted-foreground">{isAr ? 'جارٍ التحميل...' : 'Loading...'}</div>)}
               {viewError && (<div className="text-sm text-red-600">{viewError}</div>)}
               {viewUser && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
+                <>
+                  {/* Unified header with avatar */}
+                  <div className="flex items-center gap-4 mb-4">
+                    <UserAvatar
+                      src={(viewUser as any).profilePicture || (viewUser as any).profileImageUrl}
+                      name={viewUser.name}
+                      size="xl"
+                    />
+                    <div>
+                      <div className="font-medium text-base">{viewUser.name}</div>
+                      <div className="text-muted-foreground text-sm">{viewUser.email}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
                   <div className="lg:col-span-1 space-y-4">
                     <div>
                       <Label className="text-muted-foreground">{isAr ? 'الهوية' : 'ID'}</Label>
@@ -355,7 +451,8 @@ export default function AdminTechnicians({ setCurrentPage, ...context }: Partial
                       <div dir="ltr">{viewUser.iban || '—'}</div>
                     </div>
                   </div>
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </DialogContent>

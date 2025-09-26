@@ -281,6 +281,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       price: Number((productData?.originalPrice ?? productData?.price) || 0),
       // current/discounted price
       discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
+
       stockQuantity: Number(productData?.stock || 0),
       allowCustomDimensions: false,
       isAvailableForRent: false,
@@ -339,7 +340,10 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
   };
 
   const handleEditProduct = async (productData: any) => {
+    // FIXED: إظهار رسالة التحميل بوضوح
+    console.log('FIXED VendorProducts - Starting product edit:', productData.id);
     showLoading?.(locale==='ar' ? 'جاري حفظ التعديلات...' : 'Saving changes...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
+<
     const payload = {
       nameEn: String(productData?.nameEn || ''),
       nameAr: String(productData?.nameAr || productData?.name || ''),
@@ -378,16 +382,25 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
           } catch {
             toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
           }
+          toastSuccess(locale === 'en' ? 'Images uploaded successfully' : 'تم رفع الصور بنجاح', locale === 'ar');
+        } else {
+          console.error('FIXED VendorProducts - Failed to upload files:', up);
+          toastError(locale === 'en' ? 'Failed to upload images' : 'تعذر رفع الصور', locale === 'ar');
         }
-        toastSuccess(locale === 'en' ? 'Images uploaded' : 'تم رفع الصور', locale === 'ar');
-      } else {
-        toastError(locale === 'en' ? 'Failed to upload images' : 'تعذر رفع الصور', locale === 'ar');
+        setUploading(false);
       }
-      setUploading(false);
+      
+      // FIXED: رسالة نجاح واضحة
+      toastSuccess(locale === 'en' ? 'Product updated successfully' : 'تم حفظ تعديلات المنتج بنجاح', locale === 'ar');
+      setEditingProduct(null);
+      await reload();
+      
+    } catch (error) {
+      console.error('FIXED VendorProducts - Error updating product:', error);
+      toastError(locale === 'en' ? 'Failed to update product' : 'تعذر حفظ تعديلات المنتج', locale === 'ar');
+    } finally {
+      hideLoading?.();
     }
-    setEditingProduct(null);
-    await reload();
-    hideLoading?.();
   };
 
   const handleDeleteProduct = async (productId: string) => {

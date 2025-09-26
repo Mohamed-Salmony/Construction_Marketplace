@@ -102,10 +102,12 @@ export default function Footer({ setCurrentPage }: FooterProps) {
             {/* Company info */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="bg-white text-primary p-2 rounded-lg">
-                  <div className="w-8 h-8 flex items-center justify-center font-bold text-lg">
-                    ع
-                  </div>
+                <div className="bg-white p-1 rounded-lg">
+                  <img 
+                    src="/Neoteric_Logo.jpg" 
+                    alt="Neoteric Logo" 
+                    className="w-10 h-10 object-contain rounded-lg"
+                  />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{t('companyFullName')}</h3>

@@ -34,10 +34,20 @@ const userSchema = new mongoose.Schema({
   // Vendor/Technician fields
   iban: String,
   taxNumber: String,
+  registryNumber: String, // رقم السجل التجاري
+  storeName: String, // اسم المتجر
+  commercialRegistryUrl: String, // السجل التجاري
+  licenseUrl: String, // الرخصة  
+  additionalDocumentUrl: String, // مستند إضافي
   registryStart: String,
   registryEnd: String,
   profession: String, // e.g., electrician, plumber
   dailyRate: { type: Number, default: 0 }, // Daily rate for technicians in SAR
 }, { timestamps: true });
+
+// Indexes for faster admin queries
+userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ isActive: 1, isVerified: 1, role: 1 });
+userSchema.index({ createdAt: -1 });
 
 export const User = mongoose.models.User || mongoose.model('User', userSchema);

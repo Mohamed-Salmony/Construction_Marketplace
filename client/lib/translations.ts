@@ -86,9 +86,9 @@ export const translations = {
     discoverBestOffers: "اكتشف أفضل العروض على خدمات ومنتجات المقاولات عالية الجودة",
 
     // Brand name and app info
-    brandName: "العارف",
+    brandName: "Neoteric",
     brandSubtitle: "متجر مقاولات",
-    welcomeMessage: "مرحباً بك في العارف",
+    welcomeMessage: "مرحباً بك في Neoteric",
     tagline: "أكبر متجر مقاولات في المملكة",
     features: "جودة عالية • أسعار منافسة • خدمة سريعة",
     searchPrompt: "ابحث عن الخدمة أو المنتج الذي تحتاجه",
@@ -154,7 +154,7 @@ export const translations = {
 
     // Copyright
     copyright: "جميع الحقوق محفوظة",
-    companyFullName: "العارف للمقاولات",
+    companyFullName: "Neoteric للمقاولات",
 
     // Car brands
     toyota: "تويوتا",
@@ -176,7 +176,7 @@ export const translations = {
     toolsDesc: "عدد يدوية، آلات، وجميع أدوات الصيانة",
 
     // Homepage - hero/search
-    welcomeToAlAref: "مرحبًا بك في العارف",
+    welcomeToAlAref: "مرحبًا بك في Neoteric",
     largestStore: "أكبر متجر مقاولات",
     qualityPricesService: "جودة عالية • أسعار مناسبة • خدمة متميزة",
     searchForPart: "ابحث عن قطعة الغيار",
@@ -322,7 +322,7 @@ export const translations = {
 
     // Header specific
     specialOffer: "عرض خاص: خصم 20% على خدمات المقاولات",
-    brandLogo: "شعار العارف",
+    brandLogo: "شعار Neoteric",
     autoPartsSubtitle: "المقاولات",
 
     // Newsletter specific
@@ -453,7 +453,7 @@ export const translations = {
     
     // Admin Dashboard
     adminDashboardTitle: "لوحة التحكم الإدارية",
-    adminDashboardSubtitle: "إدارة شاملة لمنصة العارف",
+    adminDashboardSubtitle: "إدارة شاملة لمنصة Neoteric",
     totalUsers: "إجمالي المستخدمين",
     activeVendors: "البائعين النشطين",
     listedProducts: "المنتجات المدرجة",
@@ -504,7 +504,7 @@ export const translations = {
     // Admin Users page
     backToDashboard: "العودة للوحة التحكم",
     manageUsersTitle: "إدارة المستخدمين",
-    manageUsersSubtitle: "إدارة جميع مستخدمي منصة العارف",
+    manageUsersSubtitle: "إدارة جميع مستخدمي منصة Neoteric",
     searchAndFilter: "البحث والتصفية",
     searchByNameOrEmail: "البحث بالاسم أو البريد الإلكتروني",
     userType: "نوع المستخدم",
@@ -790,8 +790,8 @@ export const translations = {
     bestPrices: "Best Prices",
     customerSupport: "Customer Support",
     // HeroSearch specific (ensure English for hero area)
-    welcomeToAlAaref: "Welcome to Al Aaref",
-    welcomeToAlAref: "Welcome to Al Aaref",
+    welcomeToAlAaref: "Welcome to Neoteric",
+    welcomeToAlAref: "Welcome to Neoteric",
     largestStore: "Largest construction store in the Kingdom",
     qualityPricesService: "High Quality • Competitive Prices • Fast Service",
     searchForPart: "Search for the part you need",
@@ -923,7 +923,7 @@ export const translations = {
     workingHoursWeekend: "Friday - Saturday: 2PM - 10PM",
     siteMap: "Site Map",
     // Company and store
-    companyFullName: "Al Aaref Construction",
+    companyFullName: "Neoteric Construction",
     storeDescription: "Store description",
     email: "Email",
 
@@ -936,9 +936,9 @@ export const translations = {
       "Discover the best offers on high-quality construction services and products",
 
     // Brand name and app info
-    brandName: "Al Aaref",
+    brandName: "Neoteric",
     brandSubtitle: "Construction",
-    welcomeMessage: "Welcome to Al Aaref",
+    welcomeMessage: "Welcome to Neoteric",
     tagline: "Largest construction store in the Kingdom",
     features: "High Quality • Competitive Prices • Fast Service",
     
@@ -1003,7 +1003,7 @@ export const translations = {
     contactSuccessMessage: "Your message has been sent successfully!",
     ourLocation: "Our Location",
     mapLocation: "Map location placeholder",
-    addressMap: "Al Aaref Headquarters, Riyadh",
+    addressMap: "Neoteric Headquarters, Riyadh",
     faqQuickHint: "Find quick answers to popular questions",
     supportTeamHint: "Our support team is ready to help you 24/7",
     searchPrompt: "Search for the service or product you need",
@@ -1031,7 +1031,7 @@ export const translations = {
 
     // Admin Dashboard
     adminDashboardTitle: "Admin Dashboard",
-    adminDashboardSubtitle: "Comprehensive management for Al Aaref platform",
+    adminDashboardSubtitle: "Comprehensive management for Neoteric platform",
     totalUsers: "Total Users",
     activeVendors: "Active Vendors",
     listedProducts: "Listed Products",

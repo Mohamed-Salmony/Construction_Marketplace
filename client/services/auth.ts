@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { mergeGuestCartToServer } from './cart';
 
 export type LoginDto = {
   email: string;
@@ -78,6 +79,8 @@ export async function login(dto: LoginDto) {
   const res = await api.post<AuthResponseDto>('/api/Auth/login', dto);
   if (res.ok && res.data) {
     if (res.data.token) saveToken(res.data.token);
+    // After successful login, merge any guest cart into the authenticated server cart
+    try { await mergeGuestCartToServer(); } catch {}
   }
   return res;
 }
@@ -142,6 +145,10 @@ export async function register(dto: RegisterDto) {
       documentFile: 'DocumentFile',
       imageFile: 'ImageFile',
       licenseImage: 'LicenseImage',
+      // New vendor file fields
+      commercialRegistryFile: 'commercialRegistryFile',
+      licenseFile: 'licenseFile',
+      additionalDocumentFile: 'additionalDocumentFile',
       name: 'Name',
     };
     return m[k] || k;
@@ -159,6 +166,8 @@ export async function register(dto: RegisterDto) {
   if (res.ok && res.data) {
     if (res.data.token) {
       saveToken(res.data.token);
+      // Merge guest cart after registration if token provided
+      try { await mergeGuestCartToServer(); } catch {}
       return res;
     }
     // Some backends don't issue a token on register; try auto-login

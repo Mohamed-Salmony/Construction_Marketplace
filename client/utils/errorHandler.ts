@@ -60,15 +60,23 @@ class GlobalErrorHandler {
       });
 
       // Handle console errors
-      this.originalConsoleError = console.error;
+      const originalConsoleError = console.error;
+      (console as any)._originalError = originalConsoleError;
+      
       console.error = (...args: any[]) => {
-        // Prevent infinite recursion by checking if this is already a logged error
-        const message = args.map(arg => 
-          typeof arg === 'string' ? arg : JSON.stringify(arg, null, 2)
-        ).join(' ');
+        // Avoid infinite loop by checking if we're already in error handling
+        if ((console as any)._inErrorHandler) {
+          originalConsoleError.apply(console, args);
+          return;
+        }
 
-        // Don't log if it's already from our error handler to prevent recursion
-        if (!message.includes('🚨 Application Error') && !message.includes('Console Error:')) {
+        (console as any)._inErrorHandler = true;
+        
+        try {
+          const message = args.map(arg => 
+            typeof arg === 'string' ? arg : JSON.stringify(arg, null, 2)
+          ).join(' ');
+
           this.logError({
             message: `Console Error: ${message}`,
             component: 'Console',
@@ -77,6 +85,11 @@ class GlobalErrorHandler {
             userAgent: navigator.userAgent,
             url: window.location.href
           });
+        } catch (e) {
+          // If there's an error in error handling, just use original console
+          originalConsoleError('Error in error handler:', e);
+        } finally {
+          (console as any)._inErrorHandler = false;
         }
 
         // Still call the original console.error
@@ -95,16 +108,18 @@ class GlobalErrorHandler {
     if (this.errorQueue.length > this.maxErrors) {
       this.errorQueue = this.errorQueue.slice(-this.maxErrors);
     }
-
-    // Log to console for development using original console.error to prevent recursion
-    if (process.env.NODE_ENV === 'development' && this.originalConsoleError) {
-      this.originalConsoleError('🚨 Application Error:');
-      this.originalConsoleError('Message:', error.message);
-      this.originalConsoleError('Component:', error.component);
-      this.originalConsoleError('Action:', error.action);
-      this.originalConsoleError('Stack:', error.stack);
-      this.originalConsoleError('URL:', error.url);
-      this.originalConsoleError('Timestamp:', error.timestamp);
+    // Log to console for development using original console methods
+    if (process.env.NODE_ENV === 'development') {
+      // Use original console methods to avoid infinite loop
+      const originalError = (console as any)._originalError || console.log;
+      originalError('🚨 Application Error:', {
+        message: error.message,
+        component: error.component,
+        action: error.action,
+        stack: error.stack,
+        url: error.url,
+        timestamp: error.timestamp
+      });
     }
 
     // Store in localStorage for debugging

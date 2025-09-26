@@ -8,6 +8,15 @@ module.exports = {
     './src/**/*.{ts,tsx}',
   ],
   prefix: "",
+  corePlugins: {
+    preflight: true,
+  },
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
+  experimental: {
+    optimizeUniversalDefaults: true,
+  },
   theme: {
     container: {
       center: true,

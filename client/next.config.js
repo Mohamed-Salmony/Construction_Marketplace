@@ -25,6 +25,11 @@ const nextConfig = {
         hostname: 'construction-marketplace-backend.onrender.com',
       },
     ],
+    // Memory optimization for images
+    formats: ['image/webp'],
+    minimumCacheTTL: 60 * 60 * 24, // 24 hours
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
 
   reactStrictMode: false,
@@ -32,16 +37,20 @@ const nextConfig = {
   poweredByHeader: false,
   generateEtags: false,
   
-  // Performance optimizations
+  // Memory and performance optimizations for Render's 512MB limit
   experimental: {
-    // Keep experimental features minimal for Render compatibility
+    // Note: optimizeCss disabled due to critters issues in production
+    // optimizeCss: true,
   },
+  
   // Ensure certain ESM-only packages are transpiled for SSR compatibility
   transpilePackages: ['lucide-react', '@radix-ui/react-icons'],
   
   // Compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
+    // Remove unused CSS
+    styledComponents: false,
   },
   
   // Skip TypeScript checking during build for faster production builds
@@ -53,14 +62,45 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: process.env.NODE_ENV === 'production',
   },
+
+  // Reduce build output verbosity
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
+
+  // Reduce console output during build
+  productionBrowserSourceMaps: false,
   
-  // Bundle analyzer and optimization - simplified to avoid build issues
+  // Suppress Tailwind console warnings
+  env: {
+    TAILWIND_MODE: 'build',
+  },
+
+  // Note: standalone output disabled due to prerendering issues on Render
+  // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  
+  // Simplified webpack config to avoid build issues on Render
   webpack: (config, { dev, isServer }) => {
     // Fix path resolution for production builds
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': require('path').resolve(__dirname),
     };
+
+    // Reduce console output during build
+    config.stats = 'errors-warnings';
+    
+    // Simplified production optimizations
+    if (!dev && !isServer) {
+      // Basic chunk optimization without complex settings
+      config.optimization = {
+        ...config.optimization,
+        minimize: true,
+        usedExports: true,
+        sideEffects: false,
+      };
+    }
     
     return config;
   },

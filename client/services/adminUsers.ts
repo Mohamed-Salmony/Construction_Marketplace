@@ -14,6 +14,13 @@ export type AdminListUser = {
   city?: string | null;
   country?: string | null;
   profilePicture?: string | null;
+  // New vendor fields
+  registryNumber?: string | null;
+  storeName?: string | null;
+  taxNumber?: string | null;
+  commercialRegistryUrl?: string | null;
+  licenseUrl?: string | null;
+  additionalDocumentUrl?: string | null;
 };
 
 export type AdminUsersResponse = { success: boolean; items: AdminListUser[] };

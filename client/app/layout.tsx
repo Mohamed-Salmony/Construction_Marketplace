@@ -1,14 +1,18 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import './globals.css'
-// Analytics disabled to prevent 404 errors and reload loops
-// import { Analytics } from '@vercel/analytics/react'
-// import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Toaster } from '../components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'Arabic Auto - منصة السيارات العربية',
-  description: 'منصة شاملة لبيع وشراء السيارات والقطع والخدمات',
+  title: 'Neoteric - منصة المقاولات الشاملة',
+  description: 'منصة شاملة لخدمات ومنتجات المقاولات في المملكة العربية السعودية',
+  icons: {
+    icon: '/icon.jpg',
+    shortcut: '/icon.jpg',
+    apple: '/icon.jpg',
+  },
 }
 
 export default function RootLayout({
@@ -25,15 +29,15 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang={locale} dir={isRTL ? 'rtl' : 'ltr'}>
       <head>
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="alternate icon" href="/favicon.ico" />
+        <link rel="icon" href="/Neoteric_Logo.jpg" type="image/jpeg" />
+        <link rel="alternate icon" href="/Neoteric_Logo.jpg" />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
         <Toaster position="top-center" richColors />
-        {/* Analytics disabled to prevent errors */}
-        {/* {isProd && <Analytics />} */}
-        {/* {isProd && <SpeedInsights />} */}
+        {/* Analytics re-enabled with proper packages */}
+        {isProd && <Analytics />}
+        {isProd && <SpeedInsights />}
       </body>
     </html>
   )

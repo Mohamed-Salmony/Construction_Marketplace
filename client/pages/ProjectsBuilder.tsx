@@ -1,17 +1,4 @@
-  function getAuthToken(): string | null {
-    try {
-      if (typeof window === 'undefined') return null;
-      const lsAuth = window.localStorage.getItem('auth_token');
-      if (lsAuth) return lsAuth;
-      const lsToken = window.localStorage.getItem('token');
-      if (lsToken) return lsToken;
-      const cookie = document.cookie.split('; ').find((row) => row.startsWith('auth_token='));
-      if (cookie) return decodeURIComponent(cookie.split('=')[1] || '');
-      return null;
-    } catch { return null; }
-  }
-import React, { useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import type { RouteContext } from '../components/routerTypes';
@@ -33,6 +20,29 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { useFirstLoadOverlay } from '../hooks/useFirstLoadOverlay';
+
+// دالة للحصول على التوكن
+function getAuthToken(): string | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const lsAuth = window.localStorage.getItem('auth_token');
+    if (lsAuth) return lsAuth;
+    const lsToken = window.localStorage.getItem('token');
+    if (lsToken) return lsToken;
+    const cookie = document.cookie.split('; ').find((row) => row.startsWith('auth_token='));
+    if (cookie) return decodeURIComponent(cookie.split('=')[1] || '');
+    return null;
+  } catch { return null; }
+}
+
+// أنماط القياس المختلفة
+type MeasurementMode =
+  | 'area_wh'            // عرض × ارتفاع
+  | 'area_wl'            // عرض × طول  
+  | 'height_only'        // ارتفاع فقط
+  | 'length_only'        // طول فقط
+  | 'custom_wh'          // عرض × ارتفاع فقط (بدون طول)
+  | 'other_3d';          // لِخيار "أخرى": عرض + طول + ارتفاع
 
 // Product types & materials are loaded from admin options at runtime
 
@@ -67,13 +77,25 @@ const colorFactor: Record<string, number> = {
 
 // PPM is computed dynamically using admin price rules via effect and per-item rendering
 
-function computeTotal(w:number, h:number, l:number|undefined, ppm:number, qty:number, accIds:string[], getAccPrice:(id:string)=>number) {
-  // Compute measure based on available dimensions: if l is provided and >0 and either w or h is 0, treat as linear meter
-  let measure = 0;
-  const W = Math.max(0, w);
-  const H = Math.max(0, h);
-  const L = Math.max(0, Number(l||0));
-  if (W > 0 && H > 0) measure = W * H; else if (W > 0 && L > 0) measure = W * L; else if (H > 0 && L > 0) measure = H * L; else measure = W || H || L || 0;
+// حساب القياس بناءً على نمط القياس
+function computeMeasure(w: number, h: number, l: number, measurementMode: MeasurementMode): number {
+  const W = Math.max(0, w || 0);
+  const H = Math.max(0, h || 0);
+  const L = Math.max(0, l || 0);
+  
+  switch (measurementMode) {
+    case 'area_wh': return W * H;
+    case 'area_wl': return W * L;
+    case 'height_only': return H;
+    case 'length_only': return L;
+    case 'custom_wh': return W * H;
+    case 'other_3d': return W * H; // يمكن تخصيص منطق مختلف للمنتجات الأخرى
+    default: return W * H; // افتراضي
+  }
+}
+
+function computeTotal(w:number, h:number, l:number|undefined, ppm:number, qty:number, accIds:string[], getAccPrice:(id:string)=>number, measurementMode: MeasurementMode = 'area_wh') {
+  const measure = computeMeasure(w, h, Number(l||0), measurementMode);
   const accCost = accIds
     .map(id => getAccPrice(id) || 0)
     .reduce((a,b)=>a+b,0);
@@ -109,12 +131,19 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
   const [length, setLength] = useState<number>(0);
   const [reqDim, setReqDim] = useState<{ width?: boolean; height?: boolean; length?: boolean }>({ width: true, height: true });
   const [quantity, setQuantity] = useState<number>(1);
-  const [days, setDays] = useState<number>(1);
   const [pricePerMeter, setPricePerMeter] = useState<number>(0);
   const [autoPrice, setAutoPrice] = useState<boolean>(true);
   const [selectedAcc, setSelectedAcc] = useState<string[]>([]);
   const [description, setDescription] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // حقول خيار "أخرى" - إدخال يدوي كامل
+  const [otherProductName, setOtherProductName] = useState<string>('');
+  const [otherSubtype, setOtherSubtype] = useState<string>('');
+  const [otherMaterial, setOtherMaterial] = useState<string>('');
+  const [otherColor, setOtherColor] = useState<string>('');
+  const [otherDescription, setOtherDescription] = useState<string>('');
+  const [otherCustomAccessories, setOtherCustomAccessories] = useState<Array<{name: string}>>([]);
   type Builder = {
     id: string;
     ptype: string;
@@ -125,7 +154,6 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     height: number;
     length?: number;
     quantity: number;
-    days: number;
     autoPrice: boolean;
     pricePerMeter: number;
     selectedAcc: string[];
@@ -133,6 +161,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
   };
   const [additionalBuilders, setAdditionalBuilders] = useState<Builder[]>([]);
   const [hasToken, setHasToken] = useState<boolean>(false);
+  const loadedRef = useRef<boolean>(false);
 
   useEffect(() => {
     setHasToken(!!getAuthToken());
@@ -140,6 +169,9 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
 
   // Load admin-configured options once (legacy lists + unified catalog)
   useEffect(() => {
+    // Guard against double-invocation (Fast Refresh, Strict Mode, unstable deps)
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     let cancelled = false;
     (async () => {
       try {
@@ -155,15 +187,28 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
           setPriceRules(rules);
           setCatalog(cat);
         }
-      } catch {}
-      finally { if (!cancelled) { try { hideFirstOverlay(); } catch {} } }
+      } catch (e) {
+        // Optional: handle 429 Too Many Requests gracefully in UI
+        // console.warn('Failed to load options', e);
+      } finally {
+        if (!cancelled) {
+          try { hideFirstOverlay(); } catch {}
+        }
+      }
     })();
     return () => { cancelled = true; };
-  }, [hideFirstOverlay]);
+  }, []);
 
   useEffect(() => {
     // Auto-calc PPM with priority: material-level price (from selected subtype) -> legacy base rules
     const p = catalog?.products?.find(p => p.id === ptype);
+    
+    // إذا كان المنتج "أخرى"، لا نستخدم سعر للمتر ولا نظهر تكلفة
+    if (ptype === 'other') {
+      setPricePerMeter(0);
+      return;
+    }
+    
     const st: any = p?.subtypes?.find((s: any) => s.id === psubtype);
     const mat = (st?.materials || []).find((m: any) => m.id === material);
     if (mat && Number.isFinite(Number(mat.pricePerM2))) {
@@ -214,7 +259,6 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       setHeight(Number(d.height) || 0);
       setLength(Number(d.length) || 0);
       setQuantity(Number(d.quantity) || 1);
-      setDays(Number(d.days) || 1);
       setSelectedAcc(Array.isArray(d.selectedAcc) ? d.selectedAcc : []);
       setDescription(d.description || '');
       // keep auto calc for ppm via effect
@@ -234,7 +278,6 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
             width: Number(b.width) || 0,
             height: Number(b.height) || 0,
             quantity: Number(b.quantity) || 1,
-            days: Number(b.days) || 1,
             autoPrice: true,
             pricePerMeter: Number(b.pricePerMeter) || 0,
             selectedAcc: Array.isArray(b.selectedAcc) ? b.selectedAcc : [],
@@ -247,12 +290,20 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     } catch {}
   }, []);
 
-  // Keep additional builders' days in sync with main days
-  useEffect(() => {
-    setAdditionalBuilders((prev) => prev.map((b) => ({ ...b, days })));
-  }, [days]);
+  // Removed days sync - no longer needed
 
   const isComplete = (() => {
+    // تحقق خاص لخيار "أخرى"
+    if (ptype === 'other') {
+      const hasBasicInfo = otherProductName.trim() && otherSubtype.trim() && otherMaterial.trim();
+      const hasQuantity = quantity > 0;
+      const hasDimensions = width > 0 && height > 0 && length > 0; // ثلاثي الأبعاد للأخرى
+      // التحقق من الملحقات المخصصة: إن وُجدت، يجب أن تكون أسماؤها غير فارغة
+      const accessoriesValid = otherCustomAccessories.every(acc => acc.name.trim());
+      return hasBasicInfo && hasQuantity && hasDimensions && accessoriesValid;
+    }
+    
+    // تحقق عادي للمنتجات الأخرى
     if (!ptype || !material || quantity <= 0 || pricePerMeter <= 0) return false;
     const needW = !!reqDim.width; const needH = !!reqDim.height; const needL = !!reqDim.length;
     const okW = !needW || width > 0;
@@ -261,7 +312,17 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     return okW && okH && okL;
   })();
 
-  const total = useMemo(() => computeTotal(width, height, length, pricePerMeter, quantity, selectedAcc, (id)=> accessories.find(a=>a.id===id)?.price || 0), [width, height, length, pricePerMeter, quantity, selectedAcc, accessories]);
+  const total = useMemo(() => {
+    const currentProduct = catalog?.products?.find(p => p.id === ptype);
+    const measurementMode = (currentProduct as any)?.measurementMode || 'area_wh';
+    
+    // للمنتجات "أخرى"، لا يوجد حساب تكلفة حالياً
+    if (ptype === 'other') {
+      return 0;
+    }
+    
+    return computeTotal(width, height, length, pricePerMeter, quantity, selectedAcc, (id)=> accessories.find(a=>a.id===id)?.price || 0, measurementMode);
+  }, [width, height, length, pricePerMeter, quantity, selectedAcc, accessories, catalog, ptype]);
   const totalExtra = useMemo(() => {
     return additionalBuilders.reduce((sum, b) => {
       const p = catalog?.products?.find(x => x.id === b.ptype);
@@ -271,7 +332,8 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       const fallback = Math.round(base * (subtypeFactor[b.psubtype] ?? 1) * (colorFactor[b.color] ?? 1));
       const ppm = Number.isFinite(Number(mat?.pricePerM2)) ? Number(mat?.pricePerM2||0) : fallback;
       const accPrice = (id:string) => (p?.accessories || []).find(a=>a.id===id)?.price || 0;
-      return sum + computeTotal(b.width, b.height, undefined, ppm, b.quantity, b.selectedAcc, accPrice);
+      const measurementMode = (p as any)?.measurementMode || 'area_wh';
+      return sum + computeTotal(b.width, b.height, undefined, ppm, b.quantity, b.selectedAcc, accPrice, measurementMode);
     }, 0);
   }, [additionalBuilders, priceRules, catalog]);
   const grandTotal = useMemo(() => total + totalExtra, [total, totalExtra]);
@@ -307,7 +369,6 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       height: 0,
       length: 0,
       quantity: 1,
-      days: days,
       autoPrice: true,
       pricePerMeter: 0,
       selectedAcc: [],
@@ -337,9 +398,12 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     }
     if (!isComplete) return;
     // Build main project
-    const mainPPM = pricePerMeter;
+    const mainPPM = (ptype === 'other') ? 0 : pricePerMeter;
     const thisProd = catalog?.products?.find(x => x.id === ptype);
-    const mainTotal = computeTotal(width, height, length, mainPPM, quantity, selectedAcc, (id)=> (thisProd?.accessories || []).find(a=>a.id===id)?.price || 0);
+    const mainMeasurementMode = (thisProd as any)?.measurementMode || 'area_wh';
+    const mainTotal = (ptype === 'other')
+      ? 0
+      : computeTotal(width, height, length, mainPPM, quantity, selectedAcc, (id)=> (thisProd?.accessories || []).find(a=>a.id===id)?.price || 0, mainMeasurementMode);
     // Build additional items (not as separate projects)
     const items = additionalBuilders.map((b) => {
       const p = catalog?.products?.find(x => x.id === b.ptype);
@@ -368,12 +432,12 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
         height: b.height,
         length: b.length || 0,
         quantity: b.quantity,
-        days: b.days,
         autoPrice: b.autoPrice,
         pricePerMeter: ppm,
         selectedAcc: b.selectedAcc,
         description: b.description || '',
-        total: computeTotal(b.width, b.height, b.length || 0, ppm, b.quantity, b.selectedAcc, accPrices),
+
+        total: computeTotal(b.width, b.height, undefined, ppm, b.quantity, b.selectedAcc, accPrices, (p as any)?.measurementMode || 'area_wh'),
         createdAt: Date.now(),
       };
     });
@@ -381,29 +445,29 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     const mainItem = {
       id: Math.random().toString(36).slice(2),
       ptype,
-      psubtype,
-      material,
-      color,
-      // localized labels
-      ptypeAr: thisProd?.ar || undefined,
-      ptypeEn: thisProd?.en || undefined,
-      psubtypeAr: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.ar || undefined,
-      psubtypeEn: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.en || undefined,
-      materialAr: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.ar || undefined,
-      materialEn: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.en || undefined,
-      colorAr: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.ar || undefined,
-      colorEn: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.en || undefined,
+
+      psubtype: ptype === 'other' ? otherSubtype : psubtype,
+      material: ptype === 'other' ? otherMaterial : material,
+      color: ptype === 'other' ? otherColor : color,
       width,
       height,
       length,
       quantity,
-      days,
       autoPrice,
       pricePerMeter: mainPPM,
-      selectedAcc,
+      selectedAcc: ptype === 'other' ? [] : selectedAcc,
       description: description || '',
       total: mainTotal,
       createdAt: Date.now(),
+      ...(ptype === 'other' && {
+        otherProductName,
+        otherSubtype,
+        otherMaterial,
+        otherColor,
+        otherDescription,
+        otherCustomAccessories,
+        isCustomProduct: true
+      })
     };
     const allItems = [mainItem, ...items];
     // Attach current user info so vendors can see the requester name
@@ -415,30 +479,34 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
 
     // Map to backend CreateProjectDto
     const payload: any = {
-      title: description ? (locale==='ar' ? 'مشروع' : 'Project') : undefined,
+      title: ptype === 'other' ? otherProductName : (description ? (locale==='ar' ? 'مشروع' : 'Project') : undefined),
       description,
       type: ptype,
-      psubtype,
-      material,
-      color,
-      // localized labels for root as well
-      ptypeAr: thisProd?.ar || undefined,
-      ptypeEn: thisProd?.en || undefined,
-      psubtypeAr: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.ar || undefined,
-      psubtypeEn: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.en || undefined,
-      materialAr: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.ar || undefined,
-      materialEn: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.en || undefined,
-      colorAr: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.ar || undefined,
-      colorEn: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.en || undefined,
+
+      psubtype: ptype === 'other' ? otherSubtype : psubtype,
+      material: ptype === 'other' ? otherMaterial : material,
+      color: ptype === 'other' ? otherColor : color,
+
       width,
       height,
       length,
       quantity,
-      days,
       pricePerMeter: mainPPM,
-      total: grandTotal,
-      selectedAcc,
+      total: ptype === 'other' ? 0 : grandTotal,
+      selectedAcc: ptype === 'other' ? [] : selectedAcc,
       items: allItems,
+      ...(ptype === 'other' && {
+        measurementMode: 'other_3d',
+        isCustomProduct: true,
+        customProductDetails: {
+          productName: otherProductName,
+          subtype: otherSubtype,
+          material: otherMaterial,
+          color: otherColor,
+          accessories: otherCustomAccessories,
+          notes: otherDescription
+        }
+      })
     };
     (async () => {
       try {
@@ -507,6 +575,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   </SelectContent>
                 </Select>
               </div>
+              {ptype !== 'other' && (
               <div>
                 <label className="block text-sm mb-1">{locale==='ar' ? 'النوع' : 'Subtype'}</label>
                 <Select value={psubtype} onValueChange={setPsubtype}>
@@ -520,6 +589,8 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   </SelectContent>
                 </Select>
               </div>
+              )}
+              {ptype !== 'other' && (
               <div>
                 <label className="block text-sm mb-1">{locale==='ar' ? 'الخامة' : 'Material'}</label>
                 <Select value={material} onValueChange={setMaterial}>
@@ -533,6 +604,8 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   </SelectContent>
                 </Select>
               </div>
+              )}
+              {ptype !== 'other' && (
               <div>
                 <label className="block text-sm mb-1">{locale==='ar' ? 'اللون' : 'Color'}</label>
                 <Select value={color} onValueChange={setColor}>
@@ -546,6 +619,8 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   </SelectContent>
                 </Select>
               </div>
+              )}
+              {ptype !== 'other' && (
               <div className="grid grid-cols-2 gap-2">
                 {reqDim.width && (
                   <div>
@@ -566,30 +641,15 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   </div>
                 )}
               </div>
-              <div>
-                <label className="block text-sm mb-1">{locale==='ar' ? 'سعر المتر المربع' : 'Price per m²'}</label>
-                <Input type="number" min={0} step={1} value={Number.isFinite(pricePerMeter) ? pricePerMeter : 0} disabled placeholder={locale==='ar' ? '0' : '0'} />
-              </div>
+              )}
+              {ptype !== 'other' && (
               <div>
                 <label className="block text-sm mb-1">{locale==='ar' ? 'الكمية' : 'Quantity'}</label>
                 <Input type="number" min={1} step={1} value={Number.isFinite(quantity) ? quantity : 0} onChange={(e) => setQuantity(parseInt(e.target.value || '0', 10) || 0)} placeholder={locale==='ar' ? '0' : '0'} />
               </div>
-              <div>
-                <label className="block text-sm mb-1">{locale==='ar' ? 'أيام التنفيذ' : 'Days to complete'}</label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={String(Number.isFinite(days) ? days : 1)}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/[^0-9]/g, '');
-                    const n = Math.max(1, parseInt(v || '1', 10) || 1);
-                    setDays(n);
-                  }}
-                  placeholder={locale==='ar' ? 'عدد الأيام' : 'Days'}
-                />
-              </div>
+              )}
               
+              {ptype !== 'other' && (
               <div className="md:col-span-2 lg:col-span-2">
                 <label className="block text-sm mb-2">{locale==='ar' ? 'ملحقات إضافية' : 'Additional Accessories'}</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -603,6 +663,8 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   ))}
                 </div>
               </div>
+              )}
+              {ptype !== 'other' && (
               <div className="md:col-span-2 lg:col-span-3">
                 <label className="block text-sm mb-1">{locale==='ar' ? 'وصف المنتج (اختياري)' : 'Project Description (optional)'}</label>
                 <textarea
@@ -617,16 +679,187 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                   placeholder={locale==='ar' ? 'اكتب وصفاً مختصراً للمشروع...' : 'Write a brief description of your project...'}
                 />
               </div>
+              )}
+              {ptype !== 'other' && (
               <div className="md:col-span-2 lg:col-span-3">
                 <Button type="button" variant="secondary" onClick={addClonedForm} className="mt-2 flex items-center gap-1">
-                  <Plus className="w-4 h-4" /> {locale==='ar' ? 'إضافة منتج' : 'Add Product'}
+                  <span className="w-4 h-4 inline-flex items-center justify-center font-bold">+</span> {locale==='ar' ? 'إضافة منتج' : 'Add Product'}
                 </Button>
               </div>
+              )}
             </div>
 
             {/* Actions moved to bottom under the last form */}
           </CardContent>
         </Card>
+
+        {/* نموذج خيار "أخرى" - إدخال يدوي كامل */}
+        {ptype === 'other' && (
+          <Card className="mb-8 border-blue-200 bg-blue-50/30">
+            <CardContent className="p-4 md:p-6 space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <h2 className="text-lg font-semibold text-blue-800">
+                  {locale==='ar' ? 'إدخال تفاصيل المنتج المخصص' : 'Custom Product Details'}
+                </h2>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* اسم المنتج */}
+                <div>
+                  <label className="block text-sm mb-1 font-medium">{locale==='ar' ? 'اسم المنتج' : 'Product Name'}</label>
+                  <Input 
+                    value={otherProductName} 
+                    onChange={(e) => setOtherProductName(e.target.value)}
+                    placeholder={locale==='ar' ? 'مثال: باب خشبي' : 'Example: Wooden Door'}
+                  />
+                </div>
+                
+                {/* النوع */}
+                <div>
+                  <label className="block text-sm mb-1 font-medium">{locale==='ar' ? 'نوع المنتج' : 'Product Type'}</label>
+                  <Input 
+                    value={otherSubtype} 
+                    onChange={(e) => setOtherSubtype(e.target.value)}
+                    placeholder={locale==='ar' ? 'مثال: عادي، مزدوج' : 'Example: Standard, Double'}
+                  />
+                </div>
+                
+                {/* الخامة */}
+                <div>
+                  <label className="block text-sm mb-1 font-medium">{locale==='ar' ? 'الخامة' : 'Material'}</label>
+                  <Input 
+                    value={otherMaterial} 
+                    onChange={(e) => setOtherMaterial(e.target.value)}
+                    placeholder={locale==='ar' ? 'مثال: خشب زان، ألومنيوم' : 'Example: Beech Wood, Aluminum'}
+                  />
+                </div>
+                
+                {/* اللون */}
+                <div>
+                  <label className="block text-sm mb-1 font-medium">{locale==='ar' ? 'اللون (اختياري)' : 'Color (Optional)'}</label>
+                  <Input 
+                    value={otherColor} 
+                    onChange={(e) => setOtherColor(e.target.value)}
+                    placeholder={locale==='ar' ? 'مثال: بني، أبيض' : 'Example: Brown, White'}
+                  />
+                </div>
+                
+                {/* لا يوجد سعر لكل متر مربع في وضع "أخرى" */}
+                
+                {/* الأبعاد الثلاثية */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="block text-sm mb-2 font-medium text-red-600">{locale==='ar' ? 'الأبعاد (متر) *' : 'Dimensions (meters) *'}</label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs mb-1">{locale==='ar' ? 'العرض' : 'Width'}</label>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01"
+                        value={width || ''} 
+                        onChange={(e) => setWidth(Number(e.target.value) || 0)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs mb-1">{locale==='ar' ? 'الارتفاع' : 'Height'}</label>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01"
+                        value={height || ''} 
+                        onChange={(e) => setHeight(Number(e.target.value) || 0)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs mb-1">{locale==='ar' ? 'الطول' : 'Length'}</label>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01"
+                        value={length || ''} 
+                        onChange={(e) => setLength(Number(e.target.value) || 0)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* الكمية */}
+                <div>
+                  <label className="block text-sm mb-1 font-medium text-red-600">{locale==='ar' ? 'الكمية *' : 'Quantity *'}</label>
+                  <Input 
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={Number.isFinite(quantity) ? quantity : 0}
+                    onChange={(e) => setQuantity(parseInt(e.target.value || '0', 10) || 0)}
+                    placeholder={locale==='ar' ? '0' : '0'}
+                  />
+                </div>
+                
+                {/* الملحقات المخصصة */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="block text-sm mb-2 font-medium">{locale==='ar' ? 'الملحقات المخصصة (اختياري)' : 'Custom Accessories (Optional)'}</label>
+                  <div className="space-y-2">
+                    {otherCustomAccessories.map((acc, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <Input 
+                          placeholder={locale==='ar' ? 'اسم الملحق *' : 'Accessory name *'}
+                          value={acc.name}
+                          onChange={(e) => {
+                            const newAccs = [...otherCustomAccessories];
+                            newAccs[idx] = { name: e.target.value };
+                            setOtherCustomAccessories(newAccs);
+                          }}
+                          className="flex-1"
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const newAccs = otherCustomAccessories.filter((_, i) => i !== idx);
+                            setOtherCustomAccessories(newAccs);
+                          }}
+                          className="px-3"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setOtherCustomAccessories([...otherCustomAccessories, { name: '' }]);
+                      }}
+                    >
+                      {locale==='ar' ? '+ إضافة ملحق' : '+ Add Accessory'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* الوصف */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="block text-sm mb-1 font-medium">{locale==='ar' ? 'وصف المنتج (اختياري)' : 'Product Description (Optional)'}</label>
+                  <textarea
+                    value={otherDescription}
+                    onChange={(e) => setOtherDescription(e.target.value)}
+                    rows={3}
+                    className="w-full border rounded-md p-2 bg-background"
+                    spellCheck={false}
+                    autoComplete="off"
+                    data-gramm="false"
+                    data-enable-grammarly="false"
+                    placeholder={locale==='ar' ? 'اكتب وصفاً مفصلاً للمنتج المخصص...' : 'Write a detailed description of the custom product...'}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Additional Cloned Forms */}
         {additionalBuilders.length > 0 && (
@@ -729,19 +962,6 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                         <label className="block text-sm mb-1">{locale==='ar' ? 'الكمية' : 'Quantity'}</label>
                         <Input type="number" min={1} step={1} value={Number.isFinite(b.quantity) ? b.quantity : 0} onChange={(e)=> setAdditionalBuilders((prev)=>{ const c=[...prev]; c[idx] = { ...c[idx], quantity: parseInt(e.target.value || '0', 10) || 0 }; return c; })} />
                       </div>
-                      <div>
-                        <label className="block text-sm mb-1">{locale==='ar' ? 'أيام التنفيذ' : 'Days to complete'}</label>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={String(Number.isFinite(b.days) ? b.days : 1)}
-                          onChange={(e)=> {/* disabled */}}
-                          disabled
-                          readOnly
-                          placeholder={locale==='ar' ? 'عدد الأيام' : 'Days'}
-                        />
-                      </div>
                       <div className="md:col-span-2 lg:col-span-2">
                         <label className="block text-sm mb-2">{locale==='ar' ? 'ملحقات إضافية' : 'Additional Accessories'}</label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -774,16 +994,18 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
         )}
 
         {/* Grand Total at the very end */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between p-4 rounded-md border bg-muted/40">
-            <div className="text-sm text-muted-foreground">
-              {locale==='ar' ? 'الإجمالي التقديري بعد كل الاختيارات' : 'Estimated total after all selections'}
-            </div>
-            <div className="text-xl font-bold text-primary">
-              {currency} {grandTotal.toLocaleString(locale==='ar'?'ar-EG':'en-US')}
+        {ptype !== 'other' && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between p-4 rounded-md border bg-muted/40">
+              <div className="text-sm text-muted-foreground">
+                {locale==='ar' ? 'الإجمالي التقديري بعد كل الاختيارات' : 'Estimated total after all selections'}
+              </div>
+              <div className="text-xl font-bold text-primary">
+                {currency} {grandTotal.toLocaleString(locale==='ar'?'ar-EG':'en-US')}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Bottom Actions under the last form */}
         <div className="flex items-center justify-between mt-4">

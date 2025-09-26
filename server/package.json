@@ -6,12 +6,17 @@
   "main": "index.js",
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": "20.x",
+    "npm": ">=8.0.0"
   },
-  "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "nodemon index.js",
-    "start": "node index.js"
+    "start": "node --max-old-space-size=400 --expose-gc index.js",
+    "render-build": "npm ci --prefer-offline --no-audit --no-fund --silent",
+    "render-start": "node --max-old-space-size=400 --expose-gc --unhandled-rejections=strict index.js",
+    "health-check": "curl -f http://localhost:${PORT:-4000}/health || exit 1",
+    "test": "node test-before-deploy.js",
+    "predeployment-test": "node test-before-deploy.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

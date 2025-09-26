@@ -74,6 +74,12 @@ interface ProfileUser {
   isVerified?: boolean;
   // License image URL from backend profile (display-only preview)
   licenseImageUrl?: string;
+  // New vendor fields
+  registryNumber?: string;
+  storeName?: string;
+  commercialRegistryUrl?: string;
+  licenseUrl?: string;
+  additionalDocumentUrl?: string;
 }
 
 interface UserProfileProps extends RouteContext {
@@ -126,6 +132,12 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
         registryStart: '',
         registryEnd: '',
         isVerified: undefined,
+        // New vendor fields
+        registryNumber: '',
+        storeName: '',
+        commercialRegistryUrl: '',
+        licenseUrl: '',
+        additionalDocumentUrl: '',
       } as ProfileUser;
     }
     return { id: '1', name: '', email: '', phone: '', birthdate: '', avatar: '', role: 'customer', technicianType: '' } as ProfileUser;
@@ -260,6 +272,12 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
             registryEnd: (data as any)?.registryEnd || '',
             isVerified: Boolean((data as any)?.isVerified),
             licenseImageUrl: (data as any)?.licenseImageUrl || '',
+            // New vendor fields
+            registryNumber: (data as any)?.registryNumber || '',
+            storeName: (data as any)?.storeName || '',
+            commercialRegistryUrl: (data as any)?.commercialRegistryUrl || '',
+            licenseUrl: (data as any)?.licenseUrl || '',
+            additionalDocumentUrl: (data as any)?.additionalDocumentUrl || '',
           };
           setEditedUser(merged);
           // sync Router user as well
@@ -390,6 +408,12 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
         registryEnd: editedUser.registryEnd || undefined,
         phoneSecondary: editedUser.phoneSecondary || undefined,
         licenseImageUrl: editedUser.licenseImageUrl || undefined,
+        // New vendor fields
+        registryNumber: editedUser.registryNumber || undefined,
+        storeName: editedUser.storeName || undefined,
+        commercialRegistryUrl: editedUser.commercialRegistryUrl || undefined,
+        licenseUrl: editedUser.licenseUrl || undefined,
+        additionalDocumentUrl: editedUser.additionalDocumentUrl || undefined,
       } as any);
 
       // Refresh canonical profile
@@ -969,15 +993,29 @@ export default function UserProfile({ user, setUser, setCurrentPage, wishlistIte
                             <Label>{locale==='en'?'Phone (Secondary)':'الهاتف (إضافي)'}</Label>
                             <Input value={editedUser.phoneSecondary || ''} onChange={(e)=> setEditedUser({ ...editedUser, phoneSecondary: e.target.value })} disabled={!isEditing} className={!isEditing ? 'bg-muted' : ''} />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>{locale==='en'?'Registry Start':'بداية السجل الموحد'}</Label>
-                              <Input value={editedUser.registryStart || ''} onChange={(e)=> setEditedUser({ ...editedUser, registryStart: e.target.value })} disabled={!isEditing} className={!isEditing ? 'bg-muted' : ''} />
-                            </div>
-                            <div>
-                              <Label>{locale==='en'?'Registry End':'نهاية السجل الموحد'}</Label>
-                              <Input value={editedUser.registryEnd || ''} onChange={(e)=> setEditedUser({ ...editedUser, registryEnd: e.target.value })} disabled={!isEditing} className={!isEditing ? 'bg-muted' : ''} />
-                            </div>
+                          <div>
+                            <Label>{locale==='en'?'Registry Number':'رقم السجل التجاري'}</Label>
+                            <Input value={editedUser.registryNumber || ''} onChange={(e)=> setEditedUser({ ...editedUser, registryNumber: e.target.value })} disabled={!isEditing} className={!isEditing ? 'bg-muted' : ''} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>{locale==='en'?'Store Name':'اسم المتجر'}</Label>
+                            <Input value={editedUser.storeName || ''} onChange={(e)=> setEditedUser({ ...editedUser, storeName: e.target.value })} disabled={!isEditing} className={!isEditing ? 'bg-muted' : ''} />
+                          </div>
+                          <div>
+                            <Label>{locale==='en'?'Commercial Registry':'السجل التجاري'}</Label>
+                            <Input value={editedUser.commercialRegistryUrl || ''} readOnly className="bg-muted" placeholder={locale==='en'?'File URL':'رابط الملف'} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>{locale==='en'?'License':'الرخصة'}</Label>
+                            <Input value={editedUser.licenseUrl || ''} readOnly className="bg-muted" placeholder={locale==='en'?'File URL':'رابط الملف'} />
+                          </div>
+                          <div>
+                            <Label>{locale==='en'?'Additional Document':'مستند إضافي'}</Label>
+                            <Input value={editedUser.additionalDocumentUrl || ''} readOnly className="bg-muted" placeholder={locale==='en'?'File URL':'رابط الملف'} />
                           </div>
                         </div>
                       </div>
