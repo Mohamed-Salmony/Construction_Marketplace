@@ -340,47 +340,49 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
   };
 
   const handleEditProduct = async (productData: any) => {
-    // FIXED: إظهار رسالة التحميل بوضوح
-    console.log('FIXED VendorProducts - Starting product edit:', productData.id);
-    showLoading?.(locale==='ar' ? 'جاري حفظ التعديلات...' : 'Saving changes...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
+    try {
+      // FIXED: إظهار رسالة التحميل بوضوح
+      console.log('FIXED VendorProducts - Starting product edit:', productData.id);
+      showLoading?.(locale==='ar' ? 'جاري حفظ التعديلات...' : 'Saving changes...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
 
-    const payload = {
-      nameEn: String(productData?.nameEn || ''),
-      nameAr: String(productData?.nameAr || productData?.name || ''),
-      descriptionEn: String(productData?.descriptionEn || ''),
-      descriptionAr: String(productData?.descriptionAr || ''),
-      categoryId: String(productData?.categoryId || ''),
-      // base/original price
-      price: Number((productData?.originalPrice ?? productData?.price) || 0),
-      // current/discounted price
-      discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
-      stockQuantity: Number(productData?.stock || 0),
-      allowCustomDimensions: false,
-      isAvailableForRent: false,
-      rentPricePerDay: undefined as number | undefined,
-      attributes: [] as Array<{ nameEn: string; nameAr: string; valueEn: string; valueAr: string }>,
-    };
-    await updateProduct(String(productData.id), payload as any);
+      const payload = {
+        nameEn: String(productData?.nameEn || ''),
+        nameAr: String(productData?.nameAr || productData?.name || ''),
+        descriptionEn: String(productData?.descriptionEn || ''),
+        descriptionAr: String(productData?.descriptionAr || ''),
+        categoryId: String(productData?.categoryId || ''),
+        // base/original price
+        price: Number((productData?.originalPrice ?? productData?.price) || 0),
+        // current/discounted price
+        discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
+        stockQuantity: Number(productData?.stock || 0),
+        allowCustomDimensions: false,
+        isAvailableForRent: false,
+        rentPricePerDay: undefined as number | undefined,
+        attributes: [] as Array<{ nameEn: string; nameAr: string; valueEn: string; valueAr: string }>,
+      };
+      await updateProduct(String(productData.id), payload as any);
 
-    // Handle any newly added files
-    const files: File[] = Array.isArray(productData?._files) ? productData._files : [];
-    if (files.length > 0) {
-      setUploading(true); setUploadTotal(files.length); setUploadDone(0);
-      const up = await api.uploadFiles(files, 'images');
-      if (up.ok && up.data && Array.isArray((up.data as any).items)) {
-        const items = (up.data as any).items as Array<{ url: string }>;
-        for (let i = 0; i < items.length; i++) {
-          try {
-            const it = items[i];
-            const res = await addProductImage(String(productData.id), {
-              imageUrl: it.url,
-              isPrimary: false,
-              sortOrder: i,
-            } as any);
+      // Handle any newly added files
+      const files: File[] = Array.isArray(productData?._files) ? productData._files : [];
+      if (files.length > 0) {
+        setUploading(true); setUploadTotal(files.length); setUploadDone(0);
+        const up = await api.uploadFiles(files, 'images');
+        if (up.ok && up.data && Array.isArray((up.data as any).items)) {
+          const items = (up.data as any).items as Array<{ url: string }>;
+          for (let i = 0; i < items.length; i++) {
+            try {
+              const it = items[i];
+              const res = await addProductImage(String(productData.id), {
+                imageUrl: it.url,
+                isPrimary: false,
+                sortOrder: i,
+              } as any);
 
-            if ((res as any)?.ok) setUploadDone((d) => d + 1);
-          } catch {
-            toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
+              if ((res as any)?.ok) setUploadDone((d) => d + 1);
+            } catch {
+              toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
+            }
           }
           toastSuccess(locale === 'en' ? 'Images uploaded successfully' : 'تم رفع الصور بنجاح', locale === 'ar');
         } else {
