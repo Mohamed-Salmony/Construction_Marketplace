@@ -28,10 +28,8 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
   const normalizeProduct = (p?: any) => {
     const catId = p?.categoryId ?? p?.category?._id ?? p?.category?.id ?? categoryList[0]?.id ?? '';
     // Coerce numeric-like fields to digit-only strings for controlled inputs
-    const priceCurrentRaw = p?.discountPrice ?? p?.currentPrice ?? p?.price ?? p?.sellPrice ?? p?.finalPrice ?? '';
-    const priceOriginalRaw = p?.discountPrice != null && p?.discountPrice !== ''
-      ? (p?.price ?? p?.originalPrice ?? '')
-      : (p?.originalPrice ?? '');
+    const priceCurrentRaw = p?.discountPrice ?? p?.price ?? p?.sellPrice ?? p?.finalPrice ?? '';
+    const priceOriginalRaw = p?.originalPrice ?? '';
     const toDigits = (v: any) => String(v ?? '').replace(/[^0-9]/g, '');
     const priceCurrent = toDigits(priceCurrentRaw);
     const priceOriginal = toDigits(priceOriginalRaw);
@@ -147,25 +145,28 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
     const compatibilityArr = Array.isArray((formData as any).compatibilityList)
       ? (formData as any).compatibilityList.map((s: any) => String(s || '').trim()).filter(Boolean)
       : [];
-    onSave({
+    // FIXED: إصلاح منطق إرسال البيانات للباك إند
+    const finalData = {
       ...formData,
       price: priceNum,
-      originalPrice: originalPriceNum,
+      // FIXED: السعر الأصلي يكون فارغ إذا لم يدخل المستخدم قيمة
+      originalPrice: originalPriceNum > 0 ? originalPriceNum : undefined,
       stock: stockNum,
       inStock: stockNum > 0,
       image: main,
       images: uniqueImages,
-      // subCategory removed
-      // status removed
       specifications: specsObj,
       compatibility: compatibilityArr,
-      // partLocation removed
-      // normalize addon object as well
       addonInstallation: { enabled: !!formData.addonInstallEnabled, feePerUnit: Number(formData.addonInstallFee || 0) },
       unitType: (formData as any).unitType === 'meters' ? 'meters' : 'quantity',
       pricePerMeter: (formData as any).unitType === 'meters' ? Number(String((formData as any).pricePerMeter || priceNum) || 0) : undefined,
-      id: product?.id || Date.now().toString()
-    });
+      id: product?.id || Date.now().toString(),
+      // إضافة المعرف للتعديل
+      _isEdit: !!product?.id
+    };
+    
+    console.log('FIXED ProductForm - Saving product data:', finalData);
+    onSave(finalData);
   };
 
   return (
