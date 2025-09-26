@@ -1,11 +1,24 @@
 import mongoose from 'mongoose';
 
 const projectItemSchema = new mongoose.Schema({
+  // IDs/keys
   ptype: { type: String },
   type: { type: String },
+  psubtype: { type: String },
   material: { type: String },
+  color: { type: String },
+  // Localized labels (optional)
+  ptypeAr: { type: String },
+  ptypeEn: { type: String },
+  psubtypeAr: { type: String },
+  psubtypeEn: { type: String },
+  materialAr: { type: String },
+  materialEn: { type: String },
+  colorAr: { type: String },
+  colorEn: { type: String },
   width: { type: Number },
   height: { type: Number },
+  length: { type: Number },
   quantity: { type: Number },
   days: { type: Number },
   pricePerMeter: { type: Number },
@@ -30,12 +43,30 @@ const projectSchema = new mongoose.Schema({
   views: { type: Number, default: 0 },
   archived: { type: Boolean, default: false },
 
+  assignedMerchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  awardedBidId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bid' },
+  executionStartedAt: { type: Date },
+  executionDueAt: { type: Date },
+
   // Optional top-level fields (for convenience/search)
+  // IDs/keys
   ptype: { type: String },
   type: { type: String },
+  psubtype: { type: String },
   material: { type: String },
+  color: { type: String },
+  // Localized labels (optional)
+  ptypeAr: { type: String },
+  ptypeEn: { type: String },
+  psubtypeAr: { type: String },
+  psubtypeEn: { type: String },
+  materialAr: { type: String },
+  materialEn: { type: String },
+  colorAr: { type: String },
+  colorEn: { type: String },
   width: { type: Number },
   height: { type: Number },
+  length: { type: Number },
   quantity: { type: Number },
   days: { type: Number },
   pricePerMeter: { type: Number },

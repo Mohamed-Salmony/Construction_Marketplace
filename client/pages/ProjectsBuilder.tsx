@@ -123,6 +123,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     color: string;
     width: number;
     height: number;
+    length?: number;
     quantity: number;
     days: number;
     autoPrice: boolean;
@@ -211,6 +212,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       setColor(d.color || 'white');
       setWidth(Number(d.width) || 0);
       setHeight(Number(d.height) || 0);
+      setLength(Number(d.length) || 0);
       setQuantity(Number(d.quantity) || 1);
       setDays(Number(d.days) || 1);
       setSelectedAcc(Array.isArray(d.selectedAcc) ? d.selectedAcc : []);
@@ -303,6 +305,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       color: '',
       width: 0,
       height: 0,
+      length: 0,
       quantity: 1,
       days: days,
       autoPrice: true,
@@ -352,15 +355,25 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
         psubtype: b.psubtype,
         material: b.material,
         color: b.color,
+        // localized labels
+        ptypeAr: p?.ar || undefined,
+        ptypeEn: p?.en || undefined,
+        psubtypeAr: st?.ar || undefined,
+        psubtypeEn: st?.en || undefined,
+        materialAr: mat?.ar || undefined,
+        materialEn: mat?.en || undefined,
+        colorAr: (catalog?.products?.find(x=>x.id===b.ptype)?.colors||[]).find((c:any)=>c.id===b.color)?.ar || undefined,
+        colorEn: (catalog?.products?.find(x=>x.id===b.ptype)?.colors||[]).find((c:any)=>c.id===b.color)?.en || undefined,
         width: b.width,
         height: b.height,
+        length: b.length || 0,
         quantity: b.quantity,
         days: b.days,
         autoPrice: b.autoPrice,
         pricePerMeter: ppm,
         selectedAcc: b.selectedAcc,
         description: b.description || '',
-        total: computeTotal(b.width, b.height, undefined, ppm, b.quantity, b.selectedAcc, accPrices),
+        total: computeTotal(b.width, b.height, b.length || 0, ppm, b.quantity, b.selectedAcc, accPrices),
         createdAt: Date.now(),
       };
     });
@@ -371,8 +384,18 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       psubtype,
       material,
       color,
+      // localized labels
+      ptypeAr: thisProd?.ar || undefined,
+      ptypeEn: thisProd?.en || undefined,
+      psubtypeAr: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.ar || undefined,
+      psubtypeEn: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.en || undefined,
+      materialAr: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.ar || undefined,
+      materialEn: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.en || undefined,
+      colorAr: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.ar || undefined,
+      colorEn: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.en || undefined,
       width,
       height,
+      length,
       quantity,
       days,
       autoPrice,
@@ -398,6 +421,15 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       psubtype,
       material,
       color,
+      // localized labels for root as well
+      ptypeAr: thisProd?.ar || undefined,
+      ptypeEn: thisProd?.en || undefined,
+      psubtypeAr: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.ar || undefined,
+      psubtypeEn: (thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.en || undefined,
+      materialAr: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.ar || undefined,
+      materialEn: ((thisProd?.subtypes||[]).find((s:any)=>s.id===psubtype)?.materials||[]).find((m:any)=>m.id===material)?.en || undefined,
+      colorAr: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.ar || undefined,
+      colorEn: (thisProd?.colors||[]).find((c:any)=>c.id===color)?.en || undefined,
       width,
       height,
       length,
@@ -684,7 +716,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                         {(catalog?.products?.find(x=>x.id===b.ptype)?.dimensions?.length ?? false) && (
                           <div className="col-span-2 md:col-span-1">
                             <label className="block text-sm mb-1">{locale==='ar' ? 'الطول (متر طولي)' : 'Length (linear m)'}</label>
-                            <Input type="text" inputMode="decimal" value={''} onChange={()=>{ /* manage if needed in extended model */ }} disabled />
+                            <Input type="text" inputMode="decimal" value={Number.isFinite(b.length || 0) ? (b.length || 0) : ''} onChange={(e)=> setAdditionalBuilders((prev)=>{ const c=[...prev]; c[idx] = { ...c[idx], length: parseFloat(e.target.value || '0') }; return c; })} />
                           </div>
                         )}
                       </div>

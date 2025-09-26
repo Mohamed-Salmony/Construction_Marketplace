@@ -38,6 +38,34 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
   const getLastSeen = (key: string) => {
     try { const v = localStorage.getItem(key); return v ? new Date(v).getTime() : 0; } catch { return 0; }
   };
+
+  // Vendor: open user project chat directly using ProjectChat storage
+  const openVendorUserProjectChat = (projectId: string, conversationId?: string) => {
+    try {
+      // If projectId is missing but conversationId exists, still proceed to open chat
+      if (!projectId && !conversationId) return;
+      // current vendor is the merchant
+      const myId = String(context?.user?.id || '');
+      const myName = String((context as any)?.user?.name || '').trim();
+      try {
+        if (projectId) localStorage.setItem('project_chat_project_id', String(projectId));
+        if (myId) localStorage.setItem('project_chat_merchant_id', myId);
+        if (myName) localStorage.setItem('project_chat_merchant_name', myName);
+        // force fresh lookup/creation for this project/vendor pair
+        if (conversationId && String(conversationId).trim()) {
+          localStorage.setItem('project_chat_conversation_id', String(conversationId));
+        } else {
+          localStorage.removeItem('project_chat_conversation_id');
+        }
+      } catch {}
+      try { console.debug('[ChatInbox] openVendorUserProjectChat -> pid:', projectId, 'cid:', conversationId, 'merchantId:', myId, 'name:', myName); } catch {}
+      if (typeof context.setCurrentPage === 'function') {
+        context.setCurrentPage('project-chat');
+      } else if (typeof window !== 'undefined') {
+        try { window.location.assign(`/ar?page=project-chat`); } catch {}
+      }
+    } catch {}
+  };
   const setLastSeen = (key: string) => {
     try { localStorage.setItem(key, new Date().toISOString()); } catch {}
     try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('chat_seen_refresh', { detail: { key, at: Date.now() } } as any)); } catch {}
@@ -503,7 +531,7 @@ export default function ChatInbox(context: RouteContext = {} as RouteContext) {
                               <div className="font-medium text-sm">{locale==='ar' ? 'محادثة مشروع' : 'Project chat'}</div>
                               <div className="text-xs text-muted-foreground line-clamp-2">{p.message}</div>
                             </div>
-                            <Button size="sm" variant="outline" onClick={()=> { setLastSeen(lsServiceKey); openConversation(String(p.conversationId)); }}>{locale==='ar' ? 'فتح' : 'Open'}</Button>
+                            <Button size="sm" variant="outline" onClick={()=> { setLastSeen(lsServiceKey); openVendorUserProjectChat(String(p.projectId), String(p.conversationId||'')); }}>{locale==='ar' ? 'فتح' : 'Open'}</Button>
                           </CardContent>
                         </Card>
                       ))}

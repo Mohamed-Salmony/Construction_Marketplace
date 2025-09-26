@@ -158,6 +158,12 @@ export async function getAdminProjectBids(id: number | string) {
   );
 }
 
+// Admin: delete a project by id
+export async function adminDeleteProject(id: number | string) {
+  const pid = encodeURIComponent(String(id));
+  return api.del<{ success: boolean; message?: string }>(`/api/ProjectsAdmin/${pid}`, { auth: true });
+}
+
 // Approve/Deactivate technicians (workers) using the generic users status endpoint
 export async function approveTechnician(userId: string) {
   // maps to: POST /api/Admin/users/{userId}/status { status: 'active' }

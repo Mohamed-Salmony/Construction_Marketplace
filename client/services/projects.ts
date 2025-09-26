@@ -21,6 +21,10 @@ export type ProjectDto = {
   currency?: string;
   status?: ProjectStatus;
   createdAt?: string;
+  assignedMerchantId?: string;
+  awardedBidId?: string;
+  executionStartedAt?: string | null;
+  executionDueAt?: string | null;
 };
 
 export type PagedResultDto<T> = {
@@ -97,6 +101,7 @@ export type CreateProjectDto = {
   color?: string;
   width?: number;
   height?: number;
+  length?: number;
   quantity?: number;
   days?: number;
   pricePerMeter?: number;
@@ -119,5 +124,9 @@ export async function deleteProject(id: string | number) {
 
 export async function getMyProjects() {
   return api.get<ProjectDto[]>(`/api/Projects/customer/my-projects`, { auth: true });
+}
+
+export async function getVendorAssignedProjects() {
+  return api.get<ProjectDto[]>(`/api/Projects/vendor/assigned`, { auth: true, cache: 'no-store' });
 }
 

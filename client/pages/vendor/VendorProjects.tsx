@@ -48,6 +48,7 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
   }, [myBids]);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const { ok, data } = await getOpenProjects();
@@ -93,12 +94,13 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
               currency,
             };
           });
-          setUserProjects(normalized);
-        } else setUserProjects([]);
-      } catch { setUserProjects([]); }
-      finally { try { hideFirstOverlay(); } catch {} }
+          if (mounted) setUserProjects(normalized);
+        } else if (mounted) setUserProjects([]);
+      } catch { if (mounted) setUserProjects([]); }
+      finally { if (mounted) { try { hideFirstOverlay(); } catch {} } }
     })();
-  }, [hideFirstOverlay]);
+    return () => { mounted = false; };
+  }, []);
 
   // Load commission rates for projects (merchants)
   useEffect(() => {
@@ -200,9 +202,17 @@ export default function VendorProjects({ setCurrentPage, ...context }: Props) {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
-                  {(p.width || p.height) && (
+                  {(p.width || p.height || (p as any).length) && (
                     <div className="text-muted-foreground">
-                      {locale === 'ar' ? 'الأبعاد' : 'Dimensions'}: {p.width ? Number(p.width) : 0}×{p.height ? Number(p.height) : 0}
+                      {locale === 'ar' ? 'الأبعاد' : 'Dimensions'}: {(() => {
+                        const W = Number(p.width || 0);
+                        const H = Number(p.height || 0);
+                        const L = Number((p as any).length || 0);
+                        if (W > 0 && H > 0) return `${W}×${H} m`;
+                        if (W > 0 && L > 0) return `${W}×${L} m`;
+                        if (H > 0 && L > 0) return `${H}×${L} m`;
+                        return `${W || H || L || 0} m`;
+                      })()}
                     </div>
                   )}
                   {p.quantity != null && (

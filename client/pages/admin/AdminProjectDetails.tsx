@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Separator } from '../../components/ui/separator';
-import { getAdminProjectById, getAdminProjectBids } from '@/services/admin';
+import { getAdminProjectById, getAdminProjectBids, adminDeleteProject } from '@/services/admin';
 import { ArrowLeft } from 'lucide-react';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
+import { toastError, toastSuccess, confirmDialog } from '../../utils/alerts';
 
 function normalizeStatus(raw: any): string {
   if (raw === undefined || raw === null) return '';
@@ -92,15 +93,38 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   };
 
+  const onDelete = async () => {
+    if (!projectId) return;
+    const confirmed = typeof confirmDialog === 'function'
+      ? await confirmDialog(isAr ? 'هل تريد حذف هذا المشروع نهائياً؟' : 'Delete this project permanently?')
+      : window.confirm(isAr ? 'هل تريد حذف هذا المشروع نهائياً؟' : 'Delete this project permanently?');
+    if (!confirmed) return;
+    try {
+      const r = await adminDeleteProject(projectId);
+      if (r.ok && (r.data as any)?.success !== false) {
+        toastSuccess?.(isAr ? 'تم حذف المشروع بنجاح' : 'Project deleted successfully');
+        back();
+      } else {
+        toastError?.(isAr ? 'تعذر حذف المشروع' : 'Failed to delete project');
+      }
+    } catch (e) {
+      console.error('Admin delete project error:', e);
+      toastError?.(isAr ? 'تعذر حذف المشروع' : 'Failed to delete project');
+    }
+  };
+
   const st = normalizeStatus(project?.status ?? project?.Status);
 
   return (
     <div className="min-h-screen bg-background" dir={isAr ? 'rtl' : 'ltr'}>
       <Header {...(ctx as any)} />
       <div className="container mx-auto px-4 py-6">
-        <div className="mb-4">
+        <div className="mb-4 flex items-center gap-2">
           <Button variant="ghost" onClick={back}>
             <ArrowLeft className="w-4 h-4 mr-2" /> {isAr ? 'عودة' : 'Back'}
+          </Button>
+          <Button variant="destructive" className="bg-red-600 hover:bg-red-700 text-white border border-red-600" onClick={onDelete}>
+            {isAr ? 'حذف المشروع' : 'Delete Project'}
           </Button>
         </div>
 
