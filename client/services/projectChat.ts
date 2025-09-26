@@ -52,3 +52,8 @@ export async function getCustomerProjectMessageCount() {
 export async function getCustomerProjectRecentMessages() {
   return api.get<Array<{ conversationId: string; projectId: string; message: string; at: string; from: string }>>(`/api/ProjectChat/customer/messages/recent`, { auth: true });
 }
+
+// Admin/participant-agnostic fallback: list all conversations for a project where current user is a participant
+export async function getConversationsByProject(projectId: string) {
+  return api.get<Array<{ id: string; projectId: string; customerId: string; merchantId: string; createdAt?: string }>>(`/api/ProjectChat/project/${encodeURIComponent(projectId)}/conversations`, { auth: true });
+}

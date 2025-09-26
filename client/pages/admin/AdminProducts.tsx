@@ -8,7 +8,7 @@ import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Dialog } from '../../components/ui/dialog';
 import ProductForm from '../../components/vendor/ProductForm';
-import { Package, Search, Filter, Plus, Edit, Trash2, Store, Tag, ArrowRight, Clock } from 'lucide-react';
+import { Package, Search, Filter, Plus, Edit, Trash2, Store, Tag, Clock } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getProducts, createProduct, updateProduct, deleteProduct, getAllCategories, getProductById } from '../../services/products';
 import { toastSuccess, toastError } from '@/utils/alerts';
@@ -243,12 +243,6 @@ export default function AdminProducts({ setCurrentPage, ...context }: Partial<Ro
       <Header {...context} />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Button variant="outline" onClick={() => setCurrentPage && setCurrentPage('admin-dashboard')} className="mr-4">
-              <ArrowRight className="ml-2 h-4 w-4" />
-              {t('backToDashboard')}
-            </Button>
-          </div>
           <h1 className="mb-2">{t('manageProducts')}</h1>
           <p className="text-muted-foreground">{t('adminProductsSubtitle')}</p>
         </div>

@@ -843,7 +843,6 @@ export default function AdminProjectOptions({ setCurrentPage, ...rest }: Partial
 
         <div className="flex gap-2">
           <Button onClick={saveAll} disabled={loading}>{isAr ? 'حفظ كل الإعدادات' : 'Save All'}</Button>
-          <Button variant="outline" onClick={()=> setCurrentPage && setCurrentPage('admin-dashboard')}>{isAr ? 'رجوع' : 'Back'}</Button>
         </div>
 
       </div>

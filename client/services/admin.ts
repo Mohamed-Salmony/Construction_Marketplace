@@ -220,3 +220,9 @@ export type AdminAnalyticsOverview = {
 export async function getAdminAnalyticsOverview() {
   return api.get<AdminAnalyticsOverview>(`/api/Admin/analytics/overview`, { auth: true });
 }
+
+// Admin: get accurate views for a project (if backend supports it)
+export async function getAdminProjectViews(id: number | string) {
+  const pid = encodeURIComponent(String(id));
+  return api.get<{ success?: boolean; views: number }>(`/api/ProjectsAdmin/${pid}/views`, { auth: true });
+}

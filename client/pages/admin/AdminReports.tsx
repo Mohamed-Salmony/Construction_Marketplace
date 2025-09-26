@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
 import { Progress } from '../../components/ui/progress';
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, Users, Package, ArrowRight, Tag, Plus, Percent } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, Users, Package, Tag, Plus, Percent } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getAdminAnalyticsOverview, getAdminOption, setAdminOption } from '@/services/admin';
 import { getPromoCodes } from '@/services/promoCodes';
@@ -92,12 +92,6 @@ export default function AdminReports({ setCurrentPage, ...context }: Partial<Rou
       <Header {...context} />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Button variant="outline" onClick={() => setCurrentPage && setCurrentPage('admin-dashboard')} className="mr-4">
-              <ArrowRight className="ml-2 h-4 w-4" />
-              {t('backToDashboard')}
-            </Button>
-          </div>
           <h1 className="mb-2">{t('reportsAndAnalytics')}</h1>
           <p className="text-muted-foreground">{t('adminReportsSubtitle')}</p>
         </div>

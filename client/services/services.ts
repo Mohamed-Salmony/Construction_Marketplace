@@ -24,7 +24,11 @@ export async function getPublicServices() {
 
 // Admin endpoints
 export async function getAdminPendingServices() {
-  return api.get<{ success: boolean; items: Array<{ id: number; title: string; description: string; merchantId: string; payRate: number; currency: string; createdAt: string }> }>(`/api/Admin/services/pending`, { auth: true });
+  return api.get<{ success: boolean; items: Array<{ id: number; title: string; description: string; merchantId: string; payRate: number; dailyWage?: number; currency: string; createdAt: string; status?: string; isApproved?: boolean; total?: number; days?: number }> }>(`/api/Admin/services/pending`, { auth: true });
+}
+
+export async function getAdminAllServices() {
+  return api.get<{ success: boolean; items: Array<{ id: number; title: string; description: string; merchantId: string; payRate: number; dailyWage?: number; currency: string; createdAt: string; status: string; isApproved: boolean; total?: number; days?: number }> }>(`/api/Admin/services`, { auth: true });
 }
 
 export async function approveService(serviceId: number) {

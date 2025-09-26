@@ -320,10 +320,12 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                 )}
 
                 <button onClick={() => go('home')} className="flex items-center gap-2" aria-label={t('brandLogo')}>
-                  <div className="bg-primary text-white p-2 rounded-lg">
-                    <div className="w-8 h-8 flex items-center justify-center font-bold text-lg">
-                      {t('brandName').charAt(0)}
-                    </div>
+                  <div className="p-1">
+                    <img 
+                      src="/Neoteric_Logo.jpg" 
+                      alt="Neoteric Logo" 
+                      className="w-10 h-10 object-contain rounded-lg"
+                    />
                   </div>
                   <div>
                     <h1 className="text-xl font-bold text-primary">{t('brandName')}</h1>

@@ -7,8 +7,8 @@ import './globals.css'
 import { Toaster } from '../components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'Arabic Auto - منصة السيارات العربية',
-  description: 'منصة شاملة لبيع وشراء السيارات والقطع والخدمات',
+  title: 'Neoteric - منصة المقاولات الشاملة',
+  description: 'منصة شاملة لخدمات ومنتجات المقاولات في المملكة العربية السعودية',
 }
 
 export default function RootLayout({
@@ -25,8 +25,8 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang={locale} dir={isRTL ? 'rtl' : 'ltr'}>
       <head>
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="alternate icon" href="/favicon.ico" />
+        <link rel="icon" href="/Neoteric_Logo.jpg" type="image/jpeg" />
+        <link rel="alternate icon" href="/Neoteric_Logo.jpg" />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}

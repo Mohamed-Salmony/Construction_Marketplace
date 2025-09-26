@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, requireRoles } from '../middlewares/auth.js';
-import { adminListPending as servicesPending, adminApprove as servicesApprove, adminReject as servicesReject } from '../controllers/services.controller.js';
+import { adminListPending as servicesPending, adminListAll as servicesAll, adminApprove as servicesApprove, adminReject as servicesReject } from '../controllers/services.controller.js';
 
 import { adminListPendingProducts, adminApproveProduct, adminRejectProduct } from '../controllers/products.controller.js';
 import { adminListPendingMerchants, adminApproveMerchant, adminSuspendMerchant } from '../controllers/adminMerchants.controller.js';
@@ -26,6 +26,7 @@ router.get('/test', ...adminOnly, (req, res) => {
 
 // Services moderation
 router.get('/services/pending', ...adminOnly, servicesPending);
+router.get('/services', ...adminOnly, servicesAll);
 router.post('/services/:id/approve', ...adminOnly, servicesApprove);
 router.post('/services/:id/reject', ...adminOnly, servicesReject);
 

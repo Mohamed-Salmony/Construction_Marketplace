@@ -94,9 +94,34 @@ export async function adminListPending(req, res) {
     title: s.title || s.type || 'Service',
     description: s.description,
     vendorId: s.vendorId,
+    merchantId: String(s.vendorId), // alias for compatibility
+    payRate: s.dailyWage,
     dailyWage: s.dailyWage,
     days: s.days,
     total: s.total,
+    currency: s.currency || 'SAR',
+    status: s.isApproved ? 'approved' : 'pending',
+    isApproved: s.isApproved,
+    createdAt: s.createdAt,
+  }));
+  res.json({ success: true, items });
+}
+
+export async function adminListAll(req, res) {
+  const rows = await Service.find({}).sort({ createdAt: -1 });
+  const items = rows.map((s) => ({
+    id: String(s._id),
+    title: s.title || s.type || 'Service',
+    description: s.description,
+    vendorId: s.vendorId,
+    merchantId: String(s.vendorId), // alias for compatibility
+    payRate: s.dailyWage,
+    dailyWage: s.dailyWage,
+    days: s.days,
+    total: s.total,
+    currency: s.currency || 'SAR',
+    status: s.isApproved ? 'approved' : 'pending',
+    isApproved: s.isApproved,
     createdAt: s.createdAt,
   }));
   res.json({ success: true, items });

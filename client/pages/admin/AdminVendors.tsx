@@ -9,11 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { Store, Search, Filter, Plus, Edit, Trash2, MapPin, Mail, Phone, ArrowRight, CheckCircle, Ban, Eye } from 'lucide-react';
+import { Store, Search, Filter, Plus, Edit, Trash2, MapPin, Mail, Phone, CheckCircle, Ban, Eye } from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
 import UserAvatar from '../../components/UserAvatar';
 import { useFirstLoadOverlay } from '../../hooks/useFirstLoadOverlay';
 import { getPendingMerchants, getUsers as adminGetUsers, approveMerchant, suspendMerchant } from '@/services/admin';
+import { getAdminUserById as apiGetAdminUserById } from '@/services/adminUsers';
 import { successAlert, warningAlert } from '../../utils/alerts';
 import { getAdminUserById, type AdminUserDetails } from '@/services/adminUsers';
 
@@ -105,18 +106,111 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
   const [profileImgError, setProfileImgError] = useState(false);
   const [docImgError, setDocImgError] = useState(false);
 
+  // Cache + throttled avatar fetch for list rendering
+  const avatarCacheRef = React.useRef<Map<string, string>>(new Map());
+  const avatarPromiseCacheRef = React.useRef<Map<string, Promise<string | undefined>>>(new Map());
+  const delay = (ms:number)=> new Promise(res=> setTimeout(res, ms));
+  const maxAvatarConcurrency = 3;
+  const avatarInFlightRef = React.useRef(0);
+  const avatarWaitersRef = React.useRef<Array<() => void>>([]);
+  const acquireAvatarSlot = async (): Promise<() => void> => {
+    if (avatarInFlightRef.current < maxAvatarConcurrency) {
+      avatarInFlightRef.current++;
+      return () => {
+        avatarInFlightRef.current--;
+        const next = avatarWaitersRef.current.shift();
+        if (next) next();
+      };
+    }
+    return await new Promise<() => void>((resolve) => {
+      avatarWaitersRef.current.push(() => {
+        avatarInFlightRef.current++;
+        resolve(() => {
+          avatarInFlightRef.current--;
+          const nxt = avatarWaitersRef.current.shift();
+          if (nxt) nxt();
+        });
+      });
+    });
+  };
+
+  const AvatarById: React.FC<{ id: string; name: string; size?: 'sm'|'md'|'lg'|'xl'; className?: string; initialSrc?: string }>= ({ id, name, size='lg', className, initialSrc }) => {
+    const [src, setSrc] = React.useState<string | undefined>(()=> initialSrc || avatarCacheRef.current.get(id));
+    React.useEffect(()=>{
+      let mounted = true;
+      const run = async () => {
+        if (src) return;
+        const cached = avatarCacheRef.current.get(id);
+        if (cached) { setSrc(cached); return; }
+        try {
+          const runFetch = async (): Promise<string | undefined> => {
+            const attempts = [0, 400, 900];
+            for (let i=0;i<attempts.length;i++) {
+              if (attempts[i] > 0) await delay(attempts[i]);
+              const release = await acquireAvatarSlot();
+              try {
+                const r = await apiGetAdminUserById(id);
+                if (r.ok && r.data && (r.data as any).item) {
+                  const u = (r.data as any).item as any;
+                  const pic = u?.profilePicture ? String(u.profilePicture) : undefined;
+                  return pic;
+                }
+              } finally { release(); }
+            }
+            return undefined;
+          };
+          let p = avatarPromiseCacheRef.current.get(id);
+          if (!p) { p = runFetch(); avatarPromiseCacheRef.current.set(id, p); }
+          const pic = await p;
+          if (mounted && pic) {
+            avatarCacheRef.current.set(id, pic);
+            setSrc(pic);
+          }
+        } catch {}
+      };
+      void run();
+      return () => { mounted = false; };
+    }, [id, src]);
+    return (<UserAvatar src={src} name={name} size={size} className={className} />);
+  };
+
+  const AvatarLazy: React.FC<{ id: string; name: string; initialSrc?: string; size?: 'sm'|'md'|'lg'|'xl'; className?: string }>= ({ id, name, initialSrc, size='lg', className }) => {
+    const ref = React.useRef<HTMLDivElement | null>(null);
+    const [visible, setVisible] = React.useState(false);
+    React.useEffect(() => {
+      const el = ref.current; if (!el) return;
+      const obs = new IntersectionObserver((entries)=>{
+        for (const e of entries) { if (e.isIntersecting) { setVisible(true); obs.disconnect(); break; } }
+      }, { root: null, rootMargin: '150px', threshold: 0.01 });
+      obs.observe(el);
+      return () => { try { obs.disconnect(); } catch {} };
+    }, []);
+    return (
+      <div ref={ref} className={className}>
+        {visible ? (
+          <AvatarById id={id} name={name} size={size} initialSrc={initialSrc} />
+        ) : (
+          <UserAvatar src={initialSrc} name={name} size={size} />
+        )}
+      </div>
+    );
+  };
+
   const loadVendors = useCallback(async (signal?: AbortSignal) => {
     try {
       const res = await adminGetUsers({ role: 'Merchant', page: 1, pageSize: 200 }, { signal });
       if (res.ok && res.data && Array.isArray((res.data as any).items)) {
-        const list = (res.data as any).items.map((u:any) => ({
-          id: String(u.id),
-          name: u.name || '',
-          email: u.email || '',
-          phone: u.phoneNumber || '',
-          status: (u.isActive === false) ? 'suspended' : (u.isVerified === false ? 'pending' : 'active'),
-          profilePicture: u.profilePicture || ''
-        } as VendorRow));
+        const list = (res.data as any).items.map((u:any) => {
+          const profilePic = u?.profilePicture || '';
+          return {
+            id: String(u.id),
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phoneNumber || '',
+            status: (u.isActive === false) ? 'suspended' : (u.isVerified === false ? 'pending' : 'active'),
+            profilePicture: profilePic,
+          } as VendorRow;
+        });
         setRows(list);
       } else setRows([]);
     } catch (e:any) { if (e?.name !== 'AbortError') setRows([]); }
@@ -177,12 +271,6 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
       <Header {...context} />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Button variant="outline" onClick={() => setCurrentPage && setCurrentPage('admin-dashboard')} className="mr-4">
-              <ArrowRight className="ml-2 h-4 w-4" />
-              {t('backToDashboard')}
-            </Button>
-          </div>
           <h1 className="mb-2">{t('manageVendorsTitle')}</h1>
           <p className="text-muted-foreground">{t('manageVendorsSubtitle')}</p>
         </div>
@@ -197,9 +285,12 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
               <div className="space-y-3">
                 {pendingVendors.map((u:any) => (
                   <div key={u.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg">
-                    <div className="space-y-0.5 w-full min-w-0">
-                      <div className="font-medium break-words max-w-full leading-snug">{u.name}</div>
-                      <div className="text-sm text-muted-foreground break-words">{u.email}</div>
+                    <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
+                      <AvatarLazy id={String(u.id)} name={u.name} size="md" className="shrink-0" initialSrc={(u as any).profilePicture} />
+                      <div className="space-y-0.5 w-full min-w-0">
+                        <div className="font-medium break-words max-w-full leading-snug">{u.name}</div>
+                        <div className="text-sm text-muted-foreground break-words">{u.email}</div>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="outline" onClick={()=>approveVendor(u)}><CheckCircle className="h-4 w-4 mr-1" />{tt('approve', 'موافقة')}</Button>
@@ -244,12 +335,7 @@ export default function AdminVendors({ setCurrentPage, ...context }: Partial<Rou
               {filtered.map(r => (
                 <div key={r.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
-                    <UserAvatar 
-                      src={r.profilePicture} 
-                      name={r.name} 
-                      size="lg"
-                      className="shrink-0"
-                    />
+                    <AvatarLazy id={r.id} name={r.name} size="lg" className="shrink-0" initialSrc={r.profilePicture} />
                     <div className="space-y-1 w-full min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{r.name}</h3>

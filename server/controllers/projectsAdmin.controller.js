@@ -57,6 +57,16 @@ export async function listBids(req, res) {
   res.json({ success: true, items });
 }
 
+export async function getProjectViews(req, res) {
+  const id = req.params.id;
+  const p = await Project.findById(id);
+  if (!p) return res.status(404).json({ success: false, message: 'Project not found' });
+  
+  // Return the view count from the project
+  const views = p.viewCount || p.views || 0;
+  res.json({ success: true, views });
+}
+
 export async function deleteProject(req, res) {
   const id = req.params.id;
   const p = await Project.findByIdAndDelete(id);
