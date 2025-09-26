@@ -63,6 +63,15 @@ const nextConfig = {
     ignoreDuringBuilds: process.env.NODE_ENV === 'production',
   },
 
+  // Reduce build output verbosity
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
+
+  // Reduce console output during build
+  productionBrowserSourceMaps: false,
+
   // Note: standalone output disabled due to prerendering issues on Render
   // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   
@@ -74,6 +83,9 @@ const nextConfig = {
       '@': require('path').resolve(__dirname),
     };
 
+    // Reduce console output during build
+    config.stats = 'errors-warnings';
+    
     // Simplified production optimizations
     if (!dev && !isServer) {
       // Basic chunk optimization without complex settings

@@ -26,12 +26,16 @@ export default function FAQ({ setCurrentPage }: FAQProps) {
   const [openPopularId, setOpenPopularId] = useState<number | null>(null);
   const [openListId, setOpenListId] = useState<number | null>(null);
 
-  const filteredFAQs = filterFAQs(faqs, searchTerm, selectedCategory);
-  const popularFAQs = getPopularFAQs(faqs);
+  // Safety checks for data
+  const safeFaqs = Array.isArray(faqs) ? faqs : [];
+  const safeFaqCategories = Array.isArray(faqCategories) ? faqCategories : [];
+
+  const filteredFAQs = filterFAQs(safeFaqs, searchTerm, selectedCategory);
+  const popularFAQs = getPopularFAQs(safeFaqs);
   const showingPopular = !searchTerm && !selectedCategory;
-  const popularIds = new Set(popularFAQs.slice(0, 6).map(f => f.id));
+  const popularIds = new Set(popularFAQs.slice(0, 6).map(f => f?.id).filter(Boolean));
   const listFAQs = showingPopular
-    ? filteredFAQs.filter(f => !popularIds.has(f.id))
+    ? filteredFAQs.filter(f => !popularIds.has(f?.id))
     : filteredFAQs;
 
   // Reset open states when filters/search change
@@ -78,7 +82,7 @@ export default function FAQ({ setCurrentPage }: FAQProps) {
               <HelpCircle className="h-6 w-6" />
               <span className="text-sm">{t('all')}</span>
             </Button>
-            {faqCategories.map(category => (
+            {safeFaqCategories.map(category => (
               <Button
                 key={category.id}
                 variant={selectedCategory === category.id ? 'default' : 'outline'}
@@ -113,7 +117,7 @@ export default function FAQ({ setCurrentPage }: FAQProps) {
         <div>
           <h2 className="text-2xl font-bold mb-6">
             {selectedCategory ? 
-              getCategoryById(faqCategories, selectedCategory)?.name :
+              getCategoryById(safeFaqCategories, selectedCategory)?.name :
               t('allQuestions')
             }
             <span className="text-muted-foreground text-lg mr-2">({filteredFAQs.length})</span>
