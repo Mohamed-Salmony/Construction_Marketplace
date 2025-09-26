@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import './globals.css'
-// Analytics disabled to prevent 404 errors and reload loops
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Toaster } from '../components/ui/sonner'
@@ -36,9 +35,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
         <Toaster position="top-center" richColors />
-        {/* Analytics disabled to prevent errors */}
-        {/* {isProd && <Analytics />} */}
-        {/* {isProd && <SpeedInsights />} */}
+        {/* Analytics re-enabled with proper packages */}
+        {isProd && <Analytics />}
+        {isProd && <SpeedInsights />}
       </body>
     </html>
   )

@@ -75,7 +75,6 @@ const nextConfig = {
   // Suppress Tailwind console warnings
   env: {
     TAILWIND_MODE: 'build',
-    NODE_ENV: process.env.NODE_ENV,
   },
 
   // Note: standalone output disabled due to prerendering issues on Render
