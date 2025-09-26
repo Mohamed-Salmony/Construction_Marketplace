@@ -7,6 +7,7 @@ export async function adminListPendingMerchants(req, res) {
     email: 1,
     name: 1,
     companyName: 1,
+    storeName: 1,
     createdAt: 1,
   });
   const result = items.map((u) => ({
@@ -14,6 +15,7 @@ export async function adminListPendingMerchants(req, res) {
     email: u.email,
     name: u.name || '',
     companyName: u.companyName || '',
+    storeName: u.storeName || '',
     createdAt: u.createdAt,
   }));
   res.json({ success: true, items: result });

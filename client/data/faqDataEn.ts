@@ -14,8 +14,8 @@ export const faqsEn = [
   {
     id: 1,
     category: 'general',
-    question: 'What is Al Aaref platform?',
-    answer: 'Al Aaref is an online platform specialized in construction services and products. We connect customers with specialized vendors and contractors to offer the best quality at competitive prices.',
+    question: 'What is Neoteric platform?',
+    answer: 'Neoteric is an online platform specialized in construction services and products. We connect customers with specialized vendors and contractors to offer the best quality at competitive prices.',
     popular: true
   },
   {

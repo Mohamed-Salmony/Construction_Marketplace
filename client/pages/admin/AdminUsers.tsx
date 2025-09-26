@@ -10,19 +10,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import {
-  Users, 
+  Users,
   Search,
   Filter,
-  Eye,
+  Plus,
   Edit,
   Trash2,
-  Ban,
-  CheckCircle,
+  MapPin,
   Mail,
   Phone,
-  MapPin,
+  CheckCircle,
+  Ban,
+  Eye,
   Calendar,
-  ArrowRight,
   User
 } from 'lucide-react';
 import Header from '../../components/Header';
@@ -36,6 +36,7 @@ import {
   updateAdminUser as apiUpdateAdminUser,
   deleteAdminUser as apiDeleteAdminUser,
   setAdminUserStatus as apiSetAdminUserStatus,
+  getAdminUserById as apiGetAdminUserById,
   type AdminListUser,
 } from '@/services/adminUsers';
 
@@ -52,6 +53,13 @@ export type UserRow = {
   totalSpent?: string;
   joinDate?: string;
   profilePicture?: string;
+  // New vendor fields
+  registryNumber?: string;
+  storeName?: string;
+  taxNumber?: string;
+  commercialRegistryUrl?: string;
+  licenseUrl?: string;
+  additionalDocumentUrl?: string;
 };
 
 export default function AdminUsers({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -70,6 +78,105 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
     name: '', email: '', phone: '', role: 'customer', status: 'active', location: '', orders: 0, totalSpent: '0 ر.س',
   });
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const listLoadingRef = React.useRef(false);
+  const lastListFetchRef = React.useRef(0);
+
+  // Cache avatar URLs by user id to avoid repeated calls
+  const avatarCacheRef = React.useRef<Map<string, string>>(new Map());
+  const avatarPromiseCacheRef = React.useRef<Map<string, Promise<string | undefined>>>(new Map());
+  const delay = (ms:number)=> new Promise(res=> setTimeout(res, ms));
+
+  // Throttle concurrent avatar fetches across the list
+  const maxAvatarConcurrency = 3;
+  const avatarInFlightRef = React.useRef(0);
+  const avatarWaitersRef = React.useRef<Array<() => void>>([]);
+  const acquireAvatarSlot = async (): Promise<() => void> => {
+    if (avatarInFlightRef.current < maxAvatarConcurrency) {
+      avatarInFlightRef.current++;
+      return () => {
+        avatarInFlightRef.current--;
+        const next = avatarWaitersRef.current.shift();
+        if (next) next();
+      };
+    }
+    return await new Promise<() => void>((resolve) => {
+      avatarWaitersRef.current.push(() => {
+        avatarInFlightRef.current++;
+        resolve(() => {
+          avatarInFlightRef.current--;
+          const nxt = avatarWaitersRef.current.shift();
+          if (nxt) nxt();
+        });
+      });
+    });
+  };
+
+  // Inline avatar component that fetches details if needed
+  const AvatarById: React.FC<{ id: string; name: string; size?: 'sm'|'md'|'lg'|'xl'; className?: string; initialSrc?: string }>= ({ id, name, size='lg', className, initialSrc }) => {
+    const [src, setSrc] = React.useState<string | undefined>(()=> initialSrc || avatarCacheRef.current.get(id));
+    React.useEffect(()=>{
+      let mounted = true;
+      const run = async () => {
+        if (src) { return; }
+        const cached = avatarCacheRef.current.get(id);
+        if (cached) { setSrc(cached); return; }
+        try {
+          // Dedupe concurrent requests for the same id
+          const runFetch = async (): Promise<string | undefined> => {
+            // simple retry on 429 with backoff
+            const attempts = [0, 400, 900];
+            for (let i=0;i<attempts.length;i++) {
+              if (attempts[i] > 0) await delay(attempts[i]);
+              const r = await apiGetAdminUserById(id);
+              if (r.ok && r.data && (r.data as any).item) {
+                const u = (r.data as any).item as any;
+                // Only accept explicit profilePicture
+                const pic = u?.profilePicture ? String(u.profilePicture) : undefined;
+                return pic;
+              }
+            }
+            return undefined;
+          };
+          let p = avatarPromiseCacheRef.current.get(id);
+          if (!p) { p = runFetch(); avatarPromiseCacheRef.current.set(id, p); }
+          const pic = await p;
+          if (mounted && pic) {
+            avatarCacheRef.current.set(id, pic);
+            setSrc(pic);
+          }
+        } catch {}
+      };
+      void run();
+      return () => { mounted = false; };
+    }, [id, src]);
+    return (<UserAvatar src={src} name={name} size={size} className={className} />);
+  };
+
+  // Lazy wrapper: only activate AvatarById when visible
+  const AvatarLazy: React.FC<{ id: string; name: string; initialSrc?: string; size?: 'sm'|'md'|'lg'|'xl'; className?: string }>= ({ id, name, initialSrc, size='lg', className }) => {
+    const ref = React.useRef<HTMLDivElement | null>(null);
+    const [visible, setVisible] = React.useState(false);
+    React.useEffect(() => {
+      const el = ref.current;
+      if (!el) return;
+      const obs = new IntersectionObserver((entries)=>{
+        for (const e of entries) {
+          if (e.isIntersecting) { setVisible(true); obs.disconnect(); break; }
+        }
+      }, { root: null, rootMargin: '150px', threshold: 0.01 });
+      obs.observe(el);
+      return () => { try { obs.disconnect(); } catch {} };
+    }, []);
+    return (
+      <div ref={ref} className={className}>
+        {visible ? (
+          <AvatarById id={id} name={name} size={size} initialSrc={initialSrc} />
+        ) : (
+          <UserAvatar src={initialSrc} name={name} size={size} />
+        )}
+      </div>
+    );
+  };
 
   // Action handlers
   const handleViewUser = (user: UserRow) => {
@@ -101,6 +208,11 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
   };
 
   const reload = useCallback(async () => {
+    // Throttle: avoid hammering API (dev StrictMode runs effects twice)
+    if (listLoadingRef.current) return;
+    const now = Date.now();
+    if (now - lastListFetchRef.current < 1500) return;
+    listLoadingRef.current = true;
     // Map filters to API query
     const roleParam = selectedRole === 'all' ? undefined : (selectedRole === 'customer' ? 'Customer' : selectedRole === 'vendor' ? 'Merchant' : selectedRole === 'technician' ? 'Technician' : 'Admin');
     const statusParam = selectedStatus === 'all' ? undefined : selectedStatus;
@@ -117,6 +229,9 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
         const primaryRole = (u.roles && u.roles[0]) ? u.roles[0] : 'Customer';
         const role: UserRow['role'] = (/admin/i.test(primaryRole) ? 'admin' : /merchant/i.test(primaryRole) ? 'vendor' : /tech|worker/i.test(primaryRole) ? 'technician' : 'customer');
         const status: UserRow['status'] = !u.isVerified ? 'pending' : (u.isActive ? 'active' : 'suspended');
+        // Only trust explicit profilePicture from the API for list initial src
+        const profilePic = (u as any)?.profilePicture || '';
+
         return {
           id: u.id,
           name: u.name || '',
@@ -128,18 +243,25 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
           orders: 0,
           totalSpent: '—',
           joinDate: u.createdAt || '',
-          profilePicture: u.profilePicture || '',
+          profilePicture: profilePic,
+          // Add new vendor fields
+          registryNumber: u.registryNumber || '',
+          storeName: u.storeName || '',
+          taxNumber: u.taxNumber || '',
+          commercialRegistryUrl: u.commercialRegistryUrl || '',
+          licenseUrl: u.licenseUrl || '',
+          additionalDocumentUrl: u.additionalDocumentUrl || '',
         } as UserRow;
       });
       setUsers(rows);
     } else {
       setUsers([]);
     }
+    lastListFetchRef.current = Date.now();
+    listLoadingRef.current = false;
   }, [selectedRole, selectedStatus]);
+  // Single effect: reload whenever filters change (reload is memoized by filters)
   useEffect(() => { (async () => { await reload(); hideFirstOverlay(); })(); }, [reload, hideFirstOverlay]);
-
-  // Re-fetch when role/status filters change
-  useEffect(() => { void reload(); }, [reload]);
 
   // Apply UI filters (role, status, search)
   const filteredUsers = users.filter(user => {
@@ -240,16 +362,6 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
       
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setCurrentPage && setCurrentPage('admin-dashboard')}
-              className="mr-4"
-            >
-              <ArrowRight className="ml-2 h-4 w-4" />
-              {t('backToDashboard')}
-            </Button>
-          </div>
           <h1 className="mb-2">{t('manageUsersTitle')}</h1>
           <p className="text-muted-foreground">{t('manageUsersSubtitle')}</p>
         </div>
@@ -312,11 +424,7 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
             {selectedUser && (
               <div className="space-y-4">
                 <div className="flex items-center space-x-4 space-x-reverse">
-                  <UserAvatar 
-                    src={selectedUser.profilePicture} 
-                    name={selectedUser.name} 
-                    size="xl"
-                  />
+                  <AvatarById id={selectedUser.id} name={selectedUser.name} size="xl" initialSrc={selectedUser.profilePicture} />
                   <div>
                     <h3 className="font-medium">{selectedUser.name}</h3>
                     <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
@@ -380,12 +488,7 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
               {filteredUsers.map((user) => (
                 <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-4 space-x-reverse w-full min-w-0">
-                    <UserAvatar 
-                      src={user.profilePicture} 
-                      name={user.name} 
-                      size="lg"
-                      className="shrink-0"
-                    />
+                    <AvatarLazy id={user.id} name={user.name} size="lg" className="shrink-0" initialSrc={user.profilePicture} />
                     <div className="space-y-1 w-full min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium break-words max-w-full leading-snug">{user.name}</h3>
@@ -511,6 +614,35 @@ export default function AdminUsers({ setCurrentPage, ...context }: Partial<Route
                 <Label>{t('totalSpentLabel')}</Label>
                 <Input value={form.totalSpent || '0 ر.س'} onChange={(e) => setForm(f => ({ ...f, totalSpent: e.target.value }))} />
               </div>
+              {/* Vendor-specific fields */}
+              {form.role === 'vendor' && (
+                <>
+                  <div>
+                    <Label>{isArabic ? 'رقم السجل التجاري' : 'Registry Number'}</Label>
+                    <Input value={form.registryNumber || ''} onChange={(e) => setForm(f => ({ ...f, registryNumber: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'اسم المتجر' : 'Store Name'}</Label>
+                    <Input value={form.storeName || ''} onChange={(e) => setForm(f => ({ ...f, storeName: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'الرقم الضريبي' : 'Tax Number'}</Label>
+                    <Input value={form.taxNumber || ''} onChange={(e) => setForm(f => ({ ...f, taxNumber: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'السجل التجاري' : 'Commercial Registry'}</Label>
+                    <Input value={form.commercialRegistryUrl || ''} readOnly className="bg-muted" placeholder={isArabic ? 'رابط الملف' : 'File URL'} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'الرخصة' : 'License'}</Label>
+                    <Input value={form.licenseUrl || ''} readOnly className="bg-muted" placeholder={isArabic ? 'رابط الملف' : 'File URL'} />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'مستند إضافي' : 'Additional Document'}</Label>
+                    <Input value={form.additionalDocumentUrl || ''} readOnly className="bg-muted" placeholder={isArabic ? 'رابط الملف' : 'File URL'} />
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => { setFormOpen(false); setEditMode(null); }}>

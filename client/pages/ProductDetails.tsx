@@ -137,19 +137,19 @@ export default function ProductDetails({
 
         if (urlId !== null) {
           const cleanId = typeof urlId === 'string' ? urlId.trim() : urlId;
-          console.debug('[ProductDetails] Fetching by URL id:', cleanId);
+          try { console.debug('[ProductDetails] Fetching by URL id:', cleanId); } catch {}
           const res = await getProductById(cleanId as any);
-          console.debug('[ProductDetails] getProductById status:', res?.status, 'ok:', res?.ok, 'error:', res?.error);
-          if (!res?.ok) {
+          try { console.debug('[ProductDetails] getProductById status:', (res as any)?.status, 'ok:', (res as any)?.ok, 'error:', (res as any)?.error); } catch {}
+          if (!(res as any)?.ok) {
             if (!cancelled) {
-              const err = { status: res.status, error: res.error, source: 'url-id', id: cleanId } as any;
+              const err = { status: (res as any).status, error: (res as any)?.error, source: 'url-id', id: cleanId } as any;
               try { (window as any).__lastProductError = err; } catch {}
               setLoadError(err);
             }
           }
-          if (res.ok && res.data && !cancelled) {
-            try { (window as any).__lastProductRaw = res.data; } catch {}
-            const d: any = res.data as any;
+          if ((res as any).ok && (res as any).data && !cancelled) {
+            try { (window as any).__lastProductRaw = (res as any).data; } catch {}
+            const d: any = (res as any).data as any;
             const stockQ = pickNum(d, ['stockQuantity','stock','quantity','availableQuantity'], 0);
             const price = pickNum(d, ['discountPrice','price'], Number(d?.price ?? 0));
             const origPrice = pickNum(d, ['price'], 0);
@@ -199,24 +199,26 @@ export default function ProductDetails({
               specifications: typeof d?.specifications === 'object' && d?.specifications !== null ? d.specifications : {},
               compatibilityBackend: Array.isArray(d?.compatibility) ? d.compatibility : [],
               addonInstallation: d?.addonInstallation,
+              unitType: (d as any)?.unitType,
+              pricePerMeter: Number((d as any)?.pricePerMeter ?? 0),
             });
           }
           return;
         }
         // If we didn't have a URL id but we have a slug in URL, try slug
         if (!urlId && urlSlug) {
-          console.debug('[ProductDetails] Fetching by URL slug:', urlSlug);
+          try { console.debug('[ProductDetails] Fetching by URL slug:', urlSlug); } catch {}
           const rSlug = await getProductBySlug(urlSlug);
-          if (!rSlug.ok) {
+          if (!(rSlug as any).ok) {
             if (!cancelled) {
-              const err = { status: rSlug.status, error: rSlug.error, source: 'url-slug', slug: urlSlug } as any;
+              const err = { status: (rSlug as any).status, error: (rSlug as any)?.error, source: 'url-slug', slug: urlSlug } as any;
               try { (window as any).__lastProductError = err; } catch {}
               setLoadError(err);
             }
           }
-          if (rSlug.ok && rSlug.data && !cancelled) {
-            try { (window as any).__lastProductRaw = rSlug.data; } catch {}
-            const d: any = rSlug.data as any;
+          if ((rSlug as any).ok && (rSlug as any).data && !cancelled) {
+            try { (window as any).__lastProductRaw = (rSlug as any).data; } catch {}
+            const d: any = (rSlug as any).data as any;
             const stockQ = pickNum(d, ['stockQuantity','stock','quantity','availableQuantity'], 0);
             const price = pickNum(d, ['discountPrice','price'], Number(d?.price ?? 0));
             const origPrice = pickNum(d, ['price'], 0);
@@ -265,6 +267,8 @@ export default function ProductDetails({
               specifications: typeof d?.specifications === 'object' && d?.specifications !== null ? d.specifications : {},
               compatibilityBackend: Array.isArray(d?.compatibility) ? d.compatibility : [],
               addonInstallation: d?.addonInstallation,
+              unitType: (d as any)?.unitType,
+              pricePerMeter: Number((d as any)?.pricePerMeter ?? 0),
             });
             return;
           }
@@ -275,9 +279,9 @@ export default function ProductDetails({
           const cid = String(cand.id).trim();
           try {
             const r2 = await getProductById(cid);
-            console.debug('[ProductDetails] Fallback fetch by selectedProduct.id status:', r2?.status, 'ok:', r2?.ok);
-            if (r2.ok && r2.data && !cancelled) {
-              const d: any = r2.data as any;
+            try { console.debug('[ProductDetails] Fallback fetch by selectedProduct.id status:', (r2 as any)?.status, 'ok:', (r2 as any)?.ok); } catch {}
+            if ((r2 as any).ok && (r2 as any).data && !cancelled) {
+              const d: any = (r2 as any).data as any;
               const stockQ = pickNum(d, ['stockQuantity','stock','quantity','availableQuantity'], 0);
               const price = pickNum(d, ['discountPrice','price'], Number(d?.price ?? 0));
               const origPrice = pickNum(d, ['price'], 0);
@@ -326,6 +330,8 @@ export default function ProductDetails({
                 specifications: typeof d?.specifications === 'object' && d?.specifications !== null ? d.specifications : {},
                 compatibilityBackend: Array.isArray(d?.compatibility) ? d.compatibility : [],
                 addonInstallation: d?.addonInstallation,
+                unitType: (d as any)?.unitType,
+                pricePerMeter: Number((d as any)?.pricePerMeter ?? 0),
               });
               return;
             }
@@ -409,7 +415,12 @@ export default function ProductDetails({
   const fallbackInstall = doorWindowIds.has(product?.id || '') || isDoorLike || isWindowLike;
   const showInstallOption = vendorInstallEnabled ? true : fallbackInstall;
   const INSTALL_FEE_PER_UNIT = vendorInstallEnabled ? vendorInstallFee : 50;
-  const priceWithAddon = (product?.price || 0) + (showInstallOption && installSelected ? INSTALL_FEE_PER_UNIT : 0);
+  // Unit-aware pricing: prefer pricePerMeter when unitType === 'meters'
+  const unitType = String((product as any)?.unitType || 'quantity');
+  const baseUnitPrice = unitType === 'meters'
+    ? (Number((product as any)?.pricePerMeter) || Number(product?.price || 0))
+    : Number(product?.price || 0);
+  const priceWithAddon = baseUnitPrice + (showInstallOption && installSelected ? INSTALL_FEE_PER_UNIT : 0);
   const subtotal = priceWithAddon * quantity;
 
   const handleAddToCart = () => {
@@ -426,6 +437,7 @@ export default function ProductDetails({
         maxQuantity: normalizedStockCount,
         originalPrice: product.originalPrice,
         brand: getText(product.brand),
+        unitType: String((product as any)?.unitType || 'quantity'),
         // metadata
         addonInstallation: showInstallOption && installSelected ? {
           enabled: true,
@@ -445,20 +457,21 @@ export default function ProductDetails({
       addToCart({
         id: product.id,
         name: getText(product.name),
-      price: priceWithAddon,
-      image: images[0],
-      partNumber: product.partNumber,
-      quantity,
-      inStock: normalizedInStock,
-      maxQuantity: normalizedStockCount,
-      originalPrice: product.originalPrice,
-      brand: getText(product.brand),
-      addonInstallation: showInstallOption && installSelected ? {
-        enabled: true,
-        feePerUnit: INSTALL_FEE_PER_UNIT,
-        totalFee: INSTALL_FEE_PER_UNIT * quantity,
-        label: locale === 'ar' ? 'خدمة تركيب مع ضمان جودة' : 'Installation service with quality guarantee'
-      } : { enabled: false }
+        price: priceWithAddon,
+        image: images[0],
+        partNumber: product.partNumber,
+        quantity,
+        inStock: normalizedInStock,
+        maxQuantity: normalizedStockCount,
+        originalPrice: product.originalPrice,
+        brand: getText(product.brand),
+        unitType: String((product as any)?.unitType || 'quantity'),
+        addonInstallation: showInstallOption && installSelected ? {
+          enabled: true,
+          feePerUnit: INSTALL_FEE_PER_UNIT,
+          totalFee: INSTALL_FEE_PER_UNIT * quantity,
+          label: locale === 'ar' ? 'خدمة تركيب مع ضمان جودة' : 'Installation service with quality guarantee'
+        } : { enabled: false }
       });
     }
     if (setCurrentPage) {
@@ -517,8 +530,8 @@ export default function ProductDetails({
         if (!pid || pid === reviewsLoadedFor) return;
         try { console.debug('[reviews] fetching for product', pid); } catch {}
         const r = await getReviews(pid);
-        if (r.ok && (r.data as any)?.items) {
-          setReviews(((r.data as any).items as any[]).map((it:any)=> ({
+        if ((r as any).ok && ((r as any).data as any)?.items) {
+          setReviews((((r as any).data as any).items as any[]).map((it:any)=> ({
             id: String(it._id || it.id || ''),
             productId: String(it.productId || pid),
             userId: String(it.userId || ''),
@@ -558,8 +571,8 @@ export default function ProductDetails({
     try {
       try { console.debug('[reviews] submit', { pid, rating: userRating, comment: userComment }); } catch {}
       const r = await addReview(pid, { rating: userRating, comment: userComment });
-      try { console.debug('[reviews] submit result', r?.status, r?.ok, r?.error); } catch {}
-      if (r.ok) {
+      try { console.debug('[reviews] submit result', (r as any)?.status, (r as any)?.ok, (r as any)?.error); } catch {}
+      if ((r as any).ok) {
         // Prepend optimistically
         setReviews((prev)=> [{ id: String(Date.now()), productId: pid, userId: String((currentUser as any)?.id || ''), userName: String((currentUser as any)?.name || 'User'), rating: userRating, comment: userComment, createdAt: new Date().toISOString() }, ...prev]);
         setUserRating(null);
@@ -568,8 +581,8 @@ export default function ProductDetails({
         // Re-fetch from server to reflect aggregates/order
         try {
           const rr = await getReviews(pid);
-          if (rr.ok && (rr.data as any)?.items) {
-            setReviews(((rr.data as any).items as any[]).map((it:any)=> ({
+          if ((rr as any).ok && ((rr as any).data as any)?.items) {
+            setReviews((((rr as any).data as any).items as any[]).map((it:any)=> ({
               id: String(it._id || it.id || ''),
               productId: String(it.productId || pid),
               userId: String(it.userId || ''),
@@ -581,11 +594,11 @@ export default function ProductDetails({
           }
         } catch {}
       } else {
-        if (r.status === 401) {
+        if ((r as any).status === 401) {
           toastInfo(locale==='ar' ? 'الرجاء تسجيل الدخول لإضافة تقييم' : 'Please login to add a review', locale==='ar');
           setReturnToFn && setReturnToFn('product-details');
           setCurrentPageFn && setCurrentPageFn('login');
-        } else if (r.status === 400) {
+        } else if ((r as any).status === 400) {
           toastInfo(locale==='ar' ? 'معرّف المنتج غير صالح' : 'Invalid product id', locale==='ar');
         } else {
           toastInfo(locale==='ar' ? 'تعذر إرسال التقييم' : 'Failed to submit review', locale==='ar');
@@ -608,7 +621,7 @@ export default function ProductDetails({
               <h2 className="text-xl font-semibold mb-2">{locale==='ar'? 'تعذر تحميل تفاصيل المنتج' : 'Failed to load product details'}</h2>
               {loadError && (
                 <div className="text-sm text-muted-foreground mb-4 break-all">
-                  {locale==='ar' ? `رمز الاستجابة: ${loadError.status}` : `Status: ${loadError.status}`}
+                  {locale==='ar' ? `رمز الاستجابة: ${loadError.status}`  : `Status: ${loadError.status}` }
                 </div>
               )}
               <div className="text-xs text-muted-foreground mb-4">
@@ -634,6 +647,11 @@ export default function ProductDetails({
       </div>
     );
   }
+
+  // Derive display price (header): show per-meter notion if meters
+  const headerPriceValue = unitType === 'meters'
+    ? (Number((product as any)?.pricePerMeter) || Number(product.price || 0))
+    : Number(product.price || 0);
 
   return (
     <div
@@ -775,7 +793,7 @@ export default function ProductDetails({
 
               <div className="flex items-center gap-4 mb-6">
                 <span className="text-3xl font-bold text-primary">
-                  {product.price} {currency}
+                  {headerPriceValue} {currency}{unitType === 'meters' ? (locale==='ar' ? '/م' : '/m') : ''}
                 </span>
                 {product.originalPrice > product.price && (
                   <span className="text-xl text-muted-foreground line-through">
@@ -793,7 +811,7 @@ export default function ProductDetails({
                   }`}
                 >
                   {normalizedInStock
-                    ? `${t("available")} (${normalizedStockCount})`
+                    ? `${t("available")} (${normalizedStockCount})` 
                     : t("outOfStock")}
                 </span>
                 {/* Part number removed per request */}
@@ -803,7 +821,12 @@ export default function ProductDetails({
             {/* Quantity and Actions */}
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <label className="text-sm font-medium">{t("quantity")}:</label>
+                <label className="text-sm font-medium">
+                  {unitType === 'meters'
+                    ? (locale === 'ar' ? 'الأمتار' : 'Meters')
+                    : t('quantity')
+                  }:
+                </label>
                 <div className="flex items-center border rounded-lg">
                   <Button
                     variant="ghost"
@@ -848,8 +871,8 @@ export default function ProductDetails({
                     {installSelected && (
                       <div className="text-xs mt-1">
                         {locale === 'ar'
-                          ? `إجمالي خدمة التركيب: ${INSTALL_FEE_PER_UNIT * quantity} ${currency} ( ${quantity} × ${INSTALL_FEE_PER_UNIT} )`
-                          : `Installation total: ${INSTALL_FEE_PER_UNIT * quantity} ${currency} ( ${quantity} × ${INSTALL_FEE_PER_UNIT} )`}
+                          ? `إجمالي خدمة التركيب: ${INSTALL_FEE_PER_UNIT * quantity} ${currency} ( ${quantity} × ${INSTALL_FEE_PER_UNIT} )` 
+                          : `Installation total: ${INSTALL_FEE_PER_UNIT * quantity} ${currency} ( ${quantity} × ${INSTALL_FEE_PER_UNIT} )` }
                       </div>
                     )}
                   </label>
@@ -1095,7 +1118,6 @@ export default function ProductDetails({
     </div>
   );
 }
-
 
 // Force SSR to prevent static export
 export async function getServerSideProps() {

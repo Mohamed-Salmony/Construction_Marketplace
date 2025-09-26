@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, requireRoles } from '../middlewares/auth.js';
-import { list, listPublic, getById, create, update, remove, complete, adminListPending, adminApprove, adminReject, listTypes, validateCreate } from '../controllers/services.controller.js';
+import { list, listPublic, getById, create, update, remove, complete, adminListPending, adminListAll, adminApprove, adminReject, listTypes, validateCreate } from '../controllers/services.controller.js';
 
 const router = express.Router();
 
@@ -16,6 +16,7 @@ router.post('/:id/complete', protect, requireRoles('Merchant', 'Admin'), complet
 
 // Admin duplicates
 router.get('/admin/pending', protect, requireRoles('Admin'), adminListPending);
+router.get('/admin/all', protect, requireRoles('Admin'), adminListAll);
 router.post('/admin/:id/approve', protect, requireRoles('Admin'), adminApprove);
 router.post('/admin/:id/reject', protect, requireRoles('Admin'), adminReject);
 

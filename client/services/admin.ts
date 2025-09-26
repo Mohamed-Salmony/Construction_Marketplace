@@ -88,10 +88,10 @@ export async function rejectService(serviceId: string, reason?: string) {
   return api.post<unknown>(`/api/Admin/services/${serviceId}/reject`, reason ?? '', { auth: true });
 }
 
-export async function getPendingMerchants() {
+export async function getPendingMerchants(options?: any) {
   return api.get<{ success: boolean; items: Array<{ id: string; email: string; name: string; companyName?: string; createdAt?: string; profilePicture?: string }> }>(
     '/api/Admin/merchants/pending',
-    { auth: true }
+    { auth: true, ...(options || {}) }
   );
 }
 
@@ -103,13 +103,23 @@ export async function suspendMerchant(userId: string) {
   return api.post<unknown>(`/api/Admin/merchants/${userId}/suspend`, undefined, { auth: true });
 }
 
-export async function getUsers(params?: { role?: string; status?: string }) {
+export async function getUsers(params?: { role?: string; status?: string; page?: number; pageSize?: number }, options?: any) {
   const qs = new URLSearchParams();
   if (params?.role) qs.set('role', params.role);
   if (params?.status) qs.set('status', params.status);
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
   const q = qs.toString();
   const path = `/api/Admin/users${q ? `?${q}` : ''}`;
-  return api.get<{ success: boolean; items: AdminUser[] }>(path, { auth: true });
+  return api.get<{ success: boolean; items: AdminUser[]; totalCount?: number; page?: number; pageSize?: number }>(path, { auth: true, ...(options || {}) });
+}
+
+// Get full user details by ID (for viewing complete profile in admin panel)
+export async function getUserById(userId: string) {
+  return api.get<{ success: boolean; item: AdminUser & any }>(
+    `/api/Admin/users/${userId}`,
+    { auth: true }
+  );
 }
 
 // Project catalogs (types, materials, price rules, currency)
@@ -118,11 +128,26 @@ export async function getAdminOption(key: string) {
 }
 
 export async function setAdminOption(key: string, value: any) {
-  // Send raw value; server will serialize numbers/strings/objects appropriately
-  // - Numbers: stored as string numbers
-  // - Strings: stored as-is
-  // - Objects/Arrays: JSON-stringified by the backend controller
-  return api.put(`/api/AdminOptions/${encodeURIComponent(key)}`, value, { auth: true });
+
+  // Always send a string value. If value is object/array/number/boolean, stringify properly.
+  let stringValue: string;
+  try {
+    if (value === null || value === undefined) {
+      stringValue = '0';
+    } else if (typeof value === 'string') {
+      stringValue = value;
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      stringValue = String(value);
+    } else {
+      // objects/arrays/dates etc.
+      stringValue = JSON.stringify(value);
+    }
+  } catch {
+    stringValue = String(value ?? '0');
+  }
+  const payload = { value: stringValue };
+  return api.put(`/api/AdminOptions/${encodeURIComponent(key)}`, payload, { auth: true });
+ 
 }
 
 // Pending projects and approval actions
@@ -202,4 +227,10 @@ export type AdminAnalyticsOverview = {
 
 export async function getAdminAnalyticsOverview() {
   return api.get<AdminAnalyticsOverview>(`/api/Admin/analytics/overview`, { auth: true });
+}
+
+// Admin: get accurate views for a project (if backend supports it)
+export async function getAdminProjectViews(id: number | string) {
+  const pid = encodeURIComponent(String(id));
+  return api.get<{ success?: boolean; views: number }>(`/api/ProjectsAdmin/${pid}/views`, { auth: true });
 }

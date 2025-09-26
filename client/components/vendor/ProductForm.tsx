@@ -89,6 +89,9 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
       // Vendor-defined installation option
       addonInstallEnabled: p?.addonInstallEnabled || (p as any)?.addonInstallation?.enabled || false,
       addonInstallFee: (p?.addonInstallFee ?? (p as any)?.addonInstallation?.feePerUnit) ?? 50,
+      // Unit handling
+      unitType: (p?.unitType === 'meters' ? 'meters' : 'quantity') as 'quantity' | 'meters',
+      pricePerMeter: (p?.pricePerMeter != null ? String(p.pricePerMeter) : '') as string,
     };
   };
 
@@ -159,6 +162,8 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
       // partLocation removed
       // normalize addon object as well
       addonInstallation: { enabled: !!formData.addonInstallEnabled, feePerUnit: Number(formData.addonInstallFee || 0) },
+      unitType: (formData as any).unitType === 'meters' ? 'meters' : 'quantity',
+      pricePerMeter: (formData as any).unitType === 'meters' ? Number(String((formData as any).pricePerMeter || priceNum) || 0) : undefined,
       id: product?.id || Date.now().toString()
     });
   };
@@ -177,6 +182,38 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
             <Label htmlFor="nameAr">اسم المنتج (عربي)</Label>
             <Input id="nameAr" value={formData.nameAr} onChange={(e) => setFormData({ ...formData, nameAr: e.target.value })} required />
           </div>
+      {/* Unit type and (optional) price per meter */}
+      <div>
+        <Label htmlFor="unitType">طريقة البيع</Label>
+        <Select
+          value={String((formData as any).unitType || 'quantity')}
+          onValueChange={(val) => setFormData({ ...formData, unitType: (val === 'meters' ? 'meters' : 'quantity') })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="اختر الطريقة" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="quantity">بالكمية (قطع)</SelectItem>
+            <SelectItem value="meters">بالأمتار</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {(formData as any).unitType === 'meters' && (
+        <div>
+          <Label htmlFor="pricePerMeter">سعر المتر</Label>
+          <Input
+            id="pricePerMeter"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={String((formData as any).pricePerMeter || '')}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9]/g, '');
+              setFormData({ ...formData, pricePerMeter: v });
+            }}
+          />
+        </div>
+      )}
           <div>
             <Label htmlFor="nameEn">اسم المنتج (إنجليزي)</Label>
             <Input id="nameEn" value={formData.nameEn} onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })} required />
@@ -284,7 +321,15 @@ export default function ProductForm({ product, onSave, onCancel, categories = []
                 <div className="mt-2 w-full h-44 rounded-md border overflow-hidden bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {formData.image && typeof formData.image === 'string' ? (
-                    <Image src={typeof formData.image === 'string' ? formData.image : ''} alt="preview" className="max-h-full object-contain" width={200} height={176} />
+                    <Image 
+                      src={typeof formData.image === 'string' ? formData.image : ''} 
+                      alt="preview" 
+                      className="max-h-full object-contain"
+                      width={200} 
+                      height={176}
+                      // When container constrains height, keep width auto to preserve aspect ratio
+                      style={{ width: 'auto' }}
+                    />
                   ) : (
                     <span className="text-xs text-muted-foreground">لا توجد صورة بعد</span>
                   )}

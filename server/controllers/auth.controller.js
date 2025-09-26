@@ -65,25 +65,44 @@ export async function register(req, res) {
     const byField = (name) => files.find((f) => f.fieldname === name);
     async function uploadIfPresent(file, folder) {
       if (!file) return undefined;
-      const opts = { folder, resource_type: 'auto' };
-      // If multer used memoryStorage -> file.buffer is available
-      if (file.buffer) {
-        return await new Promise((resolve) => {
-          const stream = cloudinary.uploader.upload_stream(opts, (err, result) => {
-            if (err || !result) return resolve(undefined);
-            resolve(result.secure_url || result.url);
+      const opts = { folder, resource_type: 'auto', timeout: 45000 }; // 45 second timeout
+      
+      console.log(`[register] Uploading file ${file.fieldname} (${file.originalname}) to ${folder}, size: ${file.size}, type: ${file.mimetype}`);
+      
+      try {
+        // If multer used memoryStorage -> file.buffer is available
+        if (file.buffer) {
+          return await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              console.warn(`[register] Cloudinary upload timeout for ${file.fieldname}`);
+              reject(new Error('Upload timeout'));
+            }, 45000);
+            
+            const stream = cloudinary.uploader.upload_stream(opts, (err, result) => {
+              clearTimeout(timeoutId);
+              if (err) {
+                console.error(`[register] Cloudinary error for ${file.fieldname}:`, err.message);
+                console.log(`[register] Continuing registration without ${file.fieldname} upload`);
+                return resolve(undefined); // Continue without this file
+              }
+              if (!result) {
+                console.warn(`[register] No result from Cloudinary for ${file.fieldname}`);
+                return resolve(undefined);
+              }
+              console.log(`[register] Successfully uploaded ${file.fieldname} to ${result.secure_url}`);
+              resolve(result.secure_url || result.url);
+            });
+            stream.end(file.buffer);
           });
-          stream.end(file.buffer);
-        });
-      }
-      // If multer stored on disk -> file.path exists
-      if (file.path) {
-        try {
+        }
+        // If multer stored on disk -> file.path exists
+        if (file.path) {
           const res = await cloudinary.uploader.upload(file.path, opts);
           return res?.secure_url || res?.url;
-        } catch {
-          return undefined;
         }
+      } catch (error) {
+        console.error(`[register] Upload failed for ${file.fieldname}:`, error.message);
+        return undefined; // Continue registration without this file
       }
       return undefined;
     }
@@ -92,19 +111,53 @@ export async function register(req, res) {
     let docFile = byField('DocumentFile') || byField('documentFile') || byField('Document') || byField('document');
     let imgFile = byField('ImageFile') || byField('imageFile') || byField('ProfileImage') || byField('profileImage') || byField('Image') || byField('image');
     let licenseFile = byField('LicenseImage') || byField('licenseImage') || byField('License') || byField('license');
-    // If not found, pick by mimetype heuristics
-    if (!imgFile) imgFile = files.find(f => String(f.mimetype||'').toLowerCase().startsWith('image/'));
-    if (!docFile) docFile = files.find(f => {
-      const mt = String(f.mimetype||'').toLowerCase();
-      return mt === 'application/pdf' || mt === 'application/msword' || mt === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    });
-    if (!licenseFile) {
-      const images = files.filter(f => String(f.mimetype||'').toLowerCase().startsWith('image/'));
-      licenseFile = images.length > 1 ? images[1] : undefined;
+    
+    // New vendor document fields
+    let commercialRegistryFile = byField('commercialRegistryFile') || byField('CommercialRegistryFile') || byField('commercialRegistry');
+    let licenseFileNew = byField('licenseFile') || byField('LicenseFile');
+    let additionalDocumentFile = byField('additionalDocumentFile') || byField('AdditionalDocumentFile') || byField('additionalDoc');
+    // If not found, pick by mimetype heuristics - accept various document types
+    const acceptableTypes = (mt) => {
+      const mimetype = String(mt || '').toLowerCase();
+      return mimetype.startsWith('image/') || 
+             mimetype === 'application/pdf' || 
+             mimetype === 'application/msword' || 
+             mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+             mimetype === 'application/vnd.ms-word' ||
+             mimetype === 'text/plain' ||
+             mimetype.includes('document') ||
+             mimetype.includes('office') ||
+             // Some browsers might send different mimetypes
+             mimetype === 'application/octet-stream'; // Accept unknown binary files as fallback
+    };
+    
+    // Flexible fallback: any acceptable file can be used for any field
+    if (!imgFile && !docFile) {
+      const acceptableFiles = files.filter(f => acceptableTypes(f.mimetype));
+      imgFile = acceptableFiles[0]; // First file for image
+      docFile = acceptableFiles[1]; // Second file for doc if exists
     }
-    const docUrl = await uploadIfPresent(docFile, 'users/documents');
-    const imgUrl = await uploadIfPresent(imgFile, 'users/images');
-    const licenseUrl = await uploadIfPresent(licenseFile, 'users/licenses');
+    if (!licenseFile) {
+      const acceptableFiles = files.filter(f => acceptableTypes(f.mimetype));
+      licenseFile = acceptableFiles[2] || acceptableFiles[0]; // Third file or reuse first
+    }
+    // Upload all files in parallel to reduce total time
+    const [docUrl, imgUrl, licenseUrl, commercialRegistryUrl, licenseNewUrl, additionalDocumentUrl] = await Promise.allSettled([
+      uploadIfPresent(docFile, 'users/documents'),
+      uploadIfPresent(imgFile, 'users/images'),
+      uploadIfPresent(licenseFile, 'users/licenses'),
+      uploadIfPresent(commercialRegistryFile, 'users/commercial-registry'),
+      uploadIfPresent(licenseFileNew, 'users/licenses-new'),
+      uploadIfPresent(additionalDocumentFile, 'users/additional-docs')
+    ]).then(results => {
+      console.log('[register] Upload results:', results.map((r, i) => ({ 
+        index: i, 
+        status: r.status, 
+        value: r.status === 'fulfilled' ? (r.value ? 'uploaded' : 'no-file') : 'failed',
+        error: r.status === 'rejected' ? r.reason?.message : undefined 
+      })));
+      return results.map(r => r.status === 'fulfilled' ? r.value : undefined);
+    });
     try {
       console.log('[register] cloudinary urls:', { docUrl, imgUrl, licenseUrl });
       console.log('[register] parsed dob:', dobVal, 'raw:', rawDob);
@@ -130,6 +183,8 @@ export async function register(req, res) {
       companyName: req.body.CompanyName || req.body.companyName || undefined,
       iban: req.body.Iban || req.body.iban || undefined,
       taxNumber: req.body.TaxNumber || req.body.taxNumber || undefined,
+      registryNumber: req.body.RegistryNumber || req.body.registryNumber || undefined,
+      storeName: req.body.StoreName || req.body.storeName || undefined,
       registryStart: req.body.RegistryStart || req.body.registryStart || undefined,
       registryEnd: req.body.RegistryEnd || req.body.registryEnd || undefined,
       profession: req.body.Profession || req.body.profession || undefined,
@@ -137,6 +192,9 @@ export async function register(req, res) {
       documentUrl: docUrl,
       imageUrl: imgUrl,
       licenseImageUrl: licenseUrl,
+      commercialRegistryUrl: commercialRegistryUrl,
+      licenseUrl: licenseNewUrl,
+      additionalDocumentUrl: additionalDocumentUrl,
     });
 
     const token = signToken({ id: user._id, role: user.role });

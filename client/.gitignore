@@ -29,7 +29,6 @@ yarn-debug.log*
 
 # vercel
 .vercel
-vercel.json
 
 # render specific
 .render/

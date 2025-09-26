@@ -215,9 +215,6 @@ export default function AdminPendingProjects({ setCurrentPage, ...rest }: Partia
           </CardContent>
         </Card>
 
-        <div className="mt-4">
-          <Button variant="outline" onClick={()=> setCurrentPage && setCurrentPage('admin-dashboard')}>{isAr ? 'رجوع' : 'Back'}</Button>
-        </div>
 
         {/* Details Dialog */}
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

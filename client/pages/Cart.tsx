@@ -160,7 +160,6 @@ export default function Cart({ setCurrentPage, cartItems, updateCartQty, removeF
                         <div>
                           <h3 className="font-medium">{item.name}</h3>
                           <p className="text-sm text-muted-foreground">{item.brand}</p>
-                          <p className="text-xs text-muted-foreground">{t('cartPartNumber')}: {item.partNumber}</p>
                         </div>
                         <Button
                           variant="ghost"

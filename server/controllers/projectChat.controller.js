@@ -42,8 +42,10 @@ export async function getConversation(req, res) {
     return res.status(404).json({ success: false, message: 'Conversation not found' });
   }
   
-  // Only participants can view
+  // Only participants can view unless admin
   const uid = String(req.user._id);
+  const role = String(req.user?.role || '');
+  const isAdmin = ['admin','superadmin','owner','root'].includes(role.toLowerCase());
   const participants = [String(c.customerId), String(c.merchantId)];
   const isParticipant = participants.includes(uid);
   
@@ -51,7 +53,7 @@ export async function getConversation(req, res) {
   console.log('[ProjectChat] Participants:', participants);
   console.log('[ProjectChat] Is participant:', isParticipant);
   
-  if (!isParticipant) {
+  if (!isParticipant && !isAdmin) {
     console.log('[ProjectChat] User not authorized for conversation');
     return res.status(403).json({ success: false, message: 'Forbidden' });
   }
@@ -73,17 +75,26 @@ export async function getConversationByKeys(req, res) {
   }
   
   const userId = req.user?._id;
+  const role = String(req.user?.role || '');
+  const isAdmin = ['admin','superadmin','owner','root'].includes(role.toLowerCase());
   console.log('[ProjectChat] User ID in getConversationByKeys:', userId);
   
   // Check if user is customer or merchant in this conversation
   // Try both possibilities: user as customer OR user as merchant
-  const query = {
-    projectId,
-    $or: [
-      { customerId: userId, merchantId: merchantId },  // User is customer, merchantId is merchant
-      { customerId: merchantId, merchantId: userId }    // merchantId is customer, user is merchant
-    ]
-  };
+  let query;
+  if (isAdmin) {
+    // Admin can access conversation by projectId and merchantId directly
+    query = { projectId, merchantId };
+  } else {
+    // Participants only
+    query = {
+      projectId,
+      $or: [
+        { customerId: userId, merchantId: merchantId },  // User is customer, merchantId is merchant
+        { customerId: merchantId, merchantId: userId }    // merchantId is customer, user is merchant
+      ]
+    };
+  }
   
   console.log('[ProjectChat] Query:', JSON.stringify(query, null, 2));
   
@@ -108,16 +119,21 @@ export async function getConversationsByProject(req, res) {
   }
   
   const userId = req.user?._id;
+  const role = String(req.user?.role || '');
+  const isAdmin = ['admin','superadmin','owner','root'].includes(role.toLowerCase());
   console.log('[ProjectChat] User ID for project conversations:', userId);
   
   // Find all conversations for this project where user is participant
-  const conversations = await ProjectConversation.find({
-    projectId,
-    $or: [
-      { customerId: userId },
-      { merchantId: userId }
-    ]
-  });
+  const baseQuery = { projectId };
+  const conversations = isAdmin
+    ? await ProjectConversation.find(baseQuery)
+    : await ProjectConversation.find({
+        ...baseQuery,
+        $or: [
+          { customerId: userId },
+          { merchantId: userId }
+        ]
+      });
   
   console.log('[ProjectChat] Found conversations for project:', conversations.length);
   

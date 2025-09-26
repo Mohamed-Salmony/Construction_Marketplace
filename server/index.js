@@ -7,6 +7,7 @@ import { connectDB } from './config/db.js';
 import { configureCloudinary } from './config/cloudinary.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { processManager } from './utils/processManager.js';
 
 // Routes
 import authRoutes from './routes/auth.routes.js';
@@ -42,13 +43,8 @@ configureCloudinary();
 
 const app = express();
 
-// Global error visibility to diagnose startup crashes
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason);
-});
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err);
-});
+// Use advanced process manager for stability
+console.log('🚀 [STARTUP] Initializing Construction Marketplace Backend...');
 
 // CORS
 // Normalize multiple leading slashes in incoming URLs to avoid 404s from paths like //api/...
@@ -155,8 +151,23 @@ try {
   process.exit(1);
 }
 
-// Health
-app.get('/health', (req, res) => res.json({ ok: true, service: 'construction-marketplace-backend' }));
+// Enhanced Health Check
+app.get('/health', (req, res) => {
+  const uptime = process.uptime();
+  const memory = process.memoryUsage();
+  
+  res.json({ 
+    ok: true, 
+    service: 'construction-marketplace-backend',
+    uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
+    memory: {
+      heapUsed: `${(memory.heapUsed / 1024 / 1024).toFixed(2)}MB`,
+      rss: `${(memory.rss / 1024 / 1024).toFixed(2)}MB`
+    },
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Root welcome (prevents 404 on GET /)
 app.get('/', (req, res) => {
@@ -205,11 +216,31 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
+
 try {
-  app.listen(PORT, () => {
-    console.log(`API running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ [SUCCESS] API running on http://0.0.0.0:${PORT}`);
+    console.log(`🌐 [INFO] Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`💾 [INFO] Memory limit: ${process.env.NODE_OPTIONS || 'default'}`);
+    console.log(`🔗 [INFO] Health check: http://0.0.0.0:${PORT}/health`);
   });
+
+  // Set server reference for graceful shutdown
+  processManager.setServer(server);
+
+  // Handle server errors
+  server.on('error', (error) => {
+    console.error('❌ [SERVER ERROR]:', error);
+    if (error.code === 'EADDRINUSE') {
+      console.error(`🚨 [FATAL] Port ${PORT} is already in use`);
+      process.exit(1);
+    }
+  });
+
+  // Set timeout for requests
+  server.timeout = 30000; // 30 seconds
+
 } catch (e) {
-  console.error('[startup] failed to listen:', e);
+  console.error('🚨 [FATAL] Failed to start server:', e);
   process.exit(1);
 }
