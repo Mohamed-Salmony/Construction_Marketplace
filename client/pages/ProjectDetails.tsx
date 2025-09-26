@@ -6,6 +6,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
+
 import { Ruler, Package, Layers, Boxes, ClipboardList, Calendar, ArrowRight, Info, Check, X, Send, MessageCircle, Star } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -47,7 +48,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
   const [catalog, setCatalog] = useState<ProjectCatalog | null>(null);
   const userId = (rest as any)?.user?.id ? String((rest as any).user.id) : '';
   const isLoggedIn = Boolean((rest as any)?.user);
-  const isVendor = ((rest as any)?.user?.role === 'vendor');
+  const isVendor = (rest as any)?.user?.role === 'vendor';
 
   // Vendor proposal form state
   const [offerPrice, setOfferPrice] = useState<string>('');
@@ -59,7 +60,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [myProposal, setMyProposal] = useState<BidDto | null>(null);
 
-  // Load selected project by id: URL ?id= first, then localStorage fallback
+  // Load selected project
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -71,29 +72,29 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
           id = url.searchParams.get('id');
         } catch { }
         if (!id) {
+
           try { id = localStorage.getItem('selected_project_id'); } catch { }
         }
         const isValidId = (val: any) => {
           const s = String(val ?? '').trim();
           if (!s || s === 'undefined' || s === 'null') return false;
-          if (/^[a-fA-F0-9]{24}$/.test(s)) return true; // Mongo OID
-          if (/^\d+$/.test(s)) return true; // numeric
+          if (/^[a-fA-F0-9]{24}$/.test(s)) return true;
+          if (/^\d+$/.test(s)) return true;
           return false;
         };
         if (!isValidId(id)) {
           setLoading(false);
+
           try { setCurrentPage && setCurrentPage('projects'); } catch { }
           return;
         }
-        // Load from backend only (use admin endpoint for admins)
         try {
-          const isAdmin = ((rest as any)?.user?.role === 'admin');
-          const resp = isAdmin
-            ? await getAdminProjectById(String(id))
-            : await getProjectById(String(id));
+          const isAdmin = (rest as any)?.user?.role === 'admin';
+          const resp = isAdmin ? await getAdminProjectById(String(id)) : await getProjectById(String(id));
           const ok = (resp as any).ok;
           const data = (resp as any).data as any;
           if (!cancelled && ok && data) {
+
             const it0 = Array.isArray((data as any).items) && (data as any).items.length ? (data as any).items[0] : {};
             const merged = {
               id: (data as any).id ?? (data as any)._id ?? String((data as any).id || (data as any)._id || ''),
@@ -123,45 +124,59 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
         } catch { }
         // Load bids (merchant proposals) from backend
         try {
-          // Prefer same id used to fetch project
           const pidStr = String(id || localStorage.getItem('selected_project_id') || '');
           if (isValidId(pidStr)) {
             const r = await getProjectBids(pidStr);
             if (!cancelled && r.ok && Array.isArray(r.data)) {
               const mapped = (r.data as any[]).map((b: any) => {
-                // Normalize status from server enum names to UI statuses
+
                 const s = String(b.status || '').toLowerCase();
                 let statusNorm: 'pending' | 'accepted' | 'rejected' = 'pending';
                 if (s === 'accepted') statusNorm = 'accepted';
                 else if (s === 'rejected' || s === 'withdrawn') statusNorm = 'rejected';
-                else statusNorm = 'pending'; // submitted/underreview -> pending
-                return { ...b, status: statusNorm } as BidDto;
+                else statusNorm = 'pending';
+                const safeId = b?.id || b?._id || b?.bidId;
+                return { ...b, id: safeId, status: statusNorm } as BidDto;
               });
               setProposals(mapped as any);
             }
           }
+
         } catch { }
       } catch { }
       finally { if (!cancelled) { setLoading(false); try { hideFirstOverlay(); } catch { } } }
+
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track if this vendor already submitted a proposal for this project
+  // Detect vendor submission
   useEffect(() => {
     try {
-      if (!project || !isVendor) { setHasSubmitted(false); setMyProposal(null); return; }
+      if (!project || !isVendor) {
+        setHasSubmitted(false);
+        setMyProposal(null);
+        return;
+      }
       const vendorId = userId;
+
       const mine = proposals.find((b: any) => String(b.projectId) === String(project.id) && (!!vendorId ? String(b.merchantId || '') === vendorId : false));
+
       setHasSubmitted(!!mine);
       setMyProposal(mine || null);
       if (mine && !editingProposalId) setEditingProposalId(String(mine.id));
-    } catch { setHasSubmitted(false); setMyProposal(null); }
+    } catch {
+      setHasSubmitted(false);
+      setMyProposal(null);
+    }
   }, [project, userId, isVendor, proposals, editingProposalId, rest]);
 
   // Dynamic labels from ProjectCatalog
   const typeLabel = useMemo(() => {
+
     const pid = String(project?.ptype || project?.type || '');
     if (!pid) return project?.categoryName || '';
     const prod = catalog?.products?.find(p => p.id === pid);
@@ -214,6 +229,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
   // Accessories cost (dynamic from DB)
   const accessoriesCost = useMemo(() => {
     if (!project) return 0;
+
     // If backend already includes priced accessories on the project
     if (Array.isArray(project.accessories)) return project.accessories.reduce((s: number, a: any) => s + (Number(a.price) || 0), 0);
     // Otherwise resolve from catalog using selectedAcc
@@ -229,7 +245,6 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
     return 0;
   }, [project, catalog]);
 
-  // Main item total based on current project values
   const mainItemTotal = useMemo(() => {
     const qty = Math.max(1, quantity || 0);
     return Math.max(0, Math.round((subtotal + accessoriesCost) * qty));
@@ -362,7 +377,6 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
     }
   }, [project?.startedAt, project?.expectedEndAt, project, locale]);
 
-  // Baseline totals and helpers for vendor price validation
   const baseTotal: number = useMemo(() => {
     const p: any = project;
     if (!p) return 0;
@@ -372,7 +386,11 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
   const minPrice = baseTotal;
   const maxPrice = Math.max(minPrice, minPrice * 2);
   const formatMoney = (n: number) => {
-    try { return n.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US'); } catch { return String(n); }
+    try {
+      return n.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US');
+    } catch {
+      return String(n);
+    }
   };
 
   const handleEdit = () => {
@@ -386,11 +404,13 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
         color: project.color || 'white',
         width: project.width || 0,
         height: project.height || 0,
+        length: (project as any).length || 0,
         quantity: project.quantity || 1,
         days: Number(project.days) || 1,
         selectedAcc: Array.isArray(project.selectedAcc)
           ? project.selectedAcc
           : Array.isArray(project.accessories)
+
             ? project.accessories.map((a: any) => a?.id).filter(Boolean)
             : [],
         description: project.description || '',
@@ -398,7 +418,6 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
       };
       localStorage.setItem('edit_project_draft', JSON.stringify(draft));
 
-      // Prepare additional items for builder
       if (Array.isArray(project.items) && project.items.length > 0) {
         const itemsDraft = project.items.map((it: any) => ({
           id: it.id || Math.random().toString(36).slice(2),
@@ -408,10 +427,11 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
           color: it.color || 'white',
           width: Number(it.width) || 0,
           height: Number(it.height) || 0,
+          length: Number((it as any).length) || 0,
           quantity: Number(it.quantity) || 1,
           days: Number(it.days) || 1,
           autoPrice: true,
-          pricePerMeter: Number(it.pricePerMeter) || 0, // builder recalculates
+          pricePerMeter: Number(it.pricePerMeter) || 0,
           selectedAcc: Array.isArray(it.selectedAcc) ? it.selectedAcc : [],
           description: it.description || '',
           length: Number(it.length) || 0,
@@ -429,6 +449,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
     if (goBack) return goBack();
     setCurrentPage && setCurrentPage('projects');
   };
+
 
   // Open or create a chat for this project (works for both customer and merchant)
   const openChatWithMerchant = async (merchantId: string, merchantName?: string, merchantAvatar?: string) => {
@@ -481,6 +502,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
           const created = await createProjectConversation(pid, merchantId);
           if ((created as any)?.ok && (created as any).data?.id) {
             const cid = String((created as any).data.id);
+
             try { localStorage.setItem('project_chat_conversation_id', cid); } catch { }
             setCurrentPage && setCurrentPage('project-chat');
             return;
@@ -488,7 +510,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
         } catch { }
       }
 
-      // Fallback: navigate to chat page without cid; page will try resolve by keys
+
       setCurrentPage && setCurrentPage('project-chat');
     } catch { }
   };
@@ -506,12 +528,18 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
     return `${parts.join(' × ')} m`;
   };
 
+  const formatDims = (W: number, H: number, L: number) => {
+    if (W > 0 && H > 0) return `${W} × ${H} m`;
+    if (W > 0 && L > 0) return `${W} × ${L} m`;
+    if (H > 0 && L > 0) return `${H} × ${L} m`;
+    return `${W || H || L || 0} m`;
+  };
+
   return (
     <div className="min-h-screen bg-background" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <Header currentPage="project-details" setCurrentPage={setCurrentPage as any} {...(rest as any)} />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Loading/empty state */}
         {loading && (
           <Card className="max-w-2xl mx-auto animate-pulse">
             <CardContent className="p-6 space-y-4">
@@ -533,6 +561,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
               </div>
               <p className="text-lg font-medium">
                 {locale === 'ar'
+
                   ? (isLoggedIn ? 'غير مصرح لك بعرض هذا المشروع.' : 'الرجاء تسجيل الدخول لعرض المشاريع.')
                   : (isLoggedIn ? 'You are not authorized to view this project.' : 'Please sign in to view projects.')
                 }
@@ -553,13 +582,13 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
 
         {!loading && project && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main details */}
-            <Card className="lg:col-span-2 overflow-hidden shadow-sm">
+       <Card className="lg:col-span-2 overflow-hidden shadow-sm">
               <div className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Package className="w-6 h-6 text-primary" />
                     <div>
+
                       <h1 className="text-2xl font-bold">
                         {locale === 'ar' ? ' تفاصيل المشروع'  : 'Project Details'}
 
@@ -574,6 +603,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                         )}
                       </h1>
 
+ 
                       {(project?.customerName || project?.userName || project?.user?.name) && (
                         <p className="text-sm text-muted-foreground mt-1">
                           {locale === 'ar' ? 'صاحب المشروع: ' : 'Project Owner: '}
@@ -585,6 +615,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+
                     {!!project?.status && (
                       <Badge variant="outline" className="text-xs">
                         {locale === 'ar'
@@ -609,6 +640,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                         {locale === 'ar' ? `${acceptedDays} أيام تنفيذ` : `${acceptedDays} days execution`}
                       </Badge>
                     )}
+ 
                     {itemsCount > 0 && (
                       <Badge variant="outline" className="text-xs">
                         {locale === 'ar' ? `${itemsCount + 1} عناصر` : `${itemsCount + 1} items`}
@@ -616,6 +648,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                     )}
                   </div>
                 </div>
+
 
                 {/* Quick summary chips */}
                 <div className="flex flex-wrap gap-2 mt-4">
@@ -643,16 +676,16 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                         : `Budget: ${project?.budgetMin ?? '-'} - ${project?.budgetMax ?? '-'}`}
                     </Badge>
                   ) : null}
+
                 </div>
               </div>
 
               <CardContent className="p-6 space-y-6">
-                {/* Info grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Product Name */}
                   <div className="rounded-lg border p-4 bg-background shadow-sm">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <Package className="w-4 h-4" /> {locale === 'ar' ? 'اسم المنتج' : 'Product'}
+
                     </div>
                     <div className="mt-1 font-medium">{productName || '-'}</div>
                   </div>
@@ -660,6 +693,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                   {/* Product Type */}
                   <div className="rounded-lg border p-4 bg-background shadow-sm">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+
                       <Boxes className="w-4 h-4" /> {locale === 'ar' ? 'نوع المنتج' : 'Product Type'}
                     </div>
                     <div className="mt-1 font-medium">{typeLabel || '-'}</div>
@@ -673,6 +707,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                   </div>
                   <div className="rounded-lg border p-4 bg-background shadow-sm">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+
                       <Ruler className="w-4 h-4" /> {locale === 'ar' ? 'الأبعاد (متر)' : 'Dimensions (m)'}
                     </div>
                     <div className="mt-1 font-medium">
@@ -681,9 +716,11 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                   </div>
                   <div className="rounded-lg border p-4 bg-background shadow-sm">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+
                       <Boxes className="w-4 h-4" /> {locale === 'ar' ? 'الكمية' : 'Quantity'}
                     </div>
                     <div className="mt-1 font-medium">{project.quantity || 0}</div>
+
                   </div>
                   {!isOtherMain && (
                     <div className="rounded-lg border p-4 bg-background shadow-sm">
@@ -697,7 +734,6 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
 
                 <Separator />
 
-                {/* Accessories */}
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'الملحقات' : 'Accessories'}</div>
                   {accessoriesNames.length > 0 ? (
@@ -709,11 +745,11 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                       ))}
                     </div>
                   ) : (
+
                     <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'بدون' : 'None'}</div>
                   )}
                 </div>
 
-                {/* Description */}
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'الوصف' : 'Description'}</div>
                   {project.description ? (
@@ -721,6 +757,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                       {project.description}
                     </div>
                   ) : (
+
                     <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'لا يوجد وصف مضاف.' : 'No description provided.'}</div>
                   )}
                 </div>
@@ -772,6 +809,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                     </div>
                     <div className="space-y-4">
                       {itemsArray.map((it: any, idx: number) => {
+
                         // Dynamic labels for each additional item
                         const itPid = String(it?.ptype || it?.type || '');
                         const itProd = catalog?.products?.find(p => p.id === itPid);
@@ -781,13 +819,15 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                           || itProd?.subtypes?.flatMap(s => s.materials || []).find(m => m.id === itMatId);
                         const itMaterialLabel = itMat ? (locale === 'ar' ? (itMat.ar || itMat.id) : (itMat.en || itMat.id)) : '';
                         const isOtherItem = String(itPid).trim().toLowerCase() === 'other';
+
                         const itAccessoriesNames: string[] = (() => {
                           if (Array.isArray(it?.selectedAcc) && catalog?.products?.length) {
                             const pid = String(it?.ptype || it?.type || '');
-                            const prod = catalog.products.find(p => p.id === pid);
+                            const prod = catalog.products.find((p) => p.id === pid);
                             const accs = prod?.accessories || [];
                             return (it.selectedAcc as string[])
                               .map((id: string) => {
+
                                 const acc = accs.find(a => a.id === id);
                                 return acc ? (locale === 'ar' ? (acc.ar || acc.id) : (acc.en || acc.id)) : null;
                               })
@@ -798,6 +838,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                         return (
                           <div key={it?.id || `item-${idx}`} className="rounded-lg border p-4 bg-background shadow-sm">
                             <div className="flex items-center justify-between">
+
                               <div className="font-semibold">{locale === 'ar' ? `عنصر #${idx + 2}` : `Item #${idx + 2}`}</div>
                               {itTypeLabel && <Badge variant="outline">{itTypeLabel}</Badge>}
                             </div>
@@ -813,6 +854,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                                   <Ruler className="w-4 h-4" /> {locale === 'ar' ? 'الأبعاد (متر)' : 'Dimensions (m)'}
                                 </div>
                                 <div className="mt-1 font-medium">
+
                                   {formatDims(it?.width, it?.height, it?.length)}
                                 </div>
                               </div>
@@ -828,6 +870,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                                 </div>
                                 <div className="mt-1 font-medium">{Number(it?.days) > 0 ? it.days : '-'}</div>
                               </div>
+
                               {!isOtherItem && Number(it?.pricePerMeter) > 0 && (
                                 <div>
                                   <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -837,32 +880,42 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                                 </div>
                               )}
                             </div>
-                            {/* Item accessories */}
                             <div className="mt-3">
+
                               <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'الملحقات' : 'Accessories'}</div>
+ 
                               {itAccessoriesNames.length > 0 ? (
                                 <div className="flex flex-wrap gap-2 mt-1">
                                   {itAccessoriesNames.map((name: string, i: number) => (
-                                    <Badge key={`item-acc-${i}-${name}`} variant="outline" className="rounded-full px-3 py-1 text-xs">{name}</Badge>
+                                    <Badge
+                                      key={`item-acc-${i}-${name}`}
+                                      variant="outline"
+                                      className="rounded-full px-3 py-1 text-xs"
+                                    >
+                                      {name}
+                                    </Badge>
                                   ))}
                                 </div>
                               ) : (
+
                                 <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'بدون' : 'None'}</div>
                               )}
                             </div>
-                            {/* Item description */}
                             {it?.description && (
                               <div className="mt-3">
+
                                 <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'الوصف' : 'Description'}</div>
                                 <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/30 border rounded-md p-3">{it.description}</div>
                               </div>
                             )}
+ 
                           </div>
                         );
                       })}
                     </div>
                   </div>
                 )}
+
 
                 {/* Totals section or other UI can continue here as per your design... */}
               </CardContent>
@@ -1013,6 +1066,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                       </div>
                       <div className="flex gap-2">
                         <Button
+
                           className="bg-blue-600 hover:bg-blue-700"
                           onClick={async () => {
                             try {
@@ -1073,6 +1127,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                       </div>
                     </CardContent>
                   </Card>
+
                 )}
               </>
             ) : (
@@ -1209,6 +1264,7 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                           <Card key={pp.id || `proposal-${idx}`} className="hover:shadow-md transition-shadow">
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between mb-3">
+
                                 <div className="flex items-start gap-3">
                                   {/* Merchant Avatar (image if provided, otherwise initials) */}
                                   {pp.merchantProfilePicture ? (
@@ -1277,12 +1333,14 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
 
                               <div className="grid grid-cols-2 gap-4 mb-3">
                                 <div className="text-center p-3 bg-primary/5 rounded-lg">
+
                                   <div className="text-xs text-muted-foreground mb-1">{locale === 'ar' ? 'السعر المعروض' : 'Offered Price'}</div>
                                   <div className="text-lg font-bold text-primary">
                                     {currency} {Number(pp.price || 0).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US')}
                                   </div>
                                 </div>
                                 <div className="text-center p-3 bg-muted/30 rounded-lg">
+
                                   <div className="text-xs text-muted-foreground mb-1">{locale === 'ar' ? 'مدة التنفيذ' : 'Duration'}</div>
                                   <div className="text-lg font-bold">
                                     {Number(pp.days || 0)} {locale === 'ar' ? 'يوم' : 'days'}
@@ -1292,7 +1350,9 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
 
                               {pp.message && (
                                 <div className="mb-3">
+
                                   <div className="text-xs text-muted-foreground mb-1">{locale === 'ar' ? 'رسالة التاجر:' : 'Merchant message:'}</div>
+
                                   <div className="text-sm bg-muted/20 rounded-lg p-3 border-l-4 border-primary/20">
                                     {pp.message}
                                   </div>
@@ -1304,11 +1364,13 @@ export default function ProjectDetails({ setCurrentPage, goBack, ...rest }: Proj
                                   variant="outline"
                                   size="sm"
                                   className="inline-flex items-center gap-2"
+
                                   onClick={() => openChatWithMerchant(
                                     String(pp.merchantId || ''),
                                     String(pp.merchantName || ''),
                                     pp.merchantProfilePicture || ''
                                   )}
+
                                 >
                                   <MessageCircle className="w-4 h-4" />
                                   {locale === 'ar' ? 'مراسلة التاجر' : 'Chat with merchant'}

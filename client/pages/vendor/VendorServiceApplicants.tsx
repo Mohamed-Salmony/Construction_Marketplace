@@ -33,30 +33,42 @@ export default function VendorServiceApplicants({ setCurrentPage, ...context }: 
     (async () => {
       try {
         const { ok, data } = await listVendorServices({ vendorId: 'me' });
-        if (!ok || !Array.isArray(data)) { if (!cancelled) { setServices([]); setRequests({}); } return; }
+        if (!ok || !Array.isArray(data)) {
+          if (!cancelled) {
+            setServices([]);
+            setRequests({});
+          }
+          return;
+        }
         if (cancelled) return;
         setServices(data as any[]);
         // Fetch offers for each service
-        const validServices = (data as any[]).filter((s:any) => s && typeof s.id !== 'undefined' && s.id !== null && String(s.id) !== 'undefined');
+        const validServices = (data as any[]).filter((s: any) => s && typeof s.id !== 'undefined' && s.id !== null && String(s.id) !== 'undefined');
         const entries = await Promise.all(
-          validServices.map(async (s:any) => {
+          validServices.map(async (s: any) => {
             const sid = String(s.id);
             try {
               const r = await listOffersForService(sid);
               return [sid, (r.ok && Array.isArray(r.data) ? (r.data as OfferDto[]) : [])] as [string, OfferDto[]];
-            } catch { return [sid, []] as [string, OfferDto[]]; }
+            } catch {
+              return [sid, []] as [string, OfferDto[]];
+            }
           })
         );
         if (!cancelled) setRequests(Object.fromEntries(entries));
       } catch {
-        if (!cancelled) { setServices([]); setRequests({}); }
-      }
-      finally {
+        if (!cancelled) {
+          setServices([]);
+          setRequests({});
+        }
+      } finally {
         if (!cancelled) hideFirstOverlay();
       }
     })();
-    return () => { cancelled = true; };
-  }, [vendorId, hideFirstOverlay]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Build a user-friendly technician label without exposing raw ID
   const techLabel = (r: OfferDto, isAr: boolean) => {
@@ -97,11 +109,14 @@ export default function VendorServiceApplicants({ setCurrentPage, ...context }: 
       const res = await updateOfferStatus(reqId, status);
       if (res.ok) {
         // Refresh the service offers containing this request
-        const affectedServiceId = res.data?.serviceId ?? myRequests.find(r=> String(r.id)===String(reqId))?.serviceId;
+        const affectedServiceId = res.data?.serviceId ?? myRequests.find(r => String(r.id) === String(reqId))?.serviceId;
         if (affectedServiceId && String(affectedServiceId) !== 'undefined') {
           try {
             const r = await listOffersForService(String(affectedServiceId));
-            setRequests(prev => ({ ...prev, [String(affectedServiceId)]: (r.ok && Array.isArray(r.data) ? r.data as OfferDto[] : []) }));
+            setRequests((prev: Record<string, OfferDto[]>) => ({
+              ...prev,
+              [String(affectedServiceId)]: (r.ok && Array.isArray(r.data) ? (r.data as OfferDto[]) : []),
+            }));
           } catch {}
         }
         Swal.fire({ icon: 'success', title: status==='accepted' ? (isAr ? 'تم القبول' : 'Accepted') : (isAr ? 'تم الرفض' : 'Rejected'), timer: 1200, showConfirmButton: false });
@@ -154,7 +169,7 @@ export default function VendorServiceApplicants({ setCurrentPage, ...context }: 
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {list.map((r:OfferDto) => {
+                      {list.map((r:OfferDto, idx: number) => {
                         const anyR: any = r as any;
                         const name = techLabel(r, isAr);
                         const avatar = anyR.technicianAvatar || anyR.avatar || '';
@@ -166,7 +181,7 @@ export default function VendorServiceApplicants({ setCurrentPage, ...context }: 
                         const reviews = typeof anyR.reviewCount === 'number' ? anyR.reviewCount : undefined;
                         const verified = typeof anyR.isVerified === 'boolean' ? anyR.isVerified : undefined;
                         return (
-                          <div key={r.id} className="rounded border p-3 bg-muted/20">
+                          <div key={r.id || `${String(s.id)}-${idx}`} className="rounded border p-3 bg-muted/20">
                             <div className="text-xs font-semibold text-foreground mb-2">{isAr ? 'العرض' : 'Offer'}</div>
                             <div className="flex items-center justify-between">
                               <div className="font-medium text-sm flex items-center gap-3 min-w-0">

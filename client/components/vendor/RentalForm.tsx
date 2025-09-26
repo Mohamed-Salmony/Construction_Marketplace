@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '../ui/button';
@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { getAdminRentalOptions } from '../../lib/adminOptions';
+import { getRootRentalCategories } from '../../services/rentalCategories';
 import { DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Checkbox } from '../ui/checkbox';
 
@@ -16,16 +16,11 @@ interface RentalFormProps {
   onCancel: () => void;
 }
 
-// Rental category options are now admin-managed with a fallback to previous defaults
-const FALLBACK_RENTAL_CATEGORY_OPTIONS = [
-  'أدوات بناء',
-  'ادوات صيانه',
-  'ادوات تشطيب',
-] as const;
+// Categories will be loaded from DB; no hardcoded fallback
 
 export default function RentalForm({ product, onSave, onCancel }: RentalFormProps) {
-  const adminRentalCats = getAdminRentalOptions().categories;
-  const RENTAL_CATEGORY_OPTIONS = (Array.isArray(adminRentalCats) && adminRentalCats.length) ? adminRentalCats : FALLBACK_RENTAL_CATEGORY_OPTIONS;
+  const [dbCategories, setDbCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingCats, setLoadingCats] = useState<boolean>(false);
   const [formData, setFormData] = useState<any>({
     nameAr: product?.nameAr || product?.name || '',
     nameEn: product?.nameEn || '',
@@ -50,6 +45,25 @@ export default function RentalForm({ product, onSave, onCancel }: RentalFormProp
     addonInstallFee: (product?.addonInstallFee ?? (product as any)?.addonInstallation?.feePerUnit) ?? 50,
     ...product,
   });
+
+  // Load rental categories from backend
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingCats(true);
+        const { ok, data } = await getRootRentalCategories();
+        if (!cancelled && ok && Array.isArray(data)) {
+          const list = (data as any[]).map((c) => ({ id: String((c as any)._id || (c as any).id), name: (c as any).nameAr || (c as any).nameEn || (c as any).name || '' }));
+          setDbCategories(list);
+        } else if (!cancelled) {
+          setDbCategories([]);
+        }
+      } catch { if (!cancelled) setDbCategories([]); }
+      finally { if (!cancelled) setLoadingCats(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // no predefined name options; vendor types the name manually
 
@@ -108,9 +122,15 @@ export default function RentalForm({ product, onSave, onCancel }: RentalFormProp
               <SelectValue placeholder="اختر الفئة" />
             </SelectTrigger>
             <SelectContent>
-              {RENTAL_CATEGORY_OPTIONS.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
+              {loadingCats ? (
+                <div className="p-2 text-sm text-muted-foreground">جاري التحميل...</div>
+              ) : dbCategories.length > 0 ? (
+                dbCategories.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                ))
+              ) : (
+                <div className="p-2 text-sm text-muted-foreground">لا توجد فئات متاحة</div>
+              )}
             </SelectContent>
           </Select>
         </div>

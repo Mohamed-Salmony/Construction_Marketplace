@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Separator } from '../../components/ui/separator';
+
 import { getAdminProjectById, getAdminProjectBids, getUserById, getAdminProjectViews } from '@/services/admin';
 import { getProjectConversationByKeys, listProjectMessages, ProjectMessageDto, getConversationsByProject } from '@/services/projectChat';
 import { MessageCircle } from 'lucide-react';
@@ -301,6 +302,7 @@ export default function AdminProjectDetails({ setCurrentPage, ...ctx }: Partial<
     setCurrentPage && setCurrentPage('admin-all-projects');
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { }
   };
+
 
   // Chat functions
   const loadChatConversation = async () => {

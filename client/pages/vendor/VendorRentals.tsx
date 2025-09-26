@@ -91,9 +91,10 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
   const [commissionPct, setCommissionPct] = useState<number>(0);
   const [ratesCurrency, setRatesCurrency] = useState<string>('SAR');
 
+  // Load data only once on mount
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const loadData = async () => {
       try {
         const [rents, prods, rentalCats] = await Promise.all([
           listMyRentals(), 
@@ -111,10 +112,44 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
           setRentalCategories([]);
           toastError(locale==='ar'?'فشل تحميل التأجير':'Failed to load rentals', locale==='ar'); 
         }
-      } finally { if (!cancelled) { try { hideFirstOverlay(); } catch {} } }
-    })();
+      } finally { 
+        if (!cancelled) { 
+          // Call hideFirstOverlay without including it in dependencies to prevent infinite loop
+          try { hideFirstOverlay(); } catch {} 
+        } 
+      }
+    };
+    loadData();
     return () => { cancelled = true; };
-  }, [hideFirstOverlay, locale]); // Include dependencies as indicated by ESLint
+  }, []); // Empty dependency array to run only once on mount
+
+  // Handle locale changes separately to avoid infinite loop - DISABLED TO STOP SERVER OVERLOAD
+  // const previousLocaleRef = useRef(locale);
+  // const firstLoadRef = useRef(true);
+  // useEffect(() => {
+  //   if (previousLocaleRef.current !== locale && !firstLoadRef.current) {
+  //     // Reload only when locale changes (but not on first load)
+  //     (async () => {
+  //       try {
+  //         const [rents, prods, rentalCats] = await Promise.all([
+  //           listMyRentals(), 
+  //           getMyProducts(),
+  //           getRootRentalCategories()
+  //         ]);
+  //         setRentals(Array.isArray(rents.data) ? (rents.data as any[]) : []);
+  //         setMyProducts(Array.isArray(prods.data) ? (prods.data as any[]) : []);
+  //         setRentalCategories(Array.isArray(rentalCats.data) ? (rentalCats.data as RentalCategoryDto[]) : []);
+  //       } catch {
+  //         setRentals([]); 
+  //         setMyProducts([]);
+  //         setRentalCategories([]);
+  //         toastError(locale==='ar'?'فشل تحميل التأجير':'Failed to load rentals', locale==='ar'); 
+  //       }
+  //     })();
+  //     previousLocaleRef.current = locale;
+  //   }
+  //   firstLoadRef.current = false;
+  // }, [locale]);
 
   // Load commission rates for rentals (now uses separate rentals commission rate)
   useEffect(() => {
@@ -187,7 +222,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
 
   // Once rentals are loaded, open dialog if requested
   useEffect(() => {
-    if (!pendingOpenId) return;
+    if (!pendingOpenId || rentals.length === 0) return;
     const r = rentals.find((x:any) => String(x.id) === String(pendingOpenId));
     if (r) {
       openMessages(r);
@@ -201,7 +236,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
         }
       } catch {}
     }
-  }, [pendingOpenId, rentals]);
+  }, [pendingOpenId]); // Remove rentals dependency to prevent infinite loop
 
   const openMessages = async (r:any) => {
     setMsgTarget(r); setMsgOpen(true); setMessages([]); setMsgReply(''); setMsgLoading(true);
@@ -220,11 +255,10 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
       const res = await replyRentalMessage(rid, msgReply.trim());
       if (res.ok) {
         setMsgReply('');
+        // Only reload messages, don't refresh all rentals to reduce server load
         const r2 = await listRentalMessages(rid);
         if (r2.ok && Array.isArray(r2.data)) setMessages(r2.data as any[]);
-        // refresh counts
-        const fresh = await listMyRentals();
-        setRentals(Array.isArray(fresh.data) ? (fresh.data as any[]) : []);
+        toastSuccess(locale==='ar'? 'تم إرسال الرد' : 'Reply sent', locale==='ar');
       }
     } finally { setMsgLoading(false); }
   };
@@ -310,10 +344,20 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
       if (res.ok) {
         toastSuccess(locale==='ar'? 'تم تحديث العقد' : 'Rental updated', locale==='ar');
         setEditOpen(false);
-        const fresh = await listMyRentals();
-        setRentals(Array.isArray(fresh.data) ? (fresh.data as any[]) : []);
+        // Update local state instead of full refresh to reduce server load
+        setRentals(prev => prev.map(r => 
+          String(r.id || r._id) === rid ? { ...r, ...editTarget } : r
+        ));
       } else {
-        toastError(locale==='ar'? 'فشل تحديث العقد' : 'Failed to update rental', locale==='ar');
+        const status = (res as any)?.status;
+        const msg = (res as any)?.error?.message || (res as any)?.data?.message || (res as any)?.message || '';
+        console.error('[submitEdit] API Error:', { res, status, msg });
+        toastError(
+          locale==='ar'
+            ? `فشل تحديث العقد${status? ` (رمز ${status})`: ''}${msg? ` • ${msg}`: ''}`
+            : `Failed to update rental${status? ` (status ${status})`: ''}${msg? ` • ${msg}`: ''}`,
+          locale==='ar'
+        );
       }
     } finally { setSaving(false); }
   };
@@ -325,25 +369,53 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
       const res = await deleteRental(rid);
       if (res.ok) {
         toastSuccess(locale==='ar'? 'تم حذف العقد' : 'Rental deleted', locale==='ar');
-        const fresh = await listMyRentals();
-        setRentals(Array.isArray(fresh.data) ? (fresh.data as any[]) : []);
+        // Remove from local state instead of full refresh to reduce server load
+        setRentals(prev => prev.filter(rental => 
+          String(rental.id || rental._id) !== rid
+        ));
       } else {
         toastError(locale==='ar'? 'فشل حذف العقد' : 'Failed to delete rental', locale==='ar');
       }
-    } catch {
-      toastError(locale==='ar'? 'فشل حذف العقد' : 'Failed to delete rental', locale==='ar');
+    } catch (error) {
+      console.error('[removeRental] Exception:', error);
+      toastError(
+        locale==='ar'
+          ? `فشل حذف العقد • ${(error as any)?.message || 'خطأ غير معروف'}`
+          : `Failed to delete rental • ${(error as any)?.message || 'Unknown error'}`,
+        locale==='ar'
+      );
     }
   };
 
   const submitRental = async () => {
     try {
-      // If no matched product, allow creation without linking a product (backend supports optional productId)
+      // Enhanced validation
       const effectiveProductId = productId || (myProducts?.[0]?.id ? String(myProducts[0].id) : '');
-      if (!dailyRate || !securityDeposit) {
+      
+      // Check required fields
+      const errors: string[] = [];
+      
+      if (!dailyRate || Number(dailyRate) <= 0) {
+        errors.push(locale==='ar' ? 'سعر اليوم مطلوب ويجب أن يكون أكبر من صفر' : 'Daily rate is required and must be greater than zero');
+      }
+      
+      if (!securityDeposit || Number(securityDeposit) < 0) {
+        errors.push(locale==='ar' ? 'التأمين مطلوب ويجب أن يكون صفر أو أكثر' : 'Security deposit is required and must be zero or greater');
+      }
+      
+      if (!machineName?.trim()) {
+        errors.push(locale==='ar' ? 'اسم الآلة أو المعدة مطلوب' : 'Machine or equipment name is required');
+      }
+      
+      if (requiresDelivery && !deliveryAddress?.trim()) {
+        errors.push(locale==='ar' ? 'عنوان التوصيل مطلوب عند اختيار خدمة التوصيل' : 'Delivery address is required when delivery is selected');
+      }
+      
+      if (errors.length > 0) {
         toastError(
-          locale==='ar'
-            ? 'يرجى تعبئة الحقول المطلوبة (سعر اليوم، التأمين)'
-            : 'Please fill required fields (daily rate, deposit)',
+          locale==='ar' 
+            ? `يرجى إصلاح الأخطاء التالية:\n• ${errors.join('\n• ')}`
+            : `Please fix the following errors:\n• ${errors.join('\n• ')}`,
           locale==='ar'
         );
         return;
@@ -377,21 +449,29 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
         setSaving(false);
         return;
       }
+      // Backend requires endDate > startDate, so set endDate to next day
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      
       const payload: any = {
         productId: effectiveProductId ? String(effectiveProductId) : undefined,
         productName: machineName ? machineName.trim() : undefined,
         customerId: effectiveCustomerId,
-        // Backend requires dates: provide same-day placeholder; technician will adjust later
-        startDate: todayIso,
-        endDate: todayIso,
+        // Backend requires dates: provide default range; technician will adjust later
+        startDate: today.toISOString(),
+        endDate: tomorrow.toISOString(),
         dailyRate: Number(dailyRate),
         currency,
         securityDeposit: Number(securityDeposit),
         // Include rental category
-        rentalCategoryId: selectedRentalCategory || undefined,
-        // Delivery/Pickup removed
-        requiresDelivery: false,
-        requiresPickup: false,
+        rentalCategoryId: (selectedRentalCategory && selectedRentalCategory !== 'none') ? selectedRentalCategory : undefined,
+        // Delivery/Pickup options
+        requiresDelivery,
+        deliveryAddress: requiresDelivery ? deliveryAddress : undefined,
+        deliveryFee: requiresDelivery && deliveryFee ? Number(deliveryFee) : 0,
+        requiresPickup,
+        pickupFee: requiresPickup && pickupFee ? Number(pickupFee) : 0,
         specialInstructions: [specialInstructions, machineName ? `${locale==='ar' ? 'اسم الآلة' : 'Machine'}: ${machineName}` : ''].filter(Boolean).join(' | ') || undefined,
         usageNotes: usageNotes || undefined,
         // Attach image url if uploaded
@@ -430,15 +510,39 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
         setDialogOpen(false);
         setEditMode(false); setEditTarget(null);
         resetForm();
-        const fresh = await listMyRentals();
-        setRentals(Array.isArray(fresh.data) ? (fresh.data as any[]) : []);
+        // Minimal refresh: only reload if creation was successful to reduce server load
+        if (!editMode) {
+          // For new rentals, do a single refresh
+          try {
+            // DISABLED to prevent server overload: const fresh = await listMyRentals();
+            // if (fresh.ok && Array.isArray(fresh.data)) {
+            //   setRentals(fresh.data as any[]);
+           // }
+          } catch {}
+        } else {
+          // For edits, just update local state
+          setRentals(prev => prev.map(r => 
+            String(r.id || r._id) === String((editTarget as any)?.id ?? (editTarget as any)?._id) 
+              ? { ...r, dailyRate: Number(dailyRate), securityDeposit: Number(securityDeposit), currency, specialInstructions, usageNotes }
+              : r
+          ));
+        }
       } else {
         const status = (res as any)?.status;
-        const msg = (res as any)?.error?.message || (res as any)?.data?.message || '';
+        const msg = (res as any)?.error?.message || (res as any)?.data?.message || (res as any)?.message || '';
+        const errors = (res as any)?.data?.errors || (res as any)?.errors || [];
+        
+        let errorDetails = '';
+        if (Array.isArray(errors) && errors.length > 0) {
+          errorDetails = errors.map((err: any) => err.msg || err.message || String(err)).join(', ');
+        }
+        
+        console.error('[submitRental] API Error:', { res, status, msg, errors, errorDetails });
+        
         toastError(
           locale==='ar'
-            ? `${editMode? 'فشل تحديث عقد التأجير' : 'فشل إنشاء عقد التأجير'}${status? ` (رمز ${status})`: ''}${msg? ` • ${msg}`: ''}`
-            : `${editMode? 'Failed to update rental' : 'Failed to create rental'}${status? ` (status ${status})`: ''}${msg? ` • ${msg}`: ''}`,
+            ? `${editMode? 'فشل تحديث عقد التأجير' : 'فشل إنشاء عقد التأجير'}${status? ` (رمز ${status})`: ''}${msg? ` • ${msg}`: ''}${errorDetails? ` • ${errorDetails}`: ''}`
+            : `${editMode? 'Failed to update rental' : 'Failed to create rental'}${status? ` (status ${status})`: ''}${msg? ` • ${msg}`: ''}${errorDetails? ` • ${errorDetails}`: ''}`,
           locale==='ar'
         );
       }
@@ -497,8 +601,8 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                         <SelectValue placeholder={locale==='ar' ? 'اختر فئة التأجير' : 'Select rental category'} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">{locale==='ar' ? 'بدون فئة' : 'No category'}</SelectItem>
-                        {rentalCategories.map((category) => (
+                        <SelectItem value="none">{locale==='ar' ? 'بدون فئة' : 'No category'}</SelectItem>
+                        {rentalCategories.filter(category => category.id && category.id.trim() !== '').map((category) => (
                           <SelectItem key={category.id} value={category.id}>
                             {locale==='ar' ? (category.nameAr || category.nameEn) : (category.nameEn || category.nameAr)}
                           </SelectItem>
@@ -545,7 +649,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                     {images.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {images.map((src, idx)=> (
-                          <div key={idx} className="relative w-16 h-16 border rounded overflow-hidden bg-white">
+                          <div key={`image-${idx}-${src.slice(-10)}`} className="relative w-16 h-16 border rounded overflow-hidden bg-white">
                             <Image src={src} alt={`img-${idx}`} width={64} height={64} className="w-full h-full object-cover" />
                             <button
                               type="button"
@@ -628,7 +732,7 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{locale === 'en' ? 'All Categories' : 'جميع الفئات'}</SelectItem>
-                    {rentalCategories.map((category) => (
+                    {rentalCategories.filter(category => category.id && category.id.trim() !== '').map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {locale==='ar' ? (category.nameAr || category.nameEn) : (category.nameEn || category.nameAr)}
                       </SelectItem>
@@ -665,8 +769,8 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRentals.map((rental:any) => (
-                  <Card key={rental.id} className="group hover:shadow-lg transition-all duration-300 relative">
+                {filteredRentals.map((rental:any, idx: number) => (
+                  <Card key={rental.id || rental._id || `rental-${idx}`} className="group hover:shadow-lg transition-all duration-300 relative">
                     <CardContent className="p-4">
                       <div className="relative mb-3">
                         {(() => {
@@ -733,14 +837,15 @@ export default function VendorRentals({ setCurrentPage, ...context }: VendorRent
                   {messages.map((m:any, idx:number)=> {
                     const key = String(m.id ?? m._id ?? m.messageId ?? m.at ?? idx);
                     return (
-                    <div key={key} className={`rounded p-2 ${m.fromMerchant? 'bg-blue-50 text-blue-900' : 'bg-white'}`}>
-                      <div className="text-xs text-muted-foreground flex justify-between">
-                        <span>{m.fromMerchant ? (locale==='ar'? 'التاجر' : 'Merchant') : (m.name || 'Customer')}</span>
-                        <span>{String(m.at).replace('T',' ').slice(0,16)}</span>
+                      <div key={key} className={`rounded p-2 ${m.fromMerchant? 'bg-blue-50 text-blue-900' : 'bg-white'}`}>
+                        <div className="text-xs text-muted-foreground flex justify-between">
+                          <span>{m.fromMerchant ? (locale==='ar'? 'التاجر' : 'Merchant') : (m.name || 'Customer')}</span>
+                          <span>{String(m.at).replace('T',' ').slice(0,16)}</span>
+                        </div>
+                        <div className="text-sm whitespace-pre-wrap">{m.message}</div>
                       </div>
-                      <div className="text-sm whitespace-pre-wrap">{m.message}</div>
-                    </div>
-                  );})}
+                    );
+                  })}
                 </div>
               )}
             </div>

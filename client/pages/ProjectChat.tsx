@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { getProjectConversation, getProjectConversationByKeys, listProjectMessages, sendProjectMessage, createProjectConversation } from '@/services/projectChat';
+import { getProjectById } from '@/services/projects';
 import { useFirstLoadOverlay } from '../hooks/useFirstLoadOverlay';
 
 export default function ProjectChat({ setCurrentPage, ...context }: Partial<RouteContext>) {
@@ -177,20 +178,41 @@ export default function ProjectChat({ setCurrentPage, ...context }: Partial<Rout
         const c = await getProjectConversation(conversationId);
         if (c.ok && c.data) {
           setMerchantId((prev) => String((c.data as any).merchantId || '') || prev);
-          // Server getConversation currently returns only IDs; keep existing name if none provided
-          setMerchantName((prev) => {
-            const name = (c.data as any).merchantName;
-            return (typeof name === 'string' && name.trim()) ? String(name) : prev;
-          });
+          setMerchantName((prev) => (String((c.data as any).merchantName || '').trim() || prev));
           setCustomerId((prev) => String((c.data as any).customerId || '') || prev);
-          setCustomerName((prev) => {
-            const name = (c.data as any).customerName;
-            return (typeof name === 'string' && name.trim()) ? String(name) : prev;
-          });
+          setCustomerName((prev) => (String((c.data as any).customerName || '').trim() || prev));
+
         }
       } catch {}
     })();
   }, [conversationId]);
+
+  // Fallback: if names are missing, fetch project to infer the other party's name
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!projectId) return;
+        const needCustomer = (!customerName || !customerId) && (userRole === 'vendor' || userRole === 'merchant');
+        const needMerchant = (!merchantName || !merchantId) && !(userRole === 'vendor' || userRole === 'merchant');
+        if (!needCustomer && !needMerchant) return;
+        const r = await getProjectById(String(projectId));
+        if (r.ok && r.data) {
+          if (needCustomer) {
+            const cid = String((r.data as any).customerId || '');
+            const cname = String((r.data as any).customerName || (r.data as any)?.userName || (r.data as any)?.user?.name || '').trim();
+            if (cid) setCustomerId(cid);
+            if (cname) setCustomerName(cname);
+          }
+          if (needMerchant) {
+            const mid = String((r.data as any).assignedMerchantId || '');
+            const mname = String((r.data as any).assignedMerchantName || '').trim();
+            if (mid) setMerchantId(mid);
+            if (mname) setMerchantName(mname);
+          }
+        }
+      } catch {}
+    })();
+  }, [projectId, userRole, customerName, customerId, merchantName, merchantId]);
 
   // Poll messages
   useEffect(() => {

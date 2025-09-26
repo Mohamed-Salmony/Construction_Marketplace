@@ -13,6 +13,15 @@ const rentalSchema = new mongoose.Schema({
   status: { type: String, default: 'pending' },
   currency: { type: String, default: 'SAR' },
   imageUrl: { type: String },
+  // Additional rental-specific fields
+  securityDeposit: { type: Number, default: 0 },
+  deliveryAddress: { type: String },
+  requiresDelivery: { type: Boolean, default: false },
+  deliveryFee: { type: Number, default: 0 },
+  requiresPickup: { type: Boolean, default: false },
+  pickupFee: { type: Number, default: 0 },
+  specialInstructions: { type: String },
+  usageNotes: { type: String },
 }, { timestamps: true });
 
 export const Rental = mongoose.models.Rental || mongoose.model('Rental', rentalSchema);

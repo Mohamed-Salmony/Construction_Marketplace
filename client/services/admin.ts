@@ -128,6 +128,7 @@ export async function getAdminOption(key: string) {
 }
 
 export async function setAdminOption(key: string, value: any) {
+
   // Always send a string value. If value is object/array/number/boolean, stringify properly.
   let stringValue: string;
   try {
@@ -146,6 +147,7 @@ export async function setAdminOption(key: string, value: any) {
   }
   const payload = { value: stringValue };
   return api.put(`/api/AdminOptions/${encodeURIComponent(key)}`, payload, { auth: true });
+ 
 }
 
 // Pending projects and approval actions
@@ -179,6 +181,12 @@ export async function getAdminProjectBids(id: number | string) {
     `/api/ProjectsAdmin/${pid}/bids`,
     { auth: true }
   );
+}
+
+// Admin: delete a project by id
+export async function adminDeleteProject(id: number | string) {
+  const pid = encodeURIComponent(String(id));
+  return api.del<{ success: boolean; message?: string }>(`/api/ProjectsAdmin/${pid}`, { auth: true });
 }
 
 // Approve/Deactivate technicians (workers) using the generic users status endpoint

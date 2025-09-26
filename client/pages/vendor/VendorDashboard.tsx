@@ -125,6 +125,11 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
       route: "add-service",
     },
     {
+      icon: "Users",
+      label: { ar: "اطلب فني لمشروع", en: "Request Technician for Project" },
+      route: "add-service-for-project",
+    },
+    {
       icon: "Tag",
       label: { ar: "التأجير", en: "Rentals" },
       route: "vendor-rentals",
@@ -578,6 +583,14 @@ export default function VendorDashboard({ setCurrentPage, ...context }: Partial<
               >
                 <Plus className="mr-2 h-4 w-4" />
                 {locale === 'ar' ? 'اطلب فني' : 'Request Technician'}
+              </Button>
+              {/* Add Service For Project */}
+              <Button
+                className="w-full justify-start"
+                onClick={() => setCurrentPage && setCurrentPage("add-service-for-project")}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                {locale === 'ar' ? 'اطلب فني لمشروع' : 'Request Technician for Project'}
               </Button>
               {/* Rentals */}
               <Button

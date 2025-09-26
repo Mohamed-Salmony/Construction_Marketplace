@@ -12,18 +12,9 @@ import { getAdminTechnicianOptions } from "../lib/adminOptions";
 import { createService, updateService, listServiceTypes, type ServiceTypeItem } from "@/services/servicesCatalog";
 import { toastSuccess, toastError } from "../utils/alerts";
 import { getCommissionRates } from "@/services/commissions";
-import { getAdminOption } from "@/services/admin";
+import { getOption } from "@/services/options";
 
 interface AddServiceProps extends Partial<RouteContext> {}
-
-const SERVICE_TYPES = [
-  { id: "plumber", ar: "سباك", en: "Plumber" },
-  { id: "electrician", ar: "كهربائي", en: "Electrician" },
-  { id: "carpenter", ar: "نجار", en: "Carpenter" },
-  { id: "painter", ar: "نقاش", en: "Painter" },
-  { id: "gypsum_installer", ar: "فني تركيب جيبس بورد", en: "Gypsum Board Installer" },
-  { id: "marble_installer", ar: "فني تركيب رخام", en: "Marble Installer" },
-];
 
 // Minimum daily wages per service type
 const MIN_WAGE: Record<string, number> = {
@@ -125,11 +116,11 @@ export default function AddService({ setCurrentPage, user, ...rest }: AddService
     })();
   }, []);
 
-  // Load technician specialties with rates
+  // Load technician specialties with rates (from public Options endpoint)
   useEffect(() => {
     (async () => {
       try {
-        const { ok, data } = await getAdminOption('technician_specialties');
+        const { ok, data } = await getOption('technician_specialties');
         if (ok && data) {
           const arr = JSON.parse(String((data as any).value || '[]'));
           if (Array.isArray(arr)) {
@@ -152,31 +143,12 @@ export default function AddService({ setCurrentPage, user, ...rest }: AddService
   const normalizeType = (val: string): string | null => {
     if (!val) return null;
     const v = String(val).trim().toLowerCase();
-    const map: Record<string, string> = {
-      plumber: 'plumber',
-      electrician: 'electrician',
-      carpenter: 'carpenter',
-      painter: 'painter',
-      'gypsum installer': 'gypsum_installer',
-      gypsum_installer: 'gypsum_installer',
-      'marble installer': 'marble_installer',
-      marble_installer: 'marble_installer',
-      daily: 'daily',
-      hourly: 'hourly',
-      project: 'project',
-      // Arabic labels
-      'سباك': 'plumber',
-      'كهربائي': 'electrician',
-      'نجار': 'carpenter',
-      'نقاش': 'painter',
-      'فني تركيب جيبس بورد': 'gypsum_installer',
-      'فني تركيب رخام': 'marble_installer',
-    };
-    // direct match
-    if (map[v]) return map[v];
-    // try to match any SERVICE_TYPES label
-    const fromStatic = SERVICE_TYPES.find(s => s.id === v || s.ar === val || s.en.toLowerCase() === v);
-    if (fromStatic) return fromStatic.id;
+    // Prefer dynamic options from backend
+    const fromOptions = techOptions.find(o => o.id.toLowerCase() === v || o.ar?.toLowerCase() === v || o.en?.toLowerCase() === v);
+    if (fromOptions) return fromOptions.id;
+    // Fallback to admin-configured specialties list
+    const fromSpecs = techSpecialties.find(s => s.name && s.name.toLowerCase() === v);
+    if (fromSpecs) return fromSpecs.name;
     return null;
   };
 
@@ -216,29 +188,50 @@ export default function AddService({ setCurrentPage, user, ...rest }: AddService
 
   const canSubmit = Boolean(stype) && dailyWage >= (minForSelected || 0) && days >= 1;
 
-  // Load technician types dynamically from backend with fallbacks
+  // Load technician types dynamically from backend with public options (DB) preferred
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return;
       const loadTypes = async () => {
+        // Primary: public Options 'technician_specialties' (DB)
         try {
-          const r = await listServiceTypes();
-          if (r.ok && Array.isArray(r.data) && r.data.length) {
-            setTechOptions(r.data as any);
-            return;
+          const { ok, data } = await getOption('technician_specialties');
+          if (ok && data) {
+            const arr = JSON.parse(String((data as any).value || '[]'));
+            if (Array.isArray(arr) && arr.length) {
+              const mapped = arr
+                .map((it: any) => {
+                  if (typeof it === 'string') {
+                    const id = it.trim();
+                    if (!id) return null;
+                    return { id, ar: it, en: it };
+                  }
+                  if (it && typeof it === 'object') {
+                    const id = String(it.id || it.value || it.name || '').trim();
+                    if (!id) return null;
+                    const ar = typeof it.ar === 'string' && it.ar.trim() ? it.ar : (typeof it.name === 'string' ? it.name : id);
+                    const en = typeof it.en === 'string' && it.en.trim() ? it.en : id;
+                    return { id, ar, en };
+                  }
+                  return null;
+                })
+                .filter((x: any) => x && x.id && String(x.id).trim() !== '');
+              if (mapped.length) { setTechOptions(mapped as any); return; }
+            }
           }
         } catch {}
-        // Fallback to admin-configured specialties if backend types unavailable
-        const specs = getAdminTechnicianOptions().specialties || [];
-        if (Array.isArray(specs) && specs.length) {
-          setTechOptions(specs.map((name) => {
-            const match = SERVICE_TYPES.find(s => s.ar === name || s.en === name || s.id === name);
-            return match ? { id: match.id, ar: match.ar, en: match.en } : { id: name, ar: name, en: name };
-          }));
-        } else {
-          // Final fallback to static list
-          setTechOptions(SERVICE_TYPES.map(s => ({ id: s.id, ar: s.ar, en: s.en })));
-        }
+        // Fallback to services catalog types
+        try {
+          const r = await listServiceTypes();
+          if (r.ok && Array.isArray(r.data) && r.data.length) { setTechOptions(r.data as any); return; }
+        } catch {}
+        // Last resort: local admin options util
+        try {
+          const specs = getAdminTechnicianOptions().specialties || [];
+          if (Array.isArray(specs) && specs.length) {
+            setTechOptions(specs.map((name) => ({ id: String(name), ar: String(name), en: String(name) } as any)));
+          }
+        } catch {}
       };
       loadTypes();
       const onAdminUpdate = () => loadTypes();
@@ -292,17 +285,17 @@ export default function AddService({ setCurrentPage, user, ...rest }: AddService
                     <SelectValue placeholder={locale === 'ar' ? 'اختر النوع' : 'Select type'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {techOptions.length > 0
-                      ? techOptions.map((opt) => (
+                    {techOptions.length > 0 ? (
+                      techOptions
+                        .filter((opt) => opt && typeof opt.id === 'string' && opt.id.trim() !== '')
+                        .map((opt) => (
                           <SelectItem key={opt.id} value={opt.id}>
-                            {locale === 'ar' ? opt.ar : opt.en}
+                            {locale === 'ar' ? (opt.ar || opt.id) : (opt.en || opt.id)}
                           </SelectItem>
                         ))
-                      : SERVICE_TYPES.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {locale === 'ar' ? s.ar : s.en}
-                          </SelectItem>
-                        ))}
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground">{locale==='ar' ? 'لا توجد أنواع مسجلة' : 'No types available'}</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

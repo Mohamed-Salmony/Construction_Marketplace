@@ -20,6 +20,7 @@ export type ProjectDto = {
   currency?: string;
   status?: ProjectStatus;
   createdAt?: string;
+
   measurementMode?: string;
   isCustomProduct?: boolean;
   // Execution fields
@@ -175,5 +176,9 @@ export async function deleteProject(id: string | number) {
 
 export async function getMyProjects() {
   return api.get<ProjectDto[]>(`/api/Projects/customer/my-projects`, { auth: true });
+}
+
+export async function getVendorAssignedProjects() {
+  return api.get<ProjectDto[]>(`/api/Projects/vendor/assigned`, { auth: true, cache: 'no-store' });
 }
 

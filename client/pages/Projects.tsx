@@ -36,6 +36,7 @@ import Footer from "../components/Footer";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { useTranslation } from "../hooks/useTranslation";
 import type { RouteContext } from "../components/routerTypes";
+
 import { getOpenProjects, getProjects, getMyProjects, createProject, deleteProject, getProjectById, getProjectBids } from "@/services/projects";
 import { getProjectCatalog, type ProjectCatalog } from "@/services/options";
 import { toastError, toastInfo } from "../utils/alerts";
@@ -117,6 +118,9 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
   const [openProjects, setOpenProjects] = useState<any[]>([]);
   const [browseProjects, setBrowseProjects] = useState<any[]>([]);
   const [catalog, setCatalog] = useState<ProjectCatalog | null>(null);
+  // Vendor execution assignments
+  const [vendorAssigned, setVendorAssigned] = useState<ProjectDto[]>([]);
+  const [tick, setTick] = useState<number>(0);
   // Track initial load completion to hide overlay once
   const [loadedCatalog, setLoadedCatalog] = useState(false);
   const [loadedOpen, setLoadedOpen] = useState(false);
@@ -388,6 +392,48 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       setOverlayHidden(true);
     }
   }, [loadedCatalog, loadedOpen, loadedBrowse, loadedMine, overlayHidden, hideFirstOverlay]);
+
+  // Vendor: load assigned projects (InProgress/Awarded)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!isVendor) { setVendorAssigned([]); return; }
+        const { ok, data } = await getVendorAssignedProjects();
+        if (!cancelled && ok && Array.isArray(data)) {
+          setVendorAssigned((data as any[]).map((p:any) => ({
+            ...p,
+            id: String(p.id ?? p._id ?? ''),
+            assignedMerchantId: p.assignedMerchantId ? String(p.assignedMerchantId) : undefined,
+            executionStartedAt: p.executionStartedAt ?? null,
+            executionDueAt: p.executionDueAt ?? null,
+            status: (p.status ?? '') as any,
+            isApproved: (p.isApproved !== undefined ? p.isApproved : p.approved) as any,
+          })) as any);
+        }
+      } catch { setVendorAssigned([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [isVendor]);
+
+  // Ticker for countdowns (update every 60s)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t)=>t+1), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const renderCountdown = (dueIso?: string | null) => {
+    if (!dueIso) return null;
+    try {
+      const due = new Date(dueIso).getTime();
+      const now = Date.now();
+      let diff = Math.max(0, due - now);
+      const days = Math.floor(diff / (24*60*60*1000)); diff -= days*24*60*60*1000;
+      const hours = Math.floor(diff / (60*60*1000)); diff -= hours*60*60*1000;
+      const mins = Math.floor(diff / (60*1000));
+      return `${days}d ${hours}h ${mins}m`;
+    } catch { return null; }
+  };
 
   // Stop persisting user projects to localStorage
   useEffect(() => {}, [userProjects]);
@@ -743,8 +789,60 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
       <Header currentPage="projects" setCurrentPage={setCurrentPage as any} {...(rest as any)} />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Login notice for viewing own projects */}
-        {!hasToken && (
+        {/* Vendor Assigned In-Progress Section */}
+        {isVendor && vendorAssigned.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <h2 className="text-lg font-semibold mb-3">{locale==='ar' ? 'مشاريع قيد التنفيذ' : 'Projects In Progress'}</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {vendorAssigned.map((p:any) => (
+                  <div key={p.id} className="rounded-md border p-3 bg-background">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{p.status || 'InProgress'}</Badge>
+                        {p.isApproved === false && (
+                          <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-500/30">
+                            {locale==='ar' ? 'قيد الاعتماد' : 'Pending Approval'}
+                          </Badge>
+                        )}
+                        {p.isApproved === true && (
+                          <Badge className="bg-green-500/20 text-green-700 border-green-500/30">
+                            {locale==='ar' ? 'معتمد' : 'Approved'}
+                          </Badge>
+                        )}
+                      </div>
+                      {p.executionDueAt && (
+                        <Badge variant="outline" className="text-xs">
+                          {locale==='ar' ? 'الانتهاء خلال' : 'Due in'}: {renderCountdown(p.executionDueAt) || (locale==='ar'?'—':'—')}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {(p.title || '') || (locale==='ar' ? 'مشروع' : 'Project')}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {(p.executionStartedAt) ? (locale==='ar' ? 'بدأ: ' : 'Started: ') + new Date(p.executionStartedAt).toLocaleDateString(locale==='ar'?'ar-EG':'en-US') : ''}
+                    </div>
+                    <div className="pt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          try { window.localStorage.setItem('selected_vendor_project_id', String(p.id || '')); } catch {}
+                          setCurrentPage && setCurrentPage('vendor-project-details');
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-2" /> {locale==='ar' ? 'تفاصيل' : 'Details'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {/* Login notice for viewing own projects (customers only) */}
+        {!isVendor && !hasToken && (
           <Card className="mb-6 border-yellow-400 bg-yellow-50">
             <CardContent className="p-4 flex items-center justify-between text-yellow-800">
               <span className="text-sm">{locale==='ar' ? 'يرجى تسجيل الدخول لعرض مشاريعك وحالتها.' : 'Please sign in to view your projects and their status.'}</span>
@@ -754,26 +852,28 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
             </CardContent>
           </Card>
         )}
-        {!hasToken && (
+        {!isVendor && !hasToken && (
           <Card className="mb-6">
             <CardContent className="p-4 text-sm text-muted-foreground">
               {locale==='ar' ? 'يرجى تسجيل الدخول لإنشاء وعرض مشاريعك الخاصة. لن يستطيع الزوار مشاهدة مشاريع المستخدمين.' : 'Please sign in to create and view your own projects. Guests cannot view users’ projects.'}
             </CardContent>
           </Card>
         )}
-        {/* Header with Add Project (top-left) */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Button size="sm" onClick={() => setCurrentPage && setCurrentPage('projects-builder')}>
-              <Plus className="w-4 h-4 mr-1" /> {locale==='ar' ? 'إضافة مشروع جديد' : 'Add New Project'}
-            </Button>
-            <h1 className="text-2xl font-bold">{locale==='ar' ? 'مشاريعي' : 'My Projects'}</h1>
+        {/* Header with Add Project (customers only) */}
+        {!isVendor && (
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <Button size="sm" onClick={() => setCurrentPage && setCurrentPage('projects-builder')}>
+                <Plus className="w-4 h-4 mr-1" /> {locale==='ar' ? 'إضافة مشروع جديد' : 'Add New Project'}
+              </Button>
+              <h1 className="text-2xl font-bold">{locale==='ar' ? 'مشاريعي' : 'My Projects'}</h1>
+            </div>
+            <div />
           </div>
-          <div />
-        </div>
+        )}
 
-        {/* My Projects Only */}
-        {hasToken && (
+        {/* My Projects Only (customers only) */}
+        {!isVendor && hasToken && (
           <Card className="mb-8">
             <CardContent className="p-4">
               {/* Centered search for user's projects */}
@@ -817,7 +917,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                       <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select type'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {productTypes.map(pt => (
+                      {productTypes.filter(pt => pt.id && pt.id.trim() !== '').map(pt => (
                         <SelectItem key={pt.id} value={pt.id}>{locale==='ar' ? pt.ar : pt.en}</SelectItem>
                       ))}
                     </SelectContent>
@@ -831,7 +931,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                       <SelectValue placeholder={locale==='ar' ? 'اختر الخامة' : 'Select material'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {materials.map(m => (
+                      {materials.filter(m => m.id && m.id.trim() !== '').map(m => (
                         <SelectItem key={m.id} value={m.id}>{locale==='ar' ? m.ar : m.en}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1066,8 +1166,9 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
         {/* Toolbar removed to avoid duplicate Add button; search moved inside My Projects card */}
 
         {/* Content */}
-        <div className="grid lg:grid-cols-[280px_1fr] gap-6">
-          {/* Filters */}
+        <div className={`grid ${!isVendor ? 'lg:grid-cols-[280px_1fr]' : 'lg:grid-cols-1'} gap-6`}>
+          {/* Filters (hidden for vendors) */}
+          {!isVendor && (
           <aside className={`${showFilters ? 'block' : 'hidden'} lg:block`}>
             <Card className="p-4">
               <CardContent className="space-y-6">
@@ -1143,6 +1244,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
               </CardContent>
             </Card>
           </aside>
+          )}
 
           {/* Results */}
           <section>
@@ -1157,12 +1259,14 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                     const rawStatus = (up.status || up.Status || '');
                     const norm = normalizeStatus(rawStatus);
                     const statusLc = norm.toLowerCase();
+
                     const isPending = ['draft','inbidding'].includes(statusLc) || ['pending','pendingapproval','inreview','underreview'].includes(statusLc);
                     // Lock edit/delete once project is approved/published or beyond
                     const isLocked = ['published','inbidding','inprogress','bidselected','completed'].includes(statusLc);
                     const localizedStatus = (() => {
                       if (!norm) return locale==='ar' ? 'غير معروف' : 'Unknown';
-                      if (statusLc==='draft') return locale==='ar' ? 'مسودة' : 'Draft';
+                      // Treat Draft as Pending Approval for customer-facing UI
+                      if (statusLc==='draft') return locale==='ar' ? 'قيد الاعتماد' : 'Pending Approval';
                       if (statusLc==='pending' || statusLc==='pendingapproval' || statusLc==='inreview' || statusLc==='underreview') return locale==='ar' ? 'قيد الاعتماد' : 'Pending Approval';
                       if (statusLc==='inbidding') return locale==='ar' ? 'مفتوح للمناقصات' : 'In Bidding';
                       if (statusLc==='inprogress') return locale==='ar' ? 'قيد التنفيذ' : 'In Progress';
@@ -1175,6 +1279,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                     return (
                   <Card key={`${String(up.id)}-${idx}`}>
                     <CardContent className="p-4 flex items-center justify-between gap-4">
+
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <div className="font-semibold">
@@ -1232,8 +1337,10 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">{locale==='ar' ? 'الإجمالي' : 'Total'}</div>
                         <div className="text-lg font-semibold text-primary">{currency} {up.total.toLocaleString(locale==='ar'?'ar-EG':'en-US')}</div>
+
                         <div className="mt-2 flex items-center gap-2 justify-end">
                           <Button size="sm" onClick={() => {
+ 
                             try {
                               localStorage.setItem('selected_project_id', String(up.id));
                             } catch {}
@@ -1251,6 +1358,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                                 color: up.color || 'white',
                                 width: up.width || 0,
                                 height: up.height || 0,
+                                length: Number((up as any).length) || 0,
                                 quantity: up.quantity || 1,
                                 // normalize accessories ids
                                 selectedAcc: Array.isArray(up.selectedAcc)
@@ -1270,6 +1378,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                                   color: it.color || 'white',
                                   width: Number(it.width) || 0,
                                   height: Number(it.height) || 0,
+                                  length: Number(it.length) || 0,
                                   quantity: Number(it.quantity) || 1,
                                   autoPrice: true,
                                   pricePerMeter: Number(it.pricePerMeter) || 0,
@@ -1286,6 +1395,26 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                           }} aria-label={locale==='ar' ? 'تعديل' : 'Edit'}>
                             <Pencil className="w-4 h-4 ml-1" /> {locale==='ar' ? 'تعديل' : 'Edit'}
                           </Button>
+                          {Boolean((up as any).assignedMerchantId) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                try {
+                                  localStorage.setItem('project_chat_project_id', String(up.id));
+                                  localStorage.setItem('project_chat_merchant_id', String((up as any).assignedMerchantId));
+                                  const nm = String((up as any).assignedMerchantName || '');
+                                  if (nm) localStorage.setItem('project_chat_merchant_name', nm);
+                                  // Clear any stale conversation id to force fetching/creation for this vendor
+                                  localStorage.removeItem('project_chat_conversation_id');
+                                } catch {}
+                                setCurrentPage && setCurrentPage('project-chat');
+                              }}
+                              aria-label={locale==='ar' ? 'مراسلة التاجر' : 'Message vendor'}
+                            >
+                              {locale==='ar' ? 'مراسلة التاجر' : 'Message vendor'}
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="destructive"
@@ -1298,6 +1427,7 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                               try {
                                 const res = await deleteProject(up.id);
                                 if (res.ok) {
+                                  try { toastInfo(locale==='ar' ? 'تم حذف المشروع بنجاح' : 'Project deleted successfully'); } catch {}
                                   // Refresh from backend
                                   const my = await getMyProjects();
                                   if (my.ok && Array.isArray(my.data)) {
@@ -1326,10 +1456,10 @@ export default function Projects({ setCurrentPage, ...rest }: ProjectsProps) {
                                     setUserProjects(prev => prev.filter(p => p.id !== up.id));
                                   }
                                 } else {
-                                  alert(locale==='ar' ? 'تعذر الحذف.' : 'Failed to delete.');
+                                  try { toastError(locale==='ar' ? 'تعذر حذف المشروع' : 'Failed to delete project'); } catch { alert(locale==='ar' ? 'تعذر الحذف.' : 'Failed to delete.'); }
                                 }
                               } catch {
-                                alert(locale==='ar' ? 'تعذر الحذف.' : 'Failed to delete.');
+                                try { toastError(locale==='ar' ? 'تعذر حذف المشروع' : 'Failed to delete project'); } catch { alert(locale==='ar' ? 'تعذر الحذف.' : 'Failed to delete.'); }
                               }
                             }}
                             aria-label={locale==='ar' ? 'حذف' : 'Delete'}

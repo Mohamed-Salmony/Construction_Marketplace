@@ -334,29 +334,29 @@ export default function Header({ currentPage, setCurrentPage, cartItems, user, s
                 </button>
               </div>
 
-              {/* Navigation */}
-              {!isRestricted && (
-                <nav className="hidden md:flex items-center gap-8">
-                  <button onClick={() => go('home')} className="text-foreground hover:text-primary transition-colors">{t('home')}</button>
-                  <button onClick={() => go('products')} className="text-foreground hover:text-primary transition-colors">{t('products')}</button>
-                  <button onClick={() => go('offers')} className="text-foreground hover:text-primary transition-colors">{t('offers')}</button>
-                  {/* Projects/Services: for workers show Services instead of Projects */}
-                  {isWorker ? (
+            {/* Navigation */}
+            {!isRestricted && (
+              <nav className="hidden md:flex items-center gap-8">
+                <button onClick={() => go('home')} className="text-foreground hover:text-primary transition-colors">{t('home')}</button>
+                <button onClick={() => go('products')} className="text-foreground hover:text-primary transition-colors">{t('products')}</button>
+                <button onClick={() => go('offers')} className="text-foreground hover:text-primary transition-colors">{t('offers')}</button>
+                {/* Projects/Services: for workers show Services instead of Projects */}
+                {isWorker ? (
+                  <>
                     <button onClick={() => go('technician-services')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'الخدمات' : 'Services'}</button>
-                  ) : (
-                    // Only show projects if user is not vendor or if vendor is verified
-                    (!user || user.role !== 'vendor' || user.isVerified) && (
-                      <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
-                    )
-                  )}
-                  {/* Rentals: show for all logged-in users, including technicians */}
-                  {user && (
-                    <button onClick={() => go('rentals')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'التأجير' : 'Rentals'}</button>
-                  )}
-                  {/* Removed separate technician quick link as services replaces projects above */}
-                  <button onClick={() => go('about')} className="text-foreground hover:text-primary transition-colors">{t('about')}</button>
-                </nav>
-              )}
+                    <button onClick={() => go('technician-offers')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'عروضي' : 'My Offers'}</button>
+                  </>
+                ) : (
+                  <button onClick={() => go('projects')} className="text-foreground hover:text-primary transition-colors">{t('projects') || (locale==='ar'?'المشاريع':'Projects')}</button>
+                )}
+                {/* Rentals: show for all logged-in users, including technicians */}
+                {user && (
+                  <button onClick={() => go('rentals')} className="text-foreground hover:text-primary transition-colors">{locale==='ar' ? 'التأجير' : 'Rentals'}</button>
+                )}
+                {/* Removed separate technician quick link as services replaces projects above */}
+                <button onClick={() => go('about')} className="text-foreground hover:text-primary transition-colors">{t('about')}</button>
+              </nav>
+            )}
 
             {/* Contact info & actions */}
             <div className="flex items-center gap-4">

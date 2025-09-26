@@ -29,6 +29,7 @@ import ProjectDetails from '../pages/ProjectDetails';
 import ProjectChat from '../pages/ProjectChat';
 import Favorites from '../pages/Favorites';
 import AddService from '../pages/AddService';
+import AddServiceForProject from '../pages/AddServiceForProject';
 import ServiceDetails from '../pages/ServiceDetails';
 import Support from '../pages/Support';
 import Checkout from '../pages/Checkout';
@@ -79,6 +80,7 @@ import TechnicianProjects from '../pages/technician/TechnicianProjects';
 import TechnicianProjectDetails from '../pages/technician/TechnicianProjectDetails';
 import TechnicianServiceDetails from '../pages/technician/TechnicianServiceDetails';
 import TechnicianChat from '../pages/technician/TechnicianChat';
+import TechnicianMyOffers from '../pages/technician/TechnicianMyOffers';
 
 export const routes: Record<string, RouteConfig> = {
   // Public routes
@@ -100,6 +102,7 @@ export const routes: Record<string, RouteConfig> = {
   'rental-details': { component: RentalDetails, title: 'تفاصيل التأجير', icon: Tag },
   'rental-contract': { component: RentalContract, title: 'عقد تأجير', icon: Tag },
   'add-service': { component: AddService, title: 'إضافة خدمة', icon: Tag },
+  'add-service-for-project': { component: AddServiceForProject, title: 'اطلب فني لمشروع', icon: Tag, requiresAuth: true, allowedRoles: ['vendor'] },
   'service-details': { component: ServiceDetails, title: 'تفاصيل الخدمة', icon: Tag },
   'projects-builder': { component: ProjectsBuilder, title: 'إضافة مشروع', icon: Tag, requiresAuth: true },
   'project-details': { component: ProjectDetails, title: 'تفاصيل المشروع', icon: Tag },
@@ -145,12 +148,11 @@ export const routes: Record<string, RouteConfig> = {
   'admin-rentals': { component: AdminRentals, title: 'عقود التأجير (إدارة)', icon: FileText, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-offers': { component: AdminOffers, title: 'إدارة العروض', icon: Percent, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-services': { component: AdminServices, title: 'إدارة الخدمات', icon: Settings, requiresAuth: true, allowedRoles: ['admin'] },
-  'admin-technicians': { component: AdminTechnicians, title: 'إدارة الفنيين', icon: Users, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-promo-codes': { component: AdminPromoCodes, title: 'إدارة رموز الخصم', icon: Tag, requiresAuth: true, allowedRoles: ['admin'] },
-  // Worker (technician) routes (require worker role)
   'technician-services': { component: TechnicianServices, title: 'الخدمات', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-service-details': { component: TechnicianServiceDetails, title: 'تفاصيل خدمة', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-chat': { component: TechnicianChat, title: 'الدردشة', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-projects': { component: TechnicianProjects, title: 'المشاريع', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-project-details': { component: TechnicianProjectDetails, title: 'تفاصيل مشروع', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
+  'technician-offers': { component: TechnicianMyOffers, title: 'عروضي', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
 };

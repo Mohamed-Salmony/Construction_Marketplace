@@ -152,6 +152,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     color: string;
     width: number;
     height: number;
+    length?: number;
     quantity: number;
     autoPrice: boolean;
     pricePerMeter: number;
@@ -256,6 +257,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       setColor(d.color || 'white');
       setWidth(Number(d.width) || 0);
       setHeight(Number(d.height) || 0);
+      setLength(Number(d.length) || 0);
       setQuantity(Number(d.quantity) || 1);
       setSelectedAcc(Array.isArray(d.selectedAcc) ? d.selectedAcc : []);
       setDescription(d.description || '');
@@ -365,6 +367,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       color: '',
       width: 0,
       height: 0,
+      length: 0,
       quantity: 1,
       autoPrice: true,
       pricePerMeter: 0,
@@ -416,13 +419,24 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
         psubtype: b.psubtype,
         material: b.material,
         color: b.color,
+        // localized labels
+        ptypeAr: p?.ar || undefined,
+        ptypeEn: p?.en || undefined,
+        psubtypeAr: st?.ar || undefined,
+        psubtypeEn: st?.en || undefined,
+        materialAr: mat?.ar || undefined,
+        materialEn: mat?.en || undefined,
+        colorAr: (catalog?.products?.find(x=>x.id===b.ptype)?.colors||[]).find((c:any)=>c.id===b.color)?.ar || undefined,
+        colorEn: (catalog?.products?.find(x=>x.id===b.ptype)?.colors||[]).find((c:any)=>c.id===b.color)?.en || undefined,
         width: b.width,
         height: b.height,
+        length: b.length || 0,
         quantity: b.quantity,
         autoPrice: b.autoPrice,
         pricePerMeter: ppm,
         selectedAcc: b.selectedAcc,
         description: b.description || '',
+
         total: computeTotal(b.width, b.height, undefined, ppm, b.quantity, b.selectedAcc, accPrices, (p as any)?.measurementMode || 'area_wh'),
         createdAt: Date.now(),
       };
@@ -431,11 +445,13 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
     const mainItem = {
       id: Math.random().toString(36).slice(2),
       ptype,
+
       psubtype: ptype === 'other' ? otherSubtype : psubtype,
       material: ptype === 'other' ? otherMaterial : material,
       color: ptype === 'other' ? otherColor : color,
       width,
       height,
+      length,
       quantity,
       autoPrice,
       pricePerMeter: mainPPM,
@@ -466,9 +482,11 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
       title: ptype === 'other' ? otherProductName : (description ? (locale==='ar' ? 'مشروع' : 'Project') : undefined),
       description,
       type: ptype,
+
       psubtype: ptype === 'other' ? otherSubtype : psubtype,
       material: ptype === 'other' ? otherMaterial : material,
       color: ptype === 'other' ? otherColor : color,
+
       width,
       height,
       length,
@@ -551,7 +569,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select type'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {productTypes.map(pt => (
+                    {productTypes.filter(pt => pt.id && pt.id.trim() !== '').map(pt => (
                       <SelectItem key={pt.id} value={pt.id}>{locale==='ar' ? (pt.ar ?? pt.id) : (pt.en ?? pt.id)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -565,7 +583,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select subtype'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(subtypes || []).map((st) => (
+                    {(subtypes || []).filter(st => st.id && st.id.trim() !== '').map((st) => (
                       <SelectItem key={st.id} value={st.id}>{locale==='ar' ? (st.ar || st.id) : (st.en || st.id)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -580,7 +598,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر الخامة' : 'Select material'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {materials.map(m => (
+                    {materials.filter(m => m.id && m.id.trim() !== '').map(m => (
                       <SelectItem key={m.id} value={m.id}>{locale==='ar' ? (m.ar ?? m.id) : (m.en ?? m.id)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -595,7 +613,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                     <SelectValue placeholder={locale==='ar' ? 'اختر اللون' : 'Select color'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {colors.map(c => (
+                    {colors.filter(c => c.id && c.id.trim() !== '').map(c => (
                       <SelectItem key={c.id} value={c.id}>{locale==='ar' ? c.ar : c.en}</SelectItem>
                     ))}
                   </SelectContent>
@@ -870,7 +888,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر النوع' : 'Select type'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {productTypes.map((pt) => (
+                            {productTypes.filter(pt => pt.id && pt.id.trim() !== '').map((pt) => (
                               <SelectItem key={pt.id} value={pt.id}>{locale==='ar' ? pt.ar : pt.en}</SelectItem>
                             ))}
                           </SelectContent>
@@ -883,7 +901,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر النوع (عادي/وسط/دبل)' : 'Select subtype'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {(catalog?.products?.find(x=>x.id===b.ptype)?.subtypes || subtypes || []).map((st) => (
+                            {(catalog?.products?.find(x=>x.id===b.ptype)?.subtypes || subtypes || []).filter(st => st.id && st.id.trim() !== '').map((st) => (
                               <SelectItem key={st.id} value={st.id}>{locale==='ar' ? (st.ar || st.id) : (st.en || st.id)}</SelectItem>
                             ))}
                           </SelectContent>
@@ -896,7 +914,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر الخامة' : 'Select material'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {((st?.materials||[]) as any[]).map((m:any) => (
+                            {((st?.materials||[]) as any[]).filter((m:any) => m.id && m.id.trim() !== '').map((m:any) => (
                               <SelectItem key={m.id} value={m.id}>{locale==='ar' ? (m.ar || m.id) : (m.en || m.id)}</SelectItem>
                             ))}
                           </SelectContent>
@@ -909,7 +927,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                             <SelectValue placeholder={locale==='ar' ? 'اختر اللون' : 'Select color'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {colors.map((c) => (
+                            {colors.filter(c => c.id && c.id.trim() !== '').map((c) => (
                               <SelectItem key={c.id} value={c.id}>{locale==='ar' ? c.ar : c.en}</SelectItem>
                             ))}
                           </SelectContent>
@@ -931,7 +949,7 @@ export default function ProjectsBuilder({ setCurrentPage, ...rest }: RouteContex
                         {(catalog?.products?.find(x=>x.id===b.ptype)?.dimensions?.length ?? false) && (
                           <div className="col-span-2 md:col-span-1">
                             <label className="block text-sm mb-1">{locale==='ar' ? 'الطول (متر طولي)' : 'Length (linear m)'}</label>
-                            <Input type="text" inputMode="decimal" value={''} onChange={()=>{ /* manage if needed in extended model */ }} disabled />
+                            <Input type="text" inputMode="decimal" value={Number.isFinite(b.length || 0) ? (b.length || 0) : ''} onChange={(e)=> setAdditionalBuilders((prev)=>{ const c=[...prev]; c[idx] = { ...c[idx], length: parseFloat(e.target.value || '0') }; return c; })} />
                           </div>
                         )}
                       </div>

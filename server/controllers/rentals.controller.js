@@ -7,8 +7,13 @@ import { Notification } from '../models/Notification.js';
 import { body, validationResult } from 'express-validator';
 
 export async function listMine(req, res) {
-  const items = await Rental.find({ customerId: req.user._id }).sort({ createdAt: -1 });
-  res.json(items);
+  try {
+    const items = await Rental.find({ customerId: req.user._id }).sort({ createdAt: -1 });
+    res.json(items);
+  } catch (error) {
+    console.error('[listMine] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch rentals', error: error.message });
+  }
 }
 
 // Vendor-specific: recent technician-channel messages for rentals that belong to this vendor (by product.merchantId)
@@ -106,87 +111,181 @@ export const validateRentalReply = [
 ];
 
 export async function listPublic(req, res) {
-  const items = await Rental.find({ status: { $in: ['pending', 'approved'] } }).sort({ createdAt: -1 }).limit(200);
-  res.json(items);
+  try {
+    const items = await Rental.find({ status: { $in: ['pending', 'approved'] } }).sort({ createdAt: -1 }).limit(200);
+    res.json(items);
+  } catch (error) {
+    console.error('[listPublic] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch public rentals', error: error.message });
+  }
 }
 
 // Admin: list all rentals (any status)
 export async function listAll(req, res) {
-  const items = await Rental.find({}).sort({ createdAt: -1 }).limit(500);
-  res.json(items);
+  try {
+    const items = await Rental.find({}).sort({ createdAt: -1 }).limit(500);
+    res.json(items);
+  } catch (error) {
+    console.error('[listAll] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch all rentals', error: error.message });
+  }
 }
 
 export async function getById(req, res) {
-  const r = await Rental.findById(req.params.id);
-  if (!r) return res.status(404).json({ success: false, message: 'Rental not found' });
-  res.json(r);
+  try {
+    const r = await Rental.findById(req.params.id);
+    if (!r) {
+      return res.status(404).json({ success: false, message: 'Rental not found' });
+    }
+    res.json(r);
+  } catch (error) {
+    console.error('[getById] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch rental', error: error.message });
+  }
 }
 
 export async function create(req, res) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
-  const body = req.body || {};
-  const start = new Date(body.startDate);
-  const end = new Date(body.endDate);
-  const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-  const total = days * Number(body.dailyRate || 0);
-  const r = await Rental.create({
-    productId: body.productId || undefined,
-    productName: body.productName || undefined,
-    customerId: req.user._id,
-    startDate: start,
-    endDate: end,
-    rentalDays: days,
-    dailyRate: body.dailyRate,
-    totalAmount: total,
-    status: 'pending',
-    currency: body.currency || 'SAR',
-    imageUrl: body.imageUrl || undefined,
-  });
-  res.status(201).json({ id: r._id });
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.log('[create] Validation errors:', errors.array());
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    
+    const body = req.body || {};
+    console.log('[create] Creating rental with data:', { ...body, customerId: req.user._id });
+    
+    // Validate required fields
+    if (!body.startDate || !body.endDate) {
+      return res.status(400).json({ success: false, message: 'Start date and end date are required' });
+    }
+    
+    if (!body.dailyRate || Number(body.dailyRate) <= 0) {
+      return res.status(400).json({ success: false, message: 'Daily rate must be greater than 0' });
+    }
+    
+    const start = new Date(body.startDate);
+    const end = new Date(body.endDate);
+    
+    // Validate dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date format' });
+    }
+    
+    if (end <= start) {
+      return res.status(400).json({ success: false, message: 'End date must be after start date' });
+    }
+    
+    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    const total = days * Number(body.dailyRate || 0);
+    
+    const rentalData = {
+      productId: body.productId || undefined,
+      productName: body.productName || undefined,
+      customerId: req.user._id,
+      startDate: start,
+      endDate: end,
+      rentalDays: days,
+      dailyRate: Number(body.dailyRate),
+      totalAmount: total,
+      status: 'pending',
+      currency: body.currency || 'SAR',
+      imageUrl: body.imageUrl || undefined,
+      // Add optional fields
+      securityDeposit: body.securityDeposit ? Number(body.securityDeposit) : 0,
+      deliveryAddress: body.deliveryAddress || undefined,
+      requiresDelivery: !!body.requiresDelivery,
+      deliveryFee: body.deliveryFee ? Number(body.deliveryFee) : 0,
+      requiresPickup: !!body.requiresPickup,
+      pickupFee: body.pickupFee ? Number(body.pickupFee) : 0,
+      specialInstructions: body.specialInstructions || undefined,
+      usageNotes: body.usageNotes || undefined,
+    };
+    
+    const r = await Rental.create(rentalData);
+    console.log('[create] Rental created successfully:', r._id);
+    res.status(201).json({ success: true, id: r._id });
+  } catch (error) {
+    console.error('[create] Error creating rental:', error);
+    res.status(500).json({ success: false, message: 'Failed to create rental', error: error.message });
+  }
 }
 
 export async function update(req, res) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
-  const body = req.body || {};
-  if (body.startDate && body.endDate && body.dailyRate) {
-    const start = new Date(body.startDate);
-    const end = new Date(body.endDate);
-    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-    body.rentalDays = days;
-    body.totalAmount = days * Number(body.dailyRate || 0);
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    
+    const body = req.body || {};
+    console.log('[update] Updating rental:', req.params.id, 'with data:', body);
+    
+    // Recalculate days and total if dates and rate provided
+    if (body.startDate && body.endDate && body.dailyRate) {
+      const start = new Date(body.startDate);
+      const end = new Date(body.endDate);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ success: false, message: 'Invalid date format' });
+      }
+      
+      if (end <= start) {
+        return res.status(400).json({ success: false, message: 'End date must be after start date' });
+      }
+      
+      const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+      body.rentalDays = days;
+      body.totalAmount = days * Number(body.dailyRate || 0);
+    }
+    
+    const r = await Rental.findOneAndUpdate(
+      { _id: req.params.id, customerId: req.user._id },
+      {
+        ...(body.startDate ? { startDate: new Date(body.startDate) } : {}),
+        ...(body.endDate ? { endDate: new Date(body.endDate) } : {}),
+        ...(typeof body.dailyRate !== 'undefined' ? { dailyRate: Number(body.dailyRate) } : {}),
+        ...(typeof body.securityDeposit !== 'undefined' ? { securityDeposit: Number(body.securityDeposit) } : {}),
+        ...(body.currency ? { currency: body.currency } : {}),
+        ...(body.productId ? { productId: body.productId } : { productId: undefined }),
+        ...(body.productName ? { productName: body.productName } : {}),
+        ...(body.specialInstructions !== undefined ? { specialInstructions: body.specialInstructions } : {}),
+        ...(body.usageNotes !== undefined ? { usageNotes: body.usageNotes } : {}),
+        ...(typeof body.requiresDelivery !== 'undefined' ? { requiresDelivery: !!body.requiresDelivery } : {}),
+        ...(typeof body.deliveryFee !== 'undefined' ? { deliveryFee: Number(body.deliveryFee) } : {}),
+        ...(typeof body.requiresPickup !== 'undefined' ? { requiresPickup: !!body.requiresPickup } : {}),
+        ...(typeof body.pickupFee !== 'undefined' ? { pickupFee: Number(body.pickupFee) } : {}),
+        ...(body.imageUrl ? { imageUrl: body.imageUrl } : {}),
+        ...(typeof body.rentalDays !== 'undefined' ? { rentalDays: Number(body.rentalDays) } : {}),
+        ...(typeof body.totalAmount !== 'undefined' ? { totalAmount: Number(body.totalAmount) } : {}),
+      },
+      { new: true }
+    );
+    
+    if (!r) {
+      return res.status(404).json({ success: false, message: 'Rental not found or not authorized' });
+    }
+    
+    console.log('[update] Rental updated successfully:', r._id);
+    res.json({ success: true, data: r });
+  } catch (error) {
+    console.error('[update] Error updating rental:', error);
+    res.status(500).json({ success: false, message: 'Failed to update rental', error: error.message });
   }
-  const r = await Rental.findOneAndUpdate(
-    { _id: req.params.id, customerId: req.user._id },
-    {
-      ...(body.startDate ? { startDate: new Date(body.startDate) } : {}),
-      ...(body.endDate ? { endDate: new Date(body.endDate) } : {}),
-      ...(typeof body.dailyRate !== 'undefined' ? { dailyRate: Number(body.dailyRate) } : {}),
-      ...(typeof body.securityDeposit !== 'undefined' ? { securityDeposit: Number(body.securityDeposit) } : {}),
-      ...(body.currency ? { currency: body.currency } : {}),
-      ...(body.productId ? { productId: body.productId } : { productId: undefined }),
-      ...(body.productName ? { productName: body.productName } : {}),
-      ...(body.specialInstructions ? { specialInstructions: body.specialInstructions } : {}),
-      ...(body.usageNotes ? { usageNotes: body.usageNotes } : {}),
-      ...(typeof body.requiresDelivery !== 'undefined' ? { requiresDelivery: !!body.requiresDelivery } : {}),
-      ...(typeof body.deliveryFee !== 'undefined' ? { deliveryFee: Number(body.deliveryFee) } : {}),
-      ...(typeof body.requiresPickup !== 'undefined' ? { requiresPickup: !!body.requiresPickup } : {}),
-      ...(typeof body.pickupFee !== 'undefined' ? { pickupFee: Number(body.pickupFee) } : {}),
-      ...(body.imageUrl ? { imageUrl: body.imageUrl } : {}),
-      ...(typeof body.rentalDays !== 'undefined' ? { rentalDays: Number(body.rentalDays) } : {}),
-      ...(typeof body.totalAmount !== 'undefined' ? { totalAmount: Number(body.totalAmount) } : {}),
-    },
-    { new: true }
-  );
-  if (!r) return res.status(404).json({ success: false, message: 'Rental not found' });
-  res.json({ success: true });
 }
 
 export async function remove(req, res) {
-  const r = await Rental.findOneAndDelete({ _id: req.params.id, customerId: req.user._id });
-  if (!r) return res.status(404).json({ success: false, message: 'Rental not found' });
-  res.json({ success: true });
+  try {
+    const r = await Rental.findOneAndDelete({ _id: req.params.id, customerId: req.user._id });
+    if (!r) {
+      return res.status(404).json({ success: false, message: 'Rental not found or not authorized' });
+    }
+    console.log('[remove] Rental deleted successfully:', req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[remove] Error deleting rental:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete rental', error: error.message });
+  }
 }
 
 // Admin moderation endpoints
