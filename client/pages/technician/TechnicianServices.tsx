@@ -171,13 +171,15 @@ export default function TechnicianServices({ setCurrentPage, ...context }: Props
                     <Button
                       variant="outline"
                       onClick={() => {
+                        const sid = String((s as any)?.id || (s as any)?._id || '');
+                        if (!sid) return;
                         try {
                           const url = new URL(window.location.href);
-                          url.searchParams.set('serviceId', String(s.id));
+                          url.searchParams.set('serviceId', sid);
                           url.searchParams.set('page', 'technician-service-details');
                           window.history.replaceState({}, '', url.toString());
                         } catch {}
-                        try { window.localStorage.setItem('selected_service_id', String(s.id)); } catch {}
+                        try { window.localStorage.setItem('selected_service_id', sid); } catch {}
                         safeSetCurrentPage('technician-service-details');
                       }}
                     >
@@ -221,33 +223,8 @@ export default function TechnicianServices({ setCurrentPage, ...context }: Props
                 step="any"
                 value={offerPrice}
                 onChange={(e)=> setOfferPrice(e.target.value)}
-                min={Number((selectedService?.total ?? selectedService?.dailyWage) || 0)}
-                max={Number((((selectedService?.total ?? selectedService?.dailyWage) || 0) * 2))}
-                placeholder={(() => {
-                  const base = Number((selectedService?.total ?? selectedService?.dailyWage) || 0);
-                  const min = base;
-                  const max = base * 2;
-                  const numLocale = isAr ? 'ar-EG' : 'en-US';
-                  return isAr
-                    ? `الحد الأدنى ${Number(min).toLocaleString(numLocale)} والحد الأقصى ${Number(max).toLocaleString(numLocale)}`
-                    : `Min ${Number(min).toLocaleString(numLocale)} • Max ${Number(max).toLocaleString(numLocale)}`;
-                })()}
+                placeholder={isAr ? 'اكتب أي سعر تراه مناسباً' : 'Enter any price you see fit'}
               />
-              {(() => {
-                const base = Number((selectedService?.total ?? selectedService?.dailyWage) || 0);
-                const min = base;
-                const max = base * 2;
-                const v = Number(offerPrice);
-                const invalid = offerPrice !== '' && (!isFinite(v) || v < min || v > max);
-                if (!invalid) return null;
-                return (
-                  <div className="text-xs text-red-600">
-                    {isAr
-                      ? `السعر يجب أن يكون بين ${currency} ${min.toLocaleString('ar-EG')} و ${currency} ${max.toLocaleString('ar-EG')}`
-                      : `Price must be between ${currency} ${min.toLocaleString('en-US')} and ${currency} ${max.toLocaleString('en-US')}`}
-                  </div>
-                );
-              })()}
             </div>
             <div className="grid gap-2">
               <Label>{isAr ? 'المدة (أيام)' : 'Duration (days)'}</Label>
@@ -256,28 +233,8 @@ export default function TechnicianServices({ setCurrentPage, ...context }: Props
                 inputMode="numeric"
                 value={offerDays}
                 onChange={(e)=> setOfferDays(e.target.value)}
-                min={1}
-                max={Number(selectedService?.days || undefined)}
-                placeholder={(() => {
-                  const maxDays = Number(selectedService?.days || 0);
-                  return maxDays > 0
-                    ? (isAr ? `بين 1 و ${maxDays}` : `Between 1 and ${maxDays}`)
-                    : (isAr ? 'بحد أدنى 1' : 'Minimum 1');
-                })()}
+                placeholder={isAr ? 'اكتب عدد الأيام المناسب' : 'Enter any number of days'}
               />
-              {(() => {
-                const maxDays = Number(selectedService?.days || Infinity);
-                const v = Number(offerDays);
-                const invalid = offerDays !== '' && (!Number.isFinite(v) || v < 1 || (Number.isFinite(maxDays) && v > maxDays));
-                if (!invalid) return null;
-                return (
-                  <div className="text-xs text-red-600">
-                    {Number.isFinite(maxDays)
-                      ? (isAr ? `عدد الأيام يجب أن يكون بين 1 و ${maxDays}` : `Days must be between 1 and ${maxDays}`)
-                      : (isAr ? 'عدد الأيام يجب ألا يقل عن 1' : 'Days must be at least 1')}
-                  </div>
-                );
-              })()}
             </div>
             <div className="grid gap-2">
               <Label>{isAr ? 'رسالة' : 'Message'}</Label>
@@ -289,32 +246,22 @@ export default function TechnicianServices({ setCurrentPage, ...context }: Props
               className="w-full"
               disabled={(() => {
                 if (saving || !selectedService) return true;
-                const base = Number((selectedService?.total ?? selectedService?.dailyWage) || 0);
-                const minP = base, maxP = base * 2;
                 const vP = Number(offerPrice);
-                const maxD = Number(selectedService?.days || Infinity);
                 const vD = Number(offerDays);
-                const validP = offerPrice !== '' && isFinite(vP) && vP >= minP && vP <= maxP;
-                const validD = offerDays !== '' && Number.isFinite(vD) && vD >= 1 && (!Number.isFinite(maxD) || vD <= maxD);
+                const validP = offerPrice !== '' && isFinite(vP);
+                const validD = offerDays !== '' && Number.isFinite(vD);
                 return !(validP && validD);
               })()}
               onClick={() => {
                 if (!selectedService) return;
                 if (!technicianId) { toastInfo(isAr ? 'الرجاء تسجيل الدخول كفني لتقديم الطلب.' : 'Please log in as a technician to submit requests.', isAr); return; }
-                // Validate ranges strictly (no clamping)
-                const basePrice = Number((selectedService?.total ?? selectedService?.dailyWage) || 0);
-                const minPrice = basePrice;
-                const maxPrice = basePrice * 2;
+                // Basic numeric validation only
                 const priceNum = Number(offerPrice);
                 const daysNum = Number(offerDays);
-                const numLocale = isAr ? 'ar-EG' : 'en-US';
-                if (!isFinite(priceNum) || priceNum < minPrice || priceNum > maxPrice) { toastError(isAr
-                      ? `يجب أن يكون السعر بين ${currency} ${minPrice.toLocaleString(numLocale)} و ${currency} ${maxPrice.toLocaleString(numLocale)}`
-                      : `Price must be between ${currency} ${minPrice.toLocaleString(numLocale)} and ${currency} ${maxPrice.toLocaleString(numLocale)}`, isAr); return; }
-                const maxDays = Number(selectedService?.days || Infinity);
-                if (!Number.isFinite(daysNum) || daysNum < 1 || (Number.isFinite(maxDays) && daysNum > maxDays)) { toastError(Number.isFinite(maxDays)
-                      ? (isAr ? `عدد الأيام يجب أن يكون بين 1 و ${maxDays}` : `Days must be between 1 and ${maxDays}`)
-                      : (isAr ? 'عدد الأيام يجب ألا يقل عن 1' : 'Days must be at least 1'), isAr); return; }
+                if (!isFinite(priceNum) || !Number.isFinite(daysNum)) {
+                  toastError(isAr ? 'أدخل أرقاماً صحيحة للسعر والمدة' : 'Please enter valid numbers for price and days', isAr);
+                  return;
+                }
                 (async () => {
                   try {
                     setSaving(true);

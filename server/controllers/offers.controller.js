@@ -8,7 +8,7 @@ import mongoose from 'mongoose';
 export const validateCreateOffer = [
   body('TargetType').isIn(['service', 'project']),
   body('Price').isNumeric(),
-  body('Days').isInt({ min: 1 }),
+  body('Days').isInt(),
   // Conditionally require and validate target IDs
   body('ServiceId')
     .if(body('TargetType').equals('service'))
@@ -25,7 +25,7 @@ export const validateCreateOffer = [
 export const validateUpdateOffer = [
   body('TargetType').optional().isIn(['service', 'project']),
   body('Price').optional().isNumeric(),
-  body('Days').optional().isInt({ min: 1 }),
+  body('Days').optional().isInt(),
   body('ServiceId').optional().isMongoId(),
   body('ProjectId').optional().isMongoId(),
 ];
@@ -96,6 +96,10 @@ export async function listByService(req, res) {
   // Map to include technician data in response
   const mapped = items.map(offer => {
     const plainOffer = offer.toObject();
+    // Ensure a stable 'id' field for client consumption
+    if (!plainOffer.id && plainOffer._id) {
+      plainOffer.id = String(plainOffer._id);
+    }
     if (plainOffer.technicianId) {
       const tech = plainOffer.technicianId;
       plainOffer.technicianName = tech.name;

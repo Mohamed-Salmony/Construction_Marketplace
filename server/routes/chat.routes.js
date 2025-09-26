@@ -5,8 +5,9 @@ import { createConversation, getConversation, getConversationByKeys, listMessage
 const router = express.Router();
 
 router.post('/conversations', protect, createConversation);
-router.get('/conversations/:id', protect, getConversation);
+// IMPORTANT: define static routes before dynamic ':id' to avoid capturing 'by' as an id
 router.get('/conversations/by', protect, getConversationByKeys);
+router.get('/conversations/:id', protect, getConversation);
 router.get('/conversations/:id/messages', protect, listMessages);
 router.post('/conversations/:id/messages', protect, sendMessage);
 router.get('/mine', protect, listMine);

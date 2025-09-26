@@ -292,8 +292,8 @@ export default function ServiceDetails({ setCurrentPage, ...context }: ServiceDe
                   <div className="text-sm text-muted-foreground">{locale === 'ar' ? 'لا توجد عروض حتى الآن.' : 'No proposals yet.'}</div>
                 ) : (
                   <div className="space-y-3">
-                    {proposals.map((pp: any) => (
-                      <div key={pp.id} className="border rounded-md p-3">
+                    {proposals.map((pp: any, idx: number) => (
+                      <div key={pp.id || pp._id || `offer-${idx}`} className="border rounded-md p-3">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium">{usersById[String(pp.technicianId)] || (locale==='ar' ? 'فني' : 'Technician')}</div>
                           <Badge variant={pp.status==='accepted'? 'secondary' : pp.status==='rejected'? 'destructive' : 'outline'} className="text-xs capitalize">{locale==='ar' ? (pp.status==='pending'?'معلق': pp.status==='accepted'?'مقبول':'مرفوض') : pp.status}</Badge>
@@ -305,7 +305,9 @@ export default function ServiceDetails({ setCurrentPage, ...context }: ServiceDe
                           <div className="mt-2 flex items-center gap-2">
                             <Button size="sm" className="flex-1" onClick={async () => {
                               try {
-                                const r = await updateOfferStatus(String(pp.id), 'accepted');
+                                const oid = String(pp.id || pp._id || '');
+                                if (!oid) return;
+                                const r = await updateOfferStatus(oid, 'accepted');
                                 if (r.ok) {
                                   setProposals(prev => prev.map(x => x.id===pp.id ? { ...x, status: 'accepted' } as any : x));
                                 }
@@ -315,7 +317,9 @@ export default function ServiceDetails({ setCurrentPage, ...context }: ServiceDe
                             </Button>
                             <Button size="sm" variant="destructive" className="flex-1 bg-red-600 hover:bg-red-700 text-white border border-red-600" onClick={async () => {
                               try {
-                                const r = await updateOfferStatus(String(pp.id), 'rejected');
+                                const oid = String(pp.id || pp._id || '');
+                                if (!oid) return;
+                                const r = await updateOfferStatus(oid, 'rejected');
                                 if (r.ok) {
                                   setProposals(prev => prev.map(x => x.id===pp.id ? { ...x, status: 'rejected' } as any : x));
                                 }

@@ -150,6 +150,7 @@ export const routes: Record<string, RouteConfig> = {
   'admin-services': { component: AdminServices, title: 'إدارة الخدمات', icon: Settings, requiresAuth: true, allowedRoles: ['admin'] },
   'admin-promo-codes': { component: AdminPromoCodes, title: 'إدارة رموز الخصم', icon: Tag, requiresAuth: true, allowedRoles: ['admin'] },
   'technician-services': { component: TechnicianServices, title: 'الخدمات', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
+  'technician-service-details': { component: TechnicianServiceDetails, title: 'تفاصيل خدمة', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-chat': { component: TechnicianChat, title: 'الدردشة', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-projects': { component: TechnicianProjects, title: 'المشاريع', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
   'technician-project-details': { component: TechnicianProjectDetails, title: 'تفاصيل مشروع', icon: Tag, requiresAuth: true, allowedRoles: ['worker'] },
