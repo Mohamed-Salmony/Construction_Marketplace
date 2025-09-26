@@ -123,7 +123,6 @@ export async function create(req, res) {
     const psubtype = body.psubtype ?? main.psubtype;
     const type = body.type ?? main.type ?? ptype; // keep both for compatibility
     const material = body.material ?? main.material;
-    const psubtype = body.psubtype ?? main.psubtype;
 
     const color = body.color ?? main.color;
     const width = body.width ?? main.width;

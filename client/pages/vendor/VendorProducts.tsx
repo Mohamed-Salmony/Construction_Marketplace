@@ -269,74 +269,79 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
   };
 
   const handleAddProduct = async (productData: any) => {
-    showLoading?.(locale==='ar' ? 'جاري إنشاء المنتج...' : 'Creating product...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
-    // Map to backend CreateProductDto
-    const payload = {
-      nameEn: String(productData?.nameEn || ''),
-      nameAr: String(productData?.nameAr || productData?.name || ''),
-      descriptionEn: String(productData?.descriptionEn || ''),
-      descriptionAr: String(productData?.descriptionAr || ''),
-      categoryId: String(productData?.categoryId || ''),
-      // base/original price
-      price: Number((productData?.originalPrice ?? productData?.price) || 0),
-      // current/discounted price
-      discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
+    try {
+      showLoading?.(locale==='ar' ? 'جاري إنشاء المنتج...' : 'Creating product...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
+      // Map to backend CreateProductDto
+      const payload = {
+        nameEn: String(productData?.nameEn || ''),
+        nameAr: String(productData?.nameAr || productData?.name || ''),
+        descriptionEn: String(productData?.descriptionEn || ''),
+        descriptionAr: String(productData?.descriptionAr || ''),
+        categoryId: String(productData?.categoryId || ''),
+        // base/original price
+        price: Number((productData?.originalPrice ?? productData?.price) || 0),
+        // current/discounted price
+        discountPrice: (productData?.price != null && String(productData?.price) !== '') ? Number(productData?.price) : undefined as number | undefined,
+        stockQuantity: Number(productData?.stock || 0),
+        allowCustomDimensions: false,
+        isAvailableForRent: false,
+        rentPricePerDay: undefined as number | undefined,
+        attributes: [] as Array<{ nameEn: string; nameAr: string; valueEn: string; valueAr: string }>,
+      };
+      const created = await createProduct(payload as any);
+      if (!(created as any)?.ok || !(created as any)?.data) {
+        const status = (created as any)?.status;
+        toastError(
+          locale === 'en'
+            ? `Failed to create product${status ? ` (status ${status})` : ''}`
+            : `تعذر إنشاء المنتج${status ? ` (رمز ${status})` : ''}`,
+          locale === 'ar'
+        );
+        hideLoading?.();
+        return;
+      }
+      const newId = ((created?.data as any)?.id) || ((created?.data as any)?._id) || ((created?.data as any)?.Id);
+      // Upload images to Cloudinary then attach to product
+      const files: File[] = Array.isArray(productData?._files) ? productData._files : [];
+      if (newId && files.length > 0) {
+        setUploading(true); setUploadTotal(files.length); setUploadDone(0);
+        const up = await api.uploadFiles(files, 'images');
+        if (up.ok && up.data && Array.isArray((up.data as any).items)) {
+          const items = (up.data as any).items as Array<{ url: string }>;
+          for (let i = 0; i < items.length; i++) {
+            try {
+              const it = items[i];
+              const res = await addProductImage(String(newId), {
+                imageUrl: it.url,
+                isPrimary: i === 0,
+                sortOrder: i,
+              } as any);
 
-      stockQuantity: Number(productData?.stock || 0),
-      allowCustomDimensions: false,
-      isAvailableForRent: false,
-      rentPricePerDay: undefined as number | undefined,
-      attributes: [] as Array<{ nameEn: string; nameAr: string; valueEn: string; valueAr: string }>,
-    };
-    const created = await createProduct(payload as any);
-    if (!(created as any)?.ok || !(created as any)?.data) {
-      const status = (created as any)?.status;
-      toastError(
-        locale === 'en'
-          ? `Failed to create product${status ? ` (status ${status})` : ''}`
-          : `تعذر إنشاء المنتج${status ? ` (رمز ${status})` : ''}`,
-        locale === 'ar'
-      );
-      hideLoading?.();
-      return;
-    }
-    const newId = ((created?.data as any)?.id) || ((created?.data as any)?._id) || ((created?.data as any)?.Id);
-    // Upload images to Cloudinary then attach to product
-    const files: File[] = Array.isArray(productData?._files) ? productData._files : [];
-    if (newId && files.length > 0) {
-      setUploading(true); setUploadTotal(files.length); setUploadDone(0);
-      const up = await api.uploadFiles(files, 'images');
-      if (up.ok && up.data && Array.isArray((up.data as any).items)) {
-        const items = (up.data as any).items as Array<{ url: string }>;
-        for (let i = 0; i < items.length; i++) {
-          try {
-            const it = items[i];
-            const res = await addProductImage(String(newId), {
-              imageUrl: it.url,
-              isPrimary: i === 0,
-              sortOrder: i,
-            } as any);
-
-            if ((res as any)?.ok) {
-              setUploadDone((d) => d + 1);
-            } else {
+              if ((res as any)?.ok) {
+                setUploadDone((d) => d + 1);
+              } else {
+                toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
+              }
+            } catch {
               toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
             }
-          } catch {
-            toastError(locale === 'en' ? `Failed to attach image #${i + 1}` : `تعذر ربط الصورة رقم ${i + 1}` , locale === 'ar');
           }
+          toastSuccess(locale === 'en' ? 'Images uploaded' : 'تم رفع الصور', locale === 'ar');
+        } else {
+          toastError(locale === 'en' ? 'Failed to upload images' : 'تعذر رفع الصور', locale === 'ar');
         }
-        toastSuccess(locale === 'en' ? 'Images uploaded' : 'تم رفع الصور', locale === 'ar');
-      } else {
-        toastError(locale === 'en' ? 'Failed to upload images' : 'تعذر رفع الصور', locale === 'ar');
+        setUploading(false);
       }
-      setUploading(false);
+      setIsAddDialogOpen(false);
+      // Inform vendor that item awaits admin approval
+      try { toastSuccess(locale==='en' ? 'Product created. Pending admin approval.' : 'تم إنشاء المنتج وهو قيد المراجعة من الإدارة.', locale==='ar'); } catch {}
+      await reload();
+    } catch (error) {
+      console.error('Error creating product:', error);
+      toastError(locale === 'en' ? 'Failed to create product' : 'تعذر إنشاء المنتج', locale === 'ar');
+    } finally {
+      hideLoading?.();
     }
-    setIsAddDialogOpen(false);
-    // Inform vendor that item awaits admin approval
-    try { toastSuccess(locale==='en' ? 'Product created. Pending admin approval.' : 'تم إنشاء المنتج وهو قيد المراجعة من الإدارة.', locale==='ar'); } catch {}
-    await reload();
-    hideLoading?.();
   };
 
   const handleEditProduct = async (productData: any) => {
@@ -396,7 +401,6 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
       toastSuccess(locale === 'en' ? 'Product updated successfully' : 'تم حفظ تعديلات المنتج بنجاح', locale === 'ar');
       setEditingProduct(null);
       await reload();
-      
     } catch (error) {
       console.error('FIXED VendorProducts - Error updating product:', error);
       toastError(locale === 'en' ? 'Failed to update product' : 'تعذر حفظ تعديلات المنتج', locale === 'ar');
