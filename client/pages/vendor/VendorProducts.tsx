@@ -343,7 +343,7 @@ export default function VendorProducts({ setCurrentPage, setSelectedProduct, sho
     // FIXED: إظهار رسالة التحميل بوضوح
     console.log('FIXED VendorProducts - Starting product edit:', productData.id);
     showLoading?.(locale==='ar' ? 'جاري حفظ التعديلات...' : 'Saving changes...', locale==='ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment');
-<
+
     const payload = {
       nameEn: String(productData?.nameEn || ''),
       nameAr: String(productData?.nameAr || productData?.name || ''),
